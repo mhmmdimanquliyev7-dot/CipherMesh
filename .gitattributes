@@ -1,0 +1,15 @@
+# Normalise line endings (the project is developed on Windows and deployed on Linux)
+* text=auto eol=lf
+
+# CSV files use CRLF (RFC 4180), which spreadsheet tools and the Jira importer expect
+*.csv text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.wasm binary

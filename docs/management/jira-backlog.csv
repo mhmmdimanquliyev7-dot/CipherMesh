@@ -1,0 +1,1812 @@
+"Issue ID","Parent ID","Issue Type","Summary","Status","Priority","CM Priority","Labels","Labels","Labels","Labels","Fix Version","Phase","Security Impact","Evidence Required","Epic","Epic Name","Placeholder ID","Dependencies","Blocked By (Issue ID)","Blocked By (Issue ID)","Blocked By (Issue ID)","Acceptance Criteria","Security Considerations","Description"
+"1","","Epic","CM-EPIC-01 Architecture & Threat Modelling","In Progress","High","P1","architecture","documentation","","","","0, 0.5","","","CM-EPIC-01","Architecture & Threat Modelling","CM-EPIC-01","","","","","","","*Epic:* CM-EPIC-01 | *Phases:* 0, 0.5 | *Subject focus:* All three subjects
+
+h3. Work items
+* CM-T001 Repository skeleton, CLAUDE.md and documentation structure (P1)
+* CM-T002 Architecture documentation: overview, data flow, trust boundaries, data model, cloud models (P1)
+* CM-T003 Initial threat model and risk register (P1)
+* CM-T004 Cryptographic architecture, key hierarchy, key lifecycle and parameter register (P1)
+* CM-T005 Phase 0 security architecture review and ADR baseline (P0)
+* CM-T082 Phase 0.5 architecture hardening and consistency review (gate) (P0)
+* CM-T083 Jira project setup and backlog import (P1)
+* CM-T084 Git repository initialization and baseline commit (P1)"
+"2","","Epic","CM-EPIC-02 Application Foundation","Backlog","High","P1","security","backend","","","","1, 2","","","CM-EPIC-02","Application Foundation","CM-EPIC-02","","","","","","","*Epic:* CM-EPIC-02 | *Phases:* 1, 2 | *Subject focus:* Secure development, change control
+
+h3. Work items
+* CM-T006 Initialize pnpm TypeScript monorepo with strict compiler, lint and format (P0)
+* CM-T007 Scaffold Express API with secure middleware baseline (P0)
+* CM-T008 Scaffold Next.js static-export web app with Tailwind and strict CSP (P1)
+* CM-T009 Shared validation and shared-types packages (P1)
+* CM-T010 Structured logging with mandatory redaction and request correlation (P0)
+* CM-T011 Local development environment with Docker Compose (P1)
+* CM-T012 CI pipeline: lint, typecheck, tests, dependency audit, secret scanning (P1)
+* CM-T013 Prisma schema v1 and initial migrations (P0)
+* CM-T014 Database least-privilege roles and append-only audit protection (P1)"
+"3","","Epic","CM-EPIC-03 Authentication & Session Security","Backlog","High","P1","backend","security","","","","3","","","CM-EPIC-03","Authentication & Session Security","CM-EPIC-03","","","","","","","*Epic:* CM-EPIC-03 | *Phases:* 3 | *Subject focus:* Password hashing, MFA, sessions
+
+h3. Work items
+* CM-T015 Registration with Argon2id password hashing and password policy (P1)
+* CM-T016 Login with opaque server-side sessions (P0)
+* CM-T017 Session lifecycle: rotation, invalidation, expiry, concurrent sessions and logout (P1)
+* CM-T018 Brute-force and credential-stuffing protections (P1)
+* CM-T019 TOTP MFA enrollment, verification and recovery codes (P1)
+* CM-T020 CSRF defences: same-origin verification, request header and login CSRF (P0)
+* CM-T021 Step-up re-authentication and session freshness (P1)
+* CM-T022 Platform administrator bootstrap and account disabling (P1)"
+"4","","Epic","CM-EPIC-04 Cryptographic Identity & Vault","Backlog","High","P1","crypto","frontend","","","","4","","","CM-EPIC-04","Cryptographic Identity & Vault","CM-EPIC-04","","","","","","","*Epic:* CM-EPIC-04 | *Phases:* 4 | *Subject focus:* Cryptography
+
+h3. Work items
+* CM-T023 packages/crypto foundation: WebCrypto wrappers, canonical contexts, known-answer tests (P0)
+* CM-T024 Browser Argon2id library selection, Web Worker integration and benchmark (P1)
+* CM-T025 Vault setup: key-pair generation, private-key wrapping and upload (P1)
+* CM-T026 Vault unlock, auto-lock and in-memory key handling (P1)
+* CM-T027 Public-key directory API and fingerprint display (P1)
+* CM-T028 Vault passphrase change (P2)
+* CM-T086 Decide key-version authentication (OCD-12) before Phase 4 (P0)"
+"5","","Epic","CM-EPIC-05 Secure Rooms & RBAC","Backlog","High","P1","backend","security","","","","5","","","CM-EPIC-05","Secure Rooms & RBAC","CM-EPIC-05","","","","","","","*Epic:* CM-EPIC-05 | *Phases:* 5 | *Subject focus:* Access control (ISMS)
+
+h3. Work items
+* CM-T029 Central authorization module implementing the authorization matrix (P0)
+* CM-T030 Room creation, listing, renaming and deletion (P1)
+* CM-T031 Membership administration: role changes and ownership transfer (P1)
+* CM-T032 BOLA and IDOR object-level authorization test suite (P1)"
+"6","","Epic","CM-EPIC-06 Cryptographic Room Membership","Backlog","High","P1","frontend","crypto","","","","6","","","CM-EPIC-06","Cryptographic Room Membership","CM-EPIC-06","","","","","","","*Epic:* CM-EPIC-06 | *Phases:* 6 | *Subject focus:* Cryptography
+
+h3. Work items
+* CM-T033 Initial room-key version with commitment and owner envelope (P1)
+* CM-T034 Invitations with pre-wrapped key envelopes (P1)
+* CM-T035 Invitation acceptance, OWNER approval and envelope delivery (P1)
+* CM-T036 Client-side room-key unwrap, commitment check and cross-browser checks (P1)
+* CM-T085 Room Safety Code (P1)"
+"7","","Epic","CM-EPIC-07 Encrypted File System","Backlog","High","P1","backend","frontend","","","","7","","","CM-EPIC-07","Encrypted File System","CM-EPIC-07","","","","","","","*Epic:* CM-EPIC-07 | *Phases:* 7 | *Subject focus:* Cryptography, cloud storage
+
+h3. Work items
+* CM-T037 S3-compatible object storage adapter and presigned URL service (P1)
+* CM-T038 Client-side file encryption and upload (P1)
+* CM-T039 File download and authenticated decryption with tamper handling (P1)
+* CM-T040 File deletion, expiration and storage cleanup worker (P1)
+* CM-T041 Upload limits, quotas and safe download handling (P1)"
+"8","","Epic","CM-EPIC-08 Secure Notes & Secret Exchange","Backlog","High","P1","backend","crypto","","","","8, 9","","","CM-EPIC-08","Secure Notes & Secret Exchange","CM-EPIC-08","","","","","","","*Epic:* CM-EPIC-08 | *Phases:* 8, 9 | *Subject focus:* Cryptography
+
+h3. Work items
+* CM-T042 Encrypted notes (P1)
+* CM-T043 Recipient-bound secrets with envelope encryption and expiration (P1)
+* CM-T044 Atomic burn-after-reading reveal (P1)
+* CM-T045 External one-time secret links (stretch) (P3)"
+"9","","Epic","CM-EPIC-09 Security Policy Engine","Backlog","High","P1","security","backend","","","","10","","","CM-EPIC-09","Security Policy Engine","CM-EPIC-09","","","","","","","*Epic:* CM-EPIC-09 | *Phases:* 10 | *Subject focus:* Information classification (ISMS)
+
+h3. Work items
+* CM-T046 Policy catalogue as versioned code (P1)
+* CM-T047 Server-side policy enforcement gates (P1)
+* CM-T048 Profile change rules and expiration clamping (P2)
+* CM-T049 Policy enforcement test matrix (P1)"
+"10","","Epic","CM-EPIC-10 Key Lifecycle & Rotation","Backlog","High","P1","crypto","backend","","","","11","","","CM-EPIC-10","Key Lifecycle & Rotation","CM-EPIC-10","","","","","","","*Epic:* CM-EPIC-10 | *Phases:* 11 | *Subject focus:* Cryptography, key management
+
+h3. Work items
+* CM-T050 Rekey state machine and rekey operation API (P1)
+* CM-T051 Member loss triggers REKEY_REQUIRED and the write lock (P1)
+* CM-T052 Key-version retirement, destruction, wrap-count bound and cryptoperiod (P2)
+* CM-T053 Compromised identity-key procedure (P2)"
+"11","","Epic","CM-EPIC-11 Tamper-Evident Auditing","Backlog","High","P1","security","backend","","","","12","","","CM-EPIC-11","Tamper-Evident Auditing","CM-EPIC-11","","","","","","","*Epic:* CM-EPIC-11 | *Phases:* 12 | *Subject focus:* Cryptography, logging (ISMS)
+
+h3. Work items
+* CM-T054 Audit event schema, canonical serialization and hash chaining (P1)
+* CM-T055 Audit emission for security-relevant actions per audit level (P1)
+* CM-T056 Chain verification service and room audit view (P1)
+* CM-T057 Signed checkpoints, anchoring and Level 1 key custody (P1)
+* CM-T058 Offline audit verifier and tampering demonstration (P1)"
+"12","","Epic","CM-EPIC-12 Crypto Inspector & Security Dashboard","Backlog","High","P1","backend","frontend","","","","13, 14","","","CM-EPIC-12","Crypto Inspector & Security Dashboard","CM-EPIC-12","","","","","","","*Epic:* CM-EPIC-12 | *Phases:* 13, 14 | *Subject focus:* Transparency, monitoring
+
+h3. Work items
+* CM-T059 Crypto Inspector metadata API (P1)
+* CM-T060 Crypto Inspector UI (P1)
+* CM-T061 Security Dashboard metrics API (P1)
+* CM-T062 Security Dashboard UI (P1)"
+"13","","Epic","CM-EPIC-13 Cloud Deployment","Backlog","High","P1","cloud","infrastructure","","","","17, 18","","","CM-EPIC-13","Cloud Deployment","CM-EPIC-13","","","","","","","*Epic:* CM-EPIC-13 | *Phases:* 17, 18 | *Subject focus:* Cloud security
+
+h3. Work items
+* CM-T063 Cloud provider selection ADR (P1)
+* CM-T064 VM provisioning and baseline configuration (P1)
+* CM-T065 Production container images and Compose stack (P1)
+* CM-T066 Nginx reverse proxy, TLS and security headers (P1)
+* CM-T067 Managed PostgreSQL integration (P1)
+* CM-T068 Provider-managed object storage integration (P1)"
+"14","","Epic","CM-EPIC-14 Infrastructure Hardening","Backlog","High","P1","cloud","security","","","","19","","","CM-EPIC-14","Infrastructure Hardening","CM-EPIC-14","","","","","","","*Epic:* CM-EPIC-14 | *Phases:* 19 | *Subject focus:* Cloud security
+
+h3. Work items
+* CM-T069 SSH, OS and firewall hardening with Lynis baseline (P1)
+* CM-T070 Docker and container runtime hardening (P2)
+* CM-T071 Secrets management and credential rotation (P1)
+* CM-T072 Backups, restore test, logging and monitoring (P2)
+* CM-T087 Optional Level 2 audit signing with a provider-managed key (OCD-13) (P3)"
+"15","","Epic","CM-EPIC-15 Security Testing & Remediation","Backlog","High","P1","security","testing","","","","15, 16, 20, 21","","","CM-EPIC-15","Security Testing & Remediation","CM-EPIC-15","","","","","","","*Epic:* CM-EPIC-15 | *Phases:* 15, 16, 20, 21 | *Subject focus:* Assurance, corrective action
+
+h3. Work items
+* CM-T073 API hardening pass (P1)
+* CM-T074 Automated security regression suite in CI (P1)
+* CM-T075 Playwright E2E suite across Chromium, Firefox and WebKit (P2)
+* CM-T076 Dependency, container and configuration scanning (P2)
+* CM-T077 Security assessment against OWASP ASVS with DAST and manual testing (P1)
+* CM-T078 Security finding remediation and regression tests (P1)"
+"16","","Epic","CM-EPIC-16 Documentation & Final Report","Backlog","High","P1","documentation","risk","","","","22","","","CM-EPIC-16","Documentation & Final Report","CM-EPIC-16","","","","","","","*Epic:* CM-EPIC-16 | *Phases:* 22 | *Subject focus:* Evidence, reporting
+
+h3. Work items
+* CM-T079 Evidence capture and evidence index (P1)
+* CM-T080 ISMS documentation set (P1)
+* CM-T081 Final report and demonstration (P1)"
+"1001","1","Task","CM-T001 Repository skeleton, CLAUDE.md and documentation structure","Done","High","P1","architecture","documentation","","","M0 Architecture Baseline","0","Medium","EV-00-07","CM-EPIC-01","","CM-T001","","","","","- Directory structure matches CLAUDE.md section 5.
+- CLAUDE.md covers mission, architecture, stack, structure, invariants, cryptographic rules, conventions, testing, documentation, Git, Jira, forbidden practices, phases and Definition of Done.
+- .gitignore excludes environment files, keys, dumps and build output.","CLAUDE.md encodes the invariants so later sessions cannot silently weaken the design; .gitignore reduces the chance of committing secrets.","*Placeholder ID:* CM-T001 | *Epic:* CM-EPIC-01 | *Phase:* 0 | *Release:* M0 Architecture Baseline | *Security impact:* Medium
+
+h3. Description
+Create the monorepo directory skeleton, repository hygiene files ({{.gitignore}}, {{.gitattributes}}, {{.editorconfig}}), the README, placeholder READMEs, and CLAUDE.md with the rules every future session follows. _Completed in Phase 0._
+
+h3. Acceptance criteria
+* Directory structure matches CLAUDE.md section 5.
+* CLAUDE.md covers mission, architecture, stack, structure, invariants, cryptographic rules, conventions, testing, documentation, Git, Jira, forbidden practices, phases and Definition of Done.
+* {{.gitignore}} excludes environment files, keys, dumps and build output.
+
+h3. Security considerations
+CLAUDE.md encodes the invariants so later sessions cannot silently weaken the design; {{.gitignore}} reduces the chance of committing secrets.
+
+h3. Dependencies
+none
+
+h3. Evidence required
+EV-00-07"
+"1002","1","Task","CM-T002 Architecture documentation: overview, data flow, trust boundaries, data model, cloud models","Done","High","P1","architecture","cloud","documentation","","M0 Architecture Baseline","0","Medium","EV-00-01, EV-00-02","CM-EPIC-01","","CM-T002","CM-T001","1001","","","- Each document has Mermaid diagrams where useful and states what crosses each boundary in plaintext and in ciphertext.
+- The data model classifies every field and lists fields that must never exist.
+- Cloud documents are provider-neutral and include a shared-responsibility matrix.","Makes metadata exposure and trust assumptions explicit before any code exists.","*Placeholder ID:* CM-T002 | *Epic:* CM-EPIC-01 | *Phase:* 0 | *Release:* M0 Architecture Baseline | *Security impact:* Medium
+
+h3. Description
+Write the system overview, the data flows DF-01 to DF-12, the trust boundaries TB-01 to TB-11, the data-model proposal, and the cloud service-model, shared-responsibility and deployment documents. _Completed in Phase 0._
+
+h3. Acceptance criteria
+* Each document has Mermaid diagrams where useful and states what crosses each boundary in plaintext and in ciphertext.
+* The data model classifies every field and lists fields that must never exist.
+* Cloud documents are provider-neutral and include a shared-responsibility matrix.
+
+h3. Security considerations
+Makes metadata exposure and trust assumptions explicit before any code exists.
+
+h3. Dependencies
+CM-T001
+
+h3. Evidence required
+EV-00-01, EV-00-02"
+"1003","1","Task","CM-T003 Initial threat model and risk register","Done","High","P1","risk","security","architecture","","M0 Architecture Baseline","0","Medium","EV-00-04","CM-EPIC-01","","CM-T003","CM-T002","1002","","","- Every required threat is covered with asset, threat, scenario, controls, residual risk and testing strategy.
+- Risk register lists likelihood, impact, inherent and residual risk and treatment.
+- Accepted risks are listed for acknowledgement by the project owner.","Basis for the security testing plan and the ISMS risk assessment (ISO/IEC 27001 clause 6.1.2).","*Placeholder ID:* CM-T003 | *Epic:* CM-EPIC-01 | *Phase:* 0 | *Release:* M0 Architecture Baseline | *Security impact:* Medium
+
+h3. Description
+Asset-centric threat model with STRIDE where useful, qualitative risk ratings, treatments and a risk register. _Completed in Phase 0._
+
+h3. Acceptance criteria
+* Every required threat is covered with asset, threat, scenario, controls, residual risk and testing strategy.
+* Risk register lists likelihood, impact, inherent and residual risk and treatment.
+* Accepted risks are listed for acknowledgement by the project owner.
+
+h3. Security considerations
+Basis for the security testing plan and the ISMS risk assessment (ISO/IEC 27001 clause 6.1.2).
+
+h3. Dependencies
+CM-T002
+
+h3. Evidence required
+EV-00-04"
+"1004","1","Task","CM-T004 Cryptographic architecture, key hierarchy, key lifecycle and parameter register","Done","High","P1","crypto","architecture","","","M0 Architecture Baseline","0","High","EV-00-03","CM-EPIC-01","","CM-T004","CM-T002","1002","","","- Only established primitives; every composition documented with its context binding.
+- Parameter register, library register and open crypto decisions exist.
+- Limitations of rotation, burn-after-reading and web delivery are stated.","Prevents ad-hoc cryptographic choices during implementation.","*Placeholder ID:* CM-T004 | *Epic:* CM-EPIC-01 | *Phase:* 0 | *Release:* M0 Architecture Baseline | *Security impact:* High
+
+h3. Description
+Specify all cryptographic mechanisms, the acyclic key hierarchy, lifecycle and rotation rules, and the single parameter register. _Completed in Phase 0._
+
+h3. Acceptance criteria
+* Only established primitives; every composition documented with its context binding.
+* Parameter register, library register and open crypto decisions exist.
+* Limitations of rotation, burn-after-reading and web delivery are stated.
+
+h3. Security considerations
+Prevents ad-hoc cryptographic choices during implementation.
+
+h3. Dependencies
+CM-T002
+
+h3. Evidence required
+EV-00-03"
+"1005","1","Task","CM-T005 Phase 0 security architecture review and ADR baseline","Done","Highest","P0","security","architecture","documentation","","M0 Architecture Baseline","0","High","EV-00-06","CM-EPIC-01","","CM-T005","CM-T002, CM-T003, CM-T004","1002","1003","1004","- Review findings and resolutions recorded in docs/security/architecture-review.md.
+- ADR index complete; proposed ADRs identify how they will be confirmed.
+- Project owner approval of Phase 0 recorded in Jira.","Catches design flaws when they are cheapest to fix.","*Placeholder ID:* CM-T005 | *Epic:* CM-EPIC-01 | *Phase:* 0 | *Release:* M0 Architecture Baseline | *Security impact:* High
+
+h3. Description
+Review the Phase 0 design for cryptographic mistakes, nonce problems, unsafe key storage, circular key dependencies, authorization gaps, misleading claims, cloud responsibility confusion and unnecessary complexity; fix what is found; record ADR-001 to ADR-011; obtain approval.
+
+h3. Acceptance criteria
+* Review findings and resolutions recorded in {{docs/security/architecture-review.md}}.
+* ADR index complete; proposed ADRs identify how they will be confirmed.
+* Project owner approval of Phase 0 recorded in Jira.
+
+h3. Security considerations
+Catches design flaws when they are cheapest to fix.
+
+h3. Dependencies
+CM-T002, CM-T003, CM-T004
+
+h3. Evidence required
+EV-00-06"
+"1006","2","Task","CM-T006 Initialize pnpm TypeScript monorepo with strict compiler, lint and format","Backlog","Highest","P0","infrastructure","architecture","","","M1 Foundation","1","Medium","EV-01-01","CM-EPIC-02","","CM-T006","CM-T082","1082","","","- Install with a frozen lockfile, lint and typecheck succeed on the empty scaffolds.
+- Lint fails on eval, new Function, Math.random in security code, $queryRawUnsafe, dangerouslySetInnerHTML and forbidden cross-package imports.
+- Dependency lifecycle scripts are blocked unless explicitly allowlisted.","Establishes supply-chain hygiene and static enforcement of forbidden practices (T-14, T-27).","*Placeholder ID:* CM-T006 | *Epic:* CM-EPIC-02 | *Phase:* 1 | *Release:* M1 Foundation | *Security impact:* Medium
+
+h3. Description
+pnpm workspaces for {{apps/_}} and {{packages/_}}; shared strict {{tsconfig}}; ESLint with security rules and forbidden-API rules; Prettier; Node.js LTS version pinned; workspace boundary rules.
+
+h3. Acceptance criteria
+* Install with a frozen lockfile, lint and typecheck succeed on the empty scaffolds.
+* Lint fails on {{eval}}, {{new Function}}, {{Math.random}} in security code, {{$queryRawUnsafe}}, {{dangerouslySetInnerHTML}} and forbidden cross-package imports.
+* Dependency lifecycle scripts are blocked unless explicitly allowlisted.
+
+h3. Security considerations
+Establishes supply-chain hygiene and static enforcement of forbidden practices (T-14, T-27).
+
+h3. Dependencies
+CM-T082
+
+h3. Evidence required
+EV-01-01"
+"1007","2","Task","CM-T007 Scaffold Express API with secure middleware baseline","Backlog","Highest","P0","backend","security","","","M1 Foundation","1","High","","CM-EPIC-02","","CM-T007","CM-T006","1006","","","- Undeclared routes prevent startup; unknown routes return 404.
+- Non-JSON bodies return 415 and oversized bodies 413.
+- Errors return a stable code and request ID, never a stack trace.
+- Missing or malformed configuration stops the process with a clear message.","Deny by default and fail closed from the first line of code (principles 4 and 10).","*Placeholder ID:* CM-T007 | *Epic:* CM-EPIC-02 | *Phase:* 1 | *Release:* M1 Foundation | *Security impact:* High
+
+h3. Description
+Express API with request IDs, JSON-only body parsing with size limits, schema-validation hook, a deny-by-default route registry requiring an action declaration per route, a central error handler, {{Cache-Control: no-store}}, a health endpoint, startup configuration validation, and the worker entrypoint stub.
+
+h3. Acceptance criteria
+* Undeclared routes prevent startup; unknown routes return 404.
+* Non-JSON bodies return 415 and oversized bodies 413.
+* Errors return a stable code and request ID, never a stack trace.
+* Missing or malformed configuration stops the process with a clear message.
+
+h3. Security considerations
+Deny by default and fail closed from the first line of code (principles 4 and 10).
+
+h3. Dependencies
+CM-T006
+
+h3. Evidence required
+none"
+"1008","2","Task","CM-T008 Scaffold Next.js static-export web app with Tailwind and strict CSP","Backlog","High","P1","frontend","security","","","M1 Foundation","1","Medium","EV-01-04","CM-EPIC-02","","CM-T008","CM-T006","1006","","","- The build produces a static export that runs behind a local Nginx.
+- A CSP without 'unsafe-inline' or 'unsafe-eval' for scripts loads the app without violations in Chromium, Firefox and WebKit.
+- ADR-011 updated to Accepted or revised with the findings.","Strict CSP is the main structural defence against XSS (T-12) and limits injected code (T-24).","*Placeholder ID:* CM-T008 | *Epic:* CM-EPIC-02 | *Phase:* 1 | *Release:* M1 Foundation | *Security impact:* Medium
+
+h3. Description
+Next.js static export with Tailwind; routing pattern for identifiers that works with deep links and reloads; build step that generates CSP hashes; no inline event handlers. Validates ADR-011.
+
+h3. Acceptance criteria
+* The build produces a static export that runs behind a local Nginx.
+* A CSP without {{'unsafe-inline'}} or {{'unsafe-eval'}} for scripts loads the app without violations in Chromium, Firefox and WebKit.
+* ADR-011 updated to Accepted or revised with the findings.
+
+h3. Security considerations
+Strict CSP is the main structural defence against XSS (T-12) and limits injected code (T-24).
+
+h3. Dependencies
+CM-T006
+
+h3. Evidence required
+EV-01-04"
+"1009","2","Task","CM-T009 Shared validation and shared-types packages","Backlog","High","P1","backend","frontend","","","M1 Foundation","1","Medium","","CM-EPIC-02","","CM-T009","CM-T006","1006","","","- Schemas reject unknown keys, __proto__ and malformed values; unit tests cover each format.
+- The API validates requests and the client validates responses with the same schemas.","Single validation source at every trust boundary (principle 11, T-14).","*Placeholder ID:* CM-T009 | *Epic:* CM-EPIC-02 | *Phase:* 1 | *Release:* M1 Foundation | *Security impact:* Medium
+
+h3. Description
+{{packages/validation}} with strict schemas (UUID, ISO timestamps, base64url binary with exact lengths) and {{packages/shared}} with error codes, suite identifiers and skeletons for the policy catalogue and authorization matrix.
+
+h3. Acceptance criteria
+* Schemas reject unknown keys, {{__proto__}} and malformed values; unit tests cover each format.
+* The API validates requests and the client validates responses with the same schemas.
+
+h3. Security considerations
+Single validation source at every trust boundary (principle 11, T-14).
+
+h3. Dependencies
+CM-T006
+
+h3. Evidence required
+none"
+"1010","2","Task","CM-T010 Structured logging with mandatory redaction and request correlation","Backlog","Highest","P0","backend","security","","","M1 Foundation","1","High","","CM-EPIC-02","","CM-T010","CM-T007","1007","","","- Redaction unit tests for every listed field.
+- A canary test sends known secret values through endpoints and finds none in the logs.","Enforces INV-10 (T-15, T-16).","*Placeholder ID:* CM-T010 | *Epic:* CM-EPIC-02 | *Phase:* 1 | *Release:* M1 Foundation | *Security impact:* High
+
+h3. Description
+JSON logger with a central redaction list (passwords, passphrases, tokens, cookies, authorization headers, keys, envelopes, presigned URLs), request logging without bodies, correlation IDs.
+
+h3. Acceptance criteria
+* Redaction unit tests for every listed field.
+* A canary test sends known secret values through endpoints and finds none in the logs.
+
+h3. Security considerations
+Enforces INV-10 (T-15, T-16).
+
+h3. Dependencies
+CM-T007
+
+h3. Evidence required
+none"
+"1011","2","Task","CM-T011 Local development environment with Docker Compose","Backlog","High","P1","infrastructure","","","","M1 Foundation","1","Medium","","CM-EPIC-02","","CM-T011","CM-T006","1006","","","- One command starts a working database and storage; ports bound to 127.0.0.1.
+- No real credentials in the repository; emulator choice documented.","Separation of development and production (ISO/IEC 27001 control 8.31).","*Placeholder ID:* CM-T011 | *Epic:* CM-EPIC-02 | *Phase:* 1 | *Release:* M1 Foundation | *Security impact:* Medium
+
+h3. Description
+Compose file with PostgreSQL and an S3-compatible emulator chosen after a licence and maintenance check; synthetic seed data; {{.env.example}} with placeholders; setup instructions in the README.
+
+h3. Acceptance criteria
+* One command starts a working database and storage; ports bound to 127.0.0.1.
+* No real credentials in the repository; emulator choice documented.
+
+h3. Security considerations
+Separation of development and production (ISO/IEC 27001 control 8.31).
+
+h3. Dependencies
+CM-T006
+
+h3. Evidence required
+none"
+"1012","2","Task","CM-T012 CI pipeline: lint, typecheck, tests, dependency audit, secret scanning","Backlog","High","P1","infrastructure","testing","security","","M1 Foundation","1","Medium","EV-01-01, EV-01-02, EV-01-03, EV-01-05","CM-EPIC-02","","CM-T012","CM-T006","1006","","","- Pull requests cannot merge with failing checks.
+- Actions pinned to commit SHAs; default token permissions read-only.
+- Evidence screenshot of branch protection and a failing check blocking a merge.","Supply-chain and secret-leak controls (T-16, T-27); change control (control 8.32).","*Placeholder ID:* CM-T012 | *Epic:* CM-EPIC-02 | *Phase:* 1 | *Release:* M1 Foundation | *Security impact:* Medium
+
+h3. Description
+GitHub Actions on every pull request: frozen install, lint, typecheck, unit and integration tests (PostgreSQL service), dependency audit, secret scan over the full history, SBOM generation. Branch protection on {{main}}.
+
+h3. Acceptance criteria
+* Pull requests cannot merge with failing checks.
+* Actions pinned to commit SHAs; default token permissions read-only.
+* Evidence screenshot of branch protection and a failing check blocking a merge.
+
+h3. Security considerations
+Supply-chain and secret-leak controls (T-16, T-27); change control (control 8.32).
+
+h3. Dependencies
+CM-T006
+
+h3. Evidence required
+EV-01-01, EV-01-02, EV-01-03, EV-01-05"
+"1013","2","Task","CM-T013 Prisma schema v1 and initial migrations","Backlog","Highest","P0","database","","","","M1 Foundation","2","High","EV-02-01","CM-EPIC-02","","CM-T013","CM-T011","1011","","","- Field names and types follow the data model; a script checks that no ""must never exist"" field is present.
+- Migrations apply cleanly to an empty database; constraint tests pass.","Encodes INV-01, INV-04 and INV-16 in the schema; composite indexes support object-level authorization (OL-02).","*Placeholder ID:* CM-T013 | *Epic:* CM-EPIC-02 | *Phase:* 2 | *Release:* M1 Foundation | *Security impact:* High
+
+h3. Description
+Implement the entities of {{docs/architecture/data-model.md}} with constraints (partial unique indexes for one ACTIVE key pair per user, one ACTIVE OWNER per room and one PENDING rekey operation per room), foreign keys, and indexes for room-scoped lookups.
+
+h3. Acceptance criteria
+* Field names and types follow the data model; a script checks that no ""must never exist"" field is present.
+* Migrations apply cleanly to an empty database; constraint tests pass.
+
+h3. Security considerations
+Encodes INV-01, INV-04 and INV-16 in the schema; composite indexes support object-level authorization (OL-02).
+
+h3. Dependencies
+CM-T011
+
+h3. Evidence required
+EV-02-01"
+"1014","2","Task","CM-T014 Database least-privilege roles and append-only audit protection","Backlog","High","P1","database","security","","","M1 Foundation","2","High","EV-02-02, EV-02-03","CM-EPIC-02","","CM-T014","CM-T013","1013","","","- Integration tests prove the API role cannot change schema or modify audit rows.
+- The trigger blocks modification even if grants are misconfigured.","Least privilege and the first layer of audit protection (T-20).","*Placeholder ID:* CM-T014 | *Epic:* CM-EPIC-02 | *Phase:* 2 | *Release:* M1 Foundation | *Security impact:* High
+
+h3. Description
+Roles for migration, API, worker and read-only verification; audit tables with INSERT and SELECT only for runtime roles; a trigger that rejects UPDATE, DELETE and TRUNCATE on audit tables.
+
+h3. Acceptance criteria
+* Integration tests prove the API role cannot change schema or modify audit rows.
+* The trigger blocks modification even if grants are misconfigured.
+
+h3. Security considerations
+Least privilege and the first layer of audit protection (T-20).
+
+h3. Dependencies
+CM-T013
+
+h3. Evidence required
+EV-02-02, EV-02-03"
+"1015","3","Task","CM-T015 Registration with Argon2id password hashing and password policy","Backlog","High","P1","backend","security","crypto","","M2 Identity and Access","3","High","EV-03-01, EV-03-02","CM-EPIC-03","","CM-T015","CM-T013, CM-T009","1013","1009","","- Stored value is an Argon2id PHC string with the registered parameters.
+- Blocklisted and too-short passwords are rejected with a helpful message.
+- Benchmark and final parameters recorded in docs/crypto/crypto-decisions.md.
+- Registration is rate-limited; passwords never appear in logs.","INV-11; T-03. Registration reveals taken emails; accepted and rate-limited (T-15).","*Placeholder ID:* CM-T015 | *Epic:* CM-EPIC-03 | *Phase:* 3 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Registration endpoint with NFKC normalization, length 12 to 128, local blocklist, and Argon2id hashing (CP-05) using the library selected in this item (LIB-04, OCD-03) after a benchmark on a VM-sized machine. Audit event {{USER_REGISTERED}}.
+
+h3. Acceptance criteria
+* Stored value is an Argon2id PHC string with the registered parameters.
+* Blocklisted and too-short passwords are rejected with a helpful message.
+* Benchmark and final parameters recorded in {{docs/crypto/crypto-decisions.md}}.
+* Registration is rate-limited; passwords never appear in logs.
+
+h3. Security considerations
+INV-11; T-03. Registration reveals taken emails; accepted and rate-limited (T-15).
+
+h3. Dependencies
+CM-T013, CM-T009
+
+h3. Evidence required
+EV-03-01, EV-03-02"
+"1016","3","Task","CM-T016 Login with opaque server-side sessions","Backlog","Highest","P0","backend","security","","","M2 Identity and Access","3","High","EV-03-03, EV-03-06","CM-EPIC-03","","CM-T016","CM-T015","1015","","","- Cookie has HttpOnly, Secure, SameSite=Strict, Path=/ and no Domain.
+- Only the SHA-256 digest of the token is stored.
+- Failed attempts store no password and no raw identifier for unknown accounts.","T-08, T-09, INV-12.","*Placeholder ID:* CM-T016 | *Epic:* CM-EPIC-03 | *Phase:* 3 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Login per DF-01 and ADR-008: dummy Argon2id verification for unknown accounts, one generic error, {{__Host-cm_session}} cookie, token digest storage, token rotation, rehash on parameter change, login attempts recorded with an identifier HMAC for unknown accounts (CP-12). A token presented with the login request is never promoted: login always issues a new one.
+
+h3. Acceptance criteria
+* Cookie has HttpOnly, Secure, SameSite=Strict, Path=/ and no Domain.
+* Only the SHA-256 digest of the token is stored.
+* Failed attempts store no password and no raw identifier for unknown accounts.
+
+h3. Security considerations
+T-08, T-09, INV-12.
+
+h3. Dependencies
+CM-T015
+
+h3. Evidence required
+EV-03-03, EV-03-06"
+"1017","3","Task","CM-T017 Session lifecycle: rotation, invalidation, expiry, concurrent sessions and logout","Backlog","High","P1","backend","frontend","security","","M2 Identity and Access","3","High","EV-03-08","CM-EPIC-03","","CM-T017","CM-T016","1016","","","- Each event in the rotation table has the documented effect on the current and the other sessions (tests).
+- Revoked, idle-expired and absolutely expired tokens are rejected; logout clears the cookie.
+- Password change, MFA change and vault reset revoke the user's other sessions.
+- An 11th login evicts the least recently used session and records an audit event.","Limits the value of stolen sessions and prevents session fixation (T-08).","*Placeholder ID:* CM-T017 | *Epic:* CM-EPIC-03 | *Phase:* 3 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Implement {{docs/security/session-and-csrf.md}} sections 3 to 7: idle timeout 30 minutes and absolute lifetime 12 hours (CP-08); rotation and invalidation for every event in the rotation table; server-side logout with cookie deletion and a client vault lock; at most 10 active sessions with least-recently-used eviction; a session list with per-session revoke and ""sign out other sessions""; worker cleanup of expired sessions.
+
+h3. Acceptance criteria
+* Each event in the rotation table has the documented effect on the current and the other sessions (tests).
+* Revoked, idle-expired and absolutely expired tokens are rejected; logout clears the cookie.
+* Password change, MFA change and vault reset revoke the user's other sessions.
+* An 11th login evicts the least recently used session and records an audit event.
+
+h3. Security considerations
+Limits the value of stolen sessions and prevents session fixation (T-08).
+
+h3. Dependencies
+CM-T016
+
+h3. Evidence required
+EV-03-08"
+"1018","3","Task","CM-T018 Brute-force and credential-stuffing protections","Backlog","High","P1","backend","security","","","M2 Identity and Access","3","High","EV-03-04","CM-EPIC-03","","CM-T018","CM-T016","1016","","","- Scripted bursts receive 429 and the backoff schedule is observable.
+- A small load test shows the Argon2id concurrency limit protects memory.
+- Failed-login data is available for the Security Dashboard.","T-09, T-10, T-26. Avoids lockout-based denial of service.","*Placeholder ID:* CM-T018 | *Epic:* CM-EPIC-03 | *Phase:* 3 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Nginx rate-limit zones plus API limits per IP, account and identifier HMAC; progressive backoff without permanent lockout; a concurrency limit for Argon2id computations; 90-day retention of login attempts.
+
+h3. Acceptance criteria
+* Scripted bursts receive 429 and the backoff schedule is observable.
+* A small load test shows the Argon2id concurrency limit protects memory.
+* Failed-login data is available for the Security Dashboard.
+
+h3. Security considerations
+T-09, T-10, T-26. Avoids lockout-based denial of service.
+
+h3. Dependencies
+CM-T016
+
+h3. Evidence required
+EV-03-04"
+"1019","3","Task","CM-T019 TOTP MFA enrollment, verification and recovery codes","Backlog","High","P1","backend","frontend","security","crypto","M2 Identity and Access","3","High","EV-03-05","CM-EPIC-03","","CM-T019","CM-T016","1016","","","- RFC 6238 test vectors pass; replayed codes and codes outside one step are rejected.
+- At most 5 attempts per pre-auth state; recovery codes single use and stored as digests.
+- The TOTP secret appears only once (enrollment) and never in logs.
+- Session token rotates after MFA verification.","T-10, T-30. Server-readable secret by design; documented in the key hierarchy.","*Placeholder ID:* CM-T019 | *Epic:* CM-EPIC-03 | *Phase:* 3 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+DF-02: TOTP per CP-09 with a vetted library (LIB-06); secrets encrypted per CP-11; ten recovery codes per CP-10; MFA step at login; disabling MFA requires step-up.
+
+h3. Acceptance criteria
+* RFC 6238 test vectors pass; replayed codes and codes outside one step are rejected.
+* At most 5 attempts per pre-auth state; recovery codes single use and stored as digests.
+* The TOTP secret appears only once (enrollment) and never in logs.
+* Session token rotates after MFA verification.
+
+h3. Security considerations
+T-10, T-30. Server-readable secret by design; documented in the key hierarchy.
+
+h3. Dependencies
+CM-T016
+
+h3. Evidence required
+EV-03-05"
+"1020","3","Task","CM-T020 CSRF defences: same-origin verification, request header and login CSRF","Backlog","Highest","P0","backend","security","","","M2 Identity and Access","3","High","EV-03-07","CM-EPIC-03","","CM-T020","CM-T016","1016","","","- Cross-site form posts, foreign-origin fetches, Origin: null, missing headers and wrong content types are rejected before any handler runs (403 ORIGIN_REJECTED or 415).
+- Login CSRF is prevented: cross-origin registration and login fail.
+- A route test confirms that no GET handler changes state.
+- Playwright confirms that fetch() sends the real Origin under Referrer-Policy: no-referrer in Chromium, Firefox and WebKit.","T-13. SameSite=Strict stays as one layer but is not relied on (INV-19).","*Placeholder ID:* CM-T020 | *Epic:* CM-EPIC-03 | *Phase:* 3 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Implement {{docs/security/session-and-csrf.md}} section 8: {{Sec-Fetch-Site}} or exact {{Origin}} verification on every state-changing request, including registration, login, MFA and logout; JSON-only bodies; the required {{X-CipherMesh-Request}} header; no CORS; no state changes on GET. The client uses fetch() only and never submits forms.
+
+h3. Acceptance criteria
+* Cross-site form posts, foreign-origin fetches, {{Origin: null}}, missing headers and wrong content types are rejected before any handler runs (403 {{ORIGIN_REJECTED}} or 415).
+* Login CSRF is prevented: cross-origin registration and login fail.
+* A route test confirms that no GET handler changes state.
+* Playwright confirms that fetch() sends the real Origin under {{Referrer-Policy: no-referrer}} in Chromium, Firefox and WebKit.
+
+h3. Security considerations
+T-13. SameSite=Strict stays as one layer but is not relied on (INV-19).
+
+h3. Dependencies
+CM-T016
+
+h3. Evidence required
+EV-03-07"
+"1021","3","Task","CM-T021 Step-up re-authentication and session freshness","Backlog","High","P1","backend","security","","","M2 Identity and Access","3","High","","CM-EPIC-03","","CM-T021","CM-T019","1019","","","- Gates return the correct codes at window boundaries (tests).
+- Token rotates on step-up.","Foundation for PC-02 and PC-03; limits damage of stolen sessions (T-08).","*Placeholder ID:* CM-T021 | *Epic:* CM-EPIC-03 | *Phase:* 3 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Step-up endpoint (password and TOTP) that sets {{stepUpAt}} and rotates the token; reusable gates that return {{REAUTH_REQUIRED}} and {{STEP_UP_REQUIRED}}; step-up validity 15 minutes, and 5 minutes for profile downgrades.
+
+h3. Acceptance criteria
+* Gates return the correct codes at window boundaries (tests).
+* Token rotates on step-up.
+
+h3. Security considerations
+Foundation for PC-02 and PC-03; limits damage of stolen sessions (T-08).
+
+h3. Dependencies
+CM-T019
+
+h3. Evidence required
+none"
+"1022","3","Task","CM-T022 Platform administrator bootstrap and account disabling","Backlog","High","P1","backend","security","","","M2 Identity and Access","3","High","","CM-EPIC-03","","CM-T022","CM-T017","1017","","","- PLATFORM_ADMIN cannot be granted through the API.
+- Admins cannot disable themselves or the last admin.
+- Disabling an account sets its memberships to SUSPENDED and its rooms to REKEY_REQUIRED once rooms exist (integration test added in Phase 11).","Least privilege for administrators; T-30.","*Placeholder ID:* CM-T022 | *Epic:* CM-EPIC-03 | *Phase:* 3 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Server-side CLI to grant PLATFORM_ADMIN; API to disable and re-enable accounts (PA-03) with step-up, revoking all sessions; documented administrator-assisted password and MFA reset procedure (PA-04); audit events.
+
+h3. Acceptance criteria
+* PLATFORM_ADMIN cannot be granted through the API.
+* Admins cannot disable themselves or the last admin.
+* Disabling an account sets its memberships to SUSPENDED and its rooms to REKEY_REQUIRED once rooms exist (integration test added in Phase 11).
+
+h3. Security considerations
+Least privilege for administrators; T-30.
+
+h3. Dependencies
+CM-T017
+
+h3. Evidence required
+none"
+"1023","4","Task","CM-T023 packages/crypto foundation: WebCrypto wrappers, canonical contexts, known-answer tests","Backlog","Highest","P0","crypto","","","","M2 Identity and Access","4","High","","CM-EPIC-04","","CM-T023","CM-T006","1006","","","- Known-answer tests for AES-GCM, HKDF (RFC 5869), SHA-256, RSA-OAEP fixed vectors and RFC 8785 vectors.
+- Tamper tests for every decrypt function; no production function accepts an IV.
+- Different contexts produce different bytes; decryption under a wrong context fails.
+- Runs in browsers and the Node.js test environment; coverage at least 90%.","INV-02, principle 9; the base for every later crypto feature.","*Placeholder ID:* CM-T023 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Wrappers for AES-256-GCM (encrypt, decrypt, wrap, unwrap) with internally generated IVs, RSA-OAEP with labels, HKDF, SHA-256, base64url; RFC 8785 canonicalization (OCD-04); builders for every context in the cryptographic architecture; typed errors; a test-only IV seam excluded from production builds.
+
+h3. Acceptance criteria
+* Known-answer tests for AES-GCM, HKDF (RFC 5869), SHA-256, RSA-OAEP fixed vectors and RFC 8785 vectors.
+* Tamper tests for every decrypt function; no production function accepts an IV.
+* Different contexts produce different bytes; decryption under a wrong context fails.
+* Runs in browsers and the Node.js test environment; coverage at least 90%.
+
+h3. Security considerations
+INV-02, principle 9; the base for every later crypto feature.
+
+h3. Dependencies
+CM-T006
+
+h3. Evidence required
+none"
+"1024","4","Task","CM-T024 Browser Argon2id library selection, Web Worker integration and benchmark","Backlog","High","P1","crypto","frontend","","","M2 Identity and Access","4","High","EV-04-03","CM-EPIC-04","","CM-T024","CM-T023","1023","","","- Comparison of candidates recorded; RFC 9106 vectors pass in CI.
+- Final parameters recorded in the register; ADR-010 updated to Accepted.
+- CSP relaxed only by 'wasm-unsafe-eval'; failure to load WASM fails closed.","T-22, INV-15.","*Placeholder ID:* CM-T024 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Evaluate LIB-03 candidates, integrate the chosen one in a Web Worker, benchmark on a mid-range laptop and phone, set the final CP-04 parameters.
+
+h3. Acceptance criteria
+* Comparison of candidates recorded; RFC 9106 vectors pass in CI.
+* Final parameters recorded in the register; ADR-010 updated to Accepted.
+* CSP relaxed only by {{'wasm-unsafe-eval'}}; failure to load WASM fails closed.
+
+h3. Security considerations
+T-22, INV-15.
+
+h3. Dependencies
+CM-T023
+
+h3. Evidence required
+EV-04-03"
+"1025","4","Task","CM-T025 Vault setup: key-pair generation, private-key wrapping and upload","Backlog","High","P1","crypto","frontend","backend","","M2 Identity and Access","4","High","EV-04-01, EV-04-02","CM-EPIC-04","","CM-T025","CM-T024, CM-T016, CM-T086","1024","1016","1086","- A Playwright test inspects network traffic and finds neither the passphrase nor any PKCS#8 private key.
+- Parameters below the floor are rejected by the client and the API.","INV-01; T-22.","*Placeholder ID:* CM-T025 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+DF-03 end to end, with Vault Passphrase policy (CP-06) and strength feedback; API validation of key type and size, fingerprint, parameters at or above the floor, unique key ID and one ACTIVE key pair; audit {{VAULT_CREATED}}.
+
+h3. Acceptance criteria
+* A Playwright test inspects network traffic and finds neither the passphrase nor any PKCS#8 private key.
+* Parameters below the floor are rejected by the client and the API.
+
+h3. Security considerations
+INV-01; T-22.
+
+h3. Dependencies
+CM-T024, CM-T016, CM-T086
+
+h3. Evidence required
+EV-04-01, EV-04-02"
+"1026","4","Task","CM-T026 Vault unlock, auto-lock and in-memory key handling","Backlog","High","P1","crypto","frontend","","","M2 Identity and Access","4","High","EV-04-04","CM-EPIC-04","","CM-T026","CM-T025","1025","","","- No key material or plaintext in localStorage, sessionStorage, IndexedDB or cookies (Playwright inspection).
+- The private key cannot be exported (test).
+- Auto-lock clears keys and decrypted views.","T-23, L-15.","*Placeholder ID:* CM-T026 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+DF-04 including the key-pair consistency check; non-extractable private key; auto-lock after 15 minutes (CP-22), on logout, on tab close and when the session becomes invalid; generic error for a wrong passphrase.
+
+h3. Acceptance criteria
+* No key material or plaintext in localStorage, sessionStorage, IndexedDB or cookies (Playwright inspection).
+* The private key cannot be exported (test).
+* Auto-lock clears keys and decrypted views.
+
+h3. Security considerations
+T-23, L-15.
+
+h3. Dependencies
+CM-T025
+
+h3. Evidence required
+EV-04-04"
+"1027","4","Task","CM-T027 Public-key directory API and fingerprint display","Backlog","High","P1","backend","frontend","crypto","","M2 Identity and Access","4","High","EV-04-05","CM-EPIC-04","","CM-T027","CM-T025","1025","","","- Lookup returns no other fields and is rate-limited.
+- Users can view their own fingerprint for out-of-band comparison.","T-25, T-15.","*Placeholder ID:* CM-T027 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Exact-match, rate-limited user lookup returning ID, display name, account creation date, key ID, public key and fingerprint, with the email labelled unverified (SS-05, T-35); fingerprint display in 16 groups of 4 (CP-17); audit events and notices for key changes.
+
+h3. Acceptance criteria
+* Lookup returns no other fields and is rate-limited.
+* Users can view their own fingerprint for out-of-band comparison.
+
+h3. Security considerations
+T-25, T-15.
+
+h3. Dependencies
+CM-T025
+
+h3. Evidence required
+EV-04-05"
+"1028","4","Task","CM-T028 Vault passphrase change","Backlog","Medium","P2","crypto","frontend","","","M2 Identity and Access","4","Medium","","CM-EPIC-04","","CM-T028","CM-T026","1026","","","- Same key pair after the change; the old record is replaced.
+- Old passphrase no longer unlocks the stored record.","Does not protect against an attacker who already has the old blob and old passphrase; that requires an identity reset (documented in the key lifecycle).","*Placeholder ID:* CM-T028 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* Medium
+
+h3. Description
+Re-wrap the private key under a new salt and new PKWK; also re-wrap automatically when stored parameters are below the current target; audit {{VAULT_REWRAPPED}}.
+
+h3. Acceptance criteria
+* Same key pair after the change; the old record is replaced.
+* Old passphrase no longer unlocks the stored record.
+
+h3. Security considerations
+Does not protect against an attacker who already has the old blob and old passphrase; that requires an identity reset (documented in the key lifecycle).
+
+h3. Dependencies
+CM-T026
+
+h3. Evidence required
+none"
+"1029","5","Task","CM-T029 Central authorization module implementing the authorization matrix","Backlog","Highest","P0","backend","security","","","M2 Identity and Access","5","High","EV-05-01","CM-EPIC-05","","CM-T029","CM-T016, CM-T009","1016","1009","","- Exhaustive unit tests over every action and role; coverage at least 90%.
+- Route inventory test fails for any undeclared or untested route.
+- PLATFORM_ADMIN receives 404 on room-scoped endpoints of rooms they are not in.","INV-05, INV-06; T-05, T-06.","*Placeholder ID:* CM-T029 | *Epic:* CM-EPIC-05 | *Phase:* 5 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+The AZ, PA and SS matrix as data in {{packages/shared}}; a pure {{authorize()}} function; action declarations on every route; room-scope middleware implementing OL-01; room-scoped repository functions; the error semantics of the authorization model.
+
+h3. Acceptance criteria
+* Exhaustive unit tests over every action and role; coverage at least 90%.
+* Route inventory test fails for any undeclared or untested route.
+* PLATFORM_ADMIN receives 404 on room-scoped endpoints of rooms they are not in.
+
+h3. Security considerations
+INV-05, INV-06; T-05, T-06.
+
+h3. Dependencies
+CM-T016, CM-T009
+
+h3. Evidence required
+EV-05-01"
+"1030","5","Task","CM-T030 Room creation, listing, renaming and deletion","Backlog","High","P1","backend","frontend","","","M2 Identity and Access","5","Medium","","CM-EPIC-05","","CM-T030","CM-T029","1029","","","- Users see only rooms they belong to; deleted rooms refuse all reads immediately.
+- Audit events for creation, rename and deletion.","T-05; room names are metadata (T-28).","*Placeholder ID:* CM-T030 | *Epic:* CM-EPIC-05 | *Phase:* 5 | *Release:* M2 Identity and Access | *Security impact:* Medium
+
+h3. Description
+Create a room with name and profile and OWNER membership; list rooms filtered by membership in the query; rename (AZ-02); delete with step-up (AZ-04) into DELETING, with worker cleanup. Room-name warning in the UI. Key material is added to creation in CM-T033.
+
+h3. Acceptance criteria
+* Users see only rooms they belong to; deleted rooms refuse all reads immediately.
+* Audit events for creation, rename and deletion.
+
+h3. Security considerations
+T-05; room names are metadata (T-28).
+
+h3. Dependencies
+CM-T029
+
+h3. Evidence required
+none"
+"1031","5","Task","CM-T031 Membership administration: role changes and ownership transfer","Backlog","High","P1","backend","frontend","security","","M2 Identity and Access","5","High","","CM-EPIC-05","","CM-T031","CM-T030","1030","","","- Tests for every allowed and denied role-change combination.
+- The one-OWNER invariant cannot be broken through any endpoint.","T-04 (privilege escalation).","*Placeholder ID:* CM-T031 | *Epic:* CM-EPIC-05 | *Phase:* 5 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Role changes (AZ-10) and ownership transfer to an ADMIN with step-up (AZ-05), with the one-OWNER invariant enforced in the database and the API. Leaving a room (AZ-11) is implemented with the rekey machinery in CM-T051.
+
+h3. Acceptance criteria
+* Tests for every allowed and denied role-change combination.
+* The one-OWNER invariant cannot be broken through any endpoint.
+
+h3. Security considerations
+T-04 (privilege escalation).
+
+h3. Dependencies
+CM-T030
+
+h3. Evidence required
+none"
+"1032","5","Task","CM-T032 BOLA and IDOR object-level authorization test suite","Backlog","High","P1","testing","security","","","M2 Identity and Access","5","High","EV-05-02, EV-05-03","CM-EPIC-05","","CM-T032","CM-T030","1030","","","- Every route in the registry is covered; all return 404 without side effects.
+- The suite fails when a new route has no coverage; runs in CI.","Primary control test for T-06 (rated Critical inherent).","*Placeholder ID:* CM-T032 | *Epic:* CM-EPIC-05 | *Phase:* 5 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+A reusable harness that creates two rooms with separate members and calls every room-scoped endpoint with identifiers from the other room. Extended with every new endpoint.
+
+h3. Acceptance criteria
+* Every route in the registry is covered; all return 404 without side effects.
+* The suite fails when a new route has no coverage; runs in CI.
+
+h3. Security considerations
+Primary control test for T-06 (rated Critical inherent).
+
+h3. Dependencies
+CM-T030
+
+h3. Evidence required
+EV-05-02, EV-05-03"
+"1033","6","Task","CM-T033 Initial room-key version with commitment and owner envelope","Backlog","High","P1","crypto","backend","frontend","","M3 Encrypted Collaboration","6","High","EV-06-01","CM-EPIC-06","","CM-T033","CM-T030, CM-T026","1030","1026","","- A room cannot be created without valid key data.
+- Request schemas contain no field that could carry raw key material.
+- E2E: create a room, lock and unlock the vault, reopen the room.","INV-04.","*Placeholder ID:* CM-T033 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+DF-05: room creation requires version 1 with commitment and the owner envelope; the API checks envelope length, that the recipient key is the caller's ACTIVE key, and commitment length; everything is stored in one transaction. The commitment is written once at activation and never changes.
+
+h3. Acceptance criteria
+* A room cannot be created without valid key data.
+* Request schemas contain no field that could carry raw key material.
+* E2E: create a room, lock and unlock the vault, reopen the room.
+
+h3. Security considerations
+INV-04.
+
+h3. Dependencies
+CM-T030, CM-T026
+
+h3. Evidence required
+EV-06-01"
+"1034","6","Task","CM-T034 Invitations with pre-wrapped key envelopes","Backlog","High","P1","crypto","backend","frontend","security","M3 Encrypted Collaboration","6","High","EV-06-02","CM-EPIC-06","","CM-T034","CM-T033, CM-T027","1033","1027","","- Envelope sets are validated: the current version is required, older versions only where allowed.
+- RESTRICTED invitations require a confirmed fingerprint equal to the invitee's current key.
+- Profile-specific tests for every rule; audit events.","T-25 (key substitution), T-05.","*Placeholder ID:* CM-T034 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+DF-06 on the inviter side: role ceiling (ADMINs invite only MEMBER or VIEWER), history rule (PC-07), fingerprint confirmation (PC-05), server-set validity (PC-06), PENDING envelopes, revocation (AZ-08), invalidation when the invitee's key changes. Invitations are rejected while the room is REKEY_REQUIRED or REKEYING.
+
+h3. Acceptance criteria
+* Envelope sets are validated: the current version is required, older versions only where allowed.
+* RESTRICTED invitations require a confirmed fingerprint equal to the invitee's current key.
+* Profile-specific tests for every rule; audit events.
+
+h3. Security considerations
+T-25 (key substitution), T-05.
+
+h3. Dependencies
+CM-T033, CM-T027
+
+h3. Evidence required
+EV-06-02"
+"1035","6","Task","CM-T035 Invitation acceptance, OWNER approval and envelope delivery","Backlog","High","P1","backend","frontend","security","","M3 Encrypted Collaboration","6","High","EV-06-02","CM-EPIC-06","","CM-T035","CM-T034","1034","","","- PENDING envelopes are never served.
+- Expired or revoked invitations cannot be accepted.
+- Approval rules tested per profile.","Two-person rule (segregation of duties, control 5.3).","*Placeholder ID:* CM-T035 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+OWNER approval of ADMIN-created invitations in CONFIDENTIAL and RESTRICTED rooms (PC-04, approver differs from inviter); accept and decline; expiry job; envelope activation; own-envelope fetch (AZ-12, OL-05).
+
+h3. Acceptance criteria
+* PENDING envelopes are never served.
+* Expired or revoked invitations cannot be accepted.
+* Approval rules tested per profile.
+
+h3. Security considerations
+Two-person rule (segregation of duties, control 5.3).
+
+h3. Dependencies
+CM-T034
+
+h3. Evidence required
+EV-06-02"
+"1036","6","Task","CM-T036 Client-side room-key unwrap, commitment check and cross-browser checks","Backlog","High","P1","crypto","frontend","testing","","M3 Encrypted Collaboration","6","High","EV-06-03, EV-06-04","CM-EPIC-06","","CM-T036","CM-T033","1033","","","- A tampered envelope, or one whose key does not match the stored commitment, is rejected and reported.
+- A test documents the limit: a harness that serves a different commitment with a matching envelope passes this check; the Room Safety Code (CM-T085) covers that case.
+- The cross-browser suite passes in Chromium, Firefox and WebKit.
+- ADR-007 updated to Accepted or revised with the results.","The commitment detects inconsistent envelopes while the server is honest (T-29). Split views need the Room Safety Code. Tampering: T-07.","*Placeholder ID:* CM-T036 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+Envelope decryption, commitment check, reuse check against the previous version, RWK derivation and an in-memory cache cleared on lock; reporting of mismatches (AZ-29); Playwright cross-browser tests of OAEP labels and decryption into HKDF keys (OCD-01).
+
+h3. Acceptance criteria
+* A tampered envelope, or one whose key does not match the stored commitment, is rejected and reported.
+* A test documents the limit: a harness that serves a different commitment with a matching envelope passes this check; the Room Safety Code (CM-T085) covers that case.
+* The cross-browser suite passes in Chromium, Firefox and WebKit.
+* ADR-007 updated to Accepted or revised with the results.
+
+h3. Security considerations
+The commitment detects inconsistent envelopes while the server is honest (T-29). Split views need the Room Safety Code. Tampering: T-07.
+
+h3. Dependencies
+CM-T033
+
+h3. Evidence required
+EV-06-03, EV-06-04"
+"1037","7","Task","CM-T037 S3-compatible object storage adapter and presigned URL service","Backlog","High","P1","backend","cloud","","","M3 Encrypted Collaboration","7","High","EV-07-06","CM-EPIC-07","","CM-T037","CM-T011, CM-T029","1011","1029","","- Works against the local emulator; expired URLs fail (test).
+- Presigned URLs never appear in logs (redaction test).","T-02, T-18, OL-07.","*Placeholder ID:* CM-T037 | *Epic:* CM-EPIC-07 | *Phase:* 7 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+Storage interface with an S3 implementation; presigned PUT (at most 5 minutes, fixed size) and GET (at most 60 seconds, attachment headers) per CP-20; HEAD verification; delete; random object keys; scoped credentials.
+
+h3. Acceptance criteria
+* Works against the local emulator; expired URLs fail (test).
+* Presigned URLs never appear in logs (redaction test).
+
+h3. Security considerations
+T-02, T-18, OL-07.
+
+h3. Dependencies
+CM-T011, CM-T029
+
+h3. Evidence required
+EV-07-06"
+"1038","7","Task","CM-T038 Client-side file encryption and upload","Backlog","High","P1","crypto","frontend","backend","","M3 Encrypted Collaboration","7","High","EV-07-01, EV-07-02, EV-07-03, EV-07-05","CM-EPIC-07","","CM-T038","CM-T036, CM-T037","1036","1037","","- Canary scan finds no filename or content canary in the database or bucket.
+- Stale key versions (KEY_VERSION_STALE) and write-locked rooms (REKEY_REQUIRED) return 409, including at upload completion.
+- Size mismatch at completion rejects the upload and deletes the object.","INV-01, INV-16; T-01, T-02.","*Placeholder ID:* CM-T038 | *Epic:* CM-EPIC-07 | *Phase:* 7 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+DF-07: FEK, encrypted manifest, wrap under RWK_v, ciphertext hash, size limit (CP-19), PENDING_UPLOAD to AVAILABLE with completion check, wrap-count increment, current-version and room key-state checks, profile expiry rules.
+
+h3. Acceptance criteria
+* Canary scan finds no filename or content canary in the database or bucket.
+* Stale key versions ({{KEY_VERSION_STALE}}) and write-locked rooms ({{REKEY_REQUIRED}}) return 409, including at upload completion.
+* Size mismatch at completion rejects the upload and deletes the object.
+
+h3. Security considerations
+INV-01, INV-16; T-01, T-02.
+
+h3. Dependencies
+CM-T036, CM-T037
+
+h3. Evidence required
+EV-07-01, EV-07-02, EV-07-03, EV-07-05"
+"1039","7","Task","CM-T039 File download and authenticated decryption with tamper handling","Backlog","High","P1","crypto","frontend","backend","","M3 Encrypted Collaboration","7","High","EV-07-04","CM-EPIC-07","","CM-T039","CM-T038","1038","","","- Bit flips in the object, manifest or wrapped FEK produce an integrity error and no plaintext.
+- Downloaded bytes equal the original (E2E).
+- VIEWERs are denied in RESTRICTED rooms.","T-07; L-14 (download restrictions are API-level only).","*Placeholder ID:* CM-T039 | *Epic:* CM-EPIC-07 | *Phase:* 7 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+DF-08: POST for download URLs, VIEWER restriction in RESTRICTED (PC-12), ciphertext hash check, unwrap, authenticated decryption of manifest and content, plaintext hash check, integrity-error UI, audit at EXTENDED and FULL levels.
+
+h3. Acceptance criteria
+* Bit flips in the object, manifest or wrapped FEK produce an integrity error and no plaintext.
+* Downloaded bytes equal the original (E2E).
+* VIEWERs are denied in RESTRICTED rooms.
+
+h3. Security considerations
+T-07; L-14 (download restrictions are API-level only).
+
+h3. Dependencies
+CM-T038
+
+h3. Evidence required
+EV-07-04"
+"1040","7","Task","CM-T040 File deletion, expiration and storage cleanup worker","Backlog","High","P1","backend","cloud","","","M3 Encrypted Collaboration","7","Medium","","CM-EPIC-07","","CM-T040","CM-T038","1038","","","- Expired files are refused immediately, before the worker runs.
+- Deleted files have no object, wrapped FEK or manifest left in the live system.","INV-14; L-12 (backups).","*Placeholder ID:* CM-T040 | *Epic:* CM-EPIC-07 | *Phase:* 7 | *Release:* M3 Encrypted Collaboration | *Security impact:* Medium
+
+h3. Description
+Deletion rights (AZ-18), expiry enforced at read time, worker deletion of objects with retries, cleanup of abandoned uploads, tombstones, storage lifecycle rules as a safety net.
+
+h3. Acceptance criteria
+* Expired files are refused immediately, before the worker runs.
+* Deleted files have no object, wrapped FEK or manifest left in the live system.
+
+h3. Security considerations
+INV-14; L-12 (backups).
+
+h3. Dependencies
+CM-T038
+
+h3. Evidence required
+none"
+"1041","7","Task","CM-T041 Upload limits, quotas and safe download handling","Backlog","High","P1","backend","frontend","security","","M3 Encrypted Collaboration","7","High","","CM-EPIC-07","","CM-T041","CM-T038","1038","","","- Quota and size tests.
+- Playwright confirms HTML and SVG uploads never render inline.
+- Filenames with path traversal characters do not influence storage keys.","T-11, T-26.","*Placeholder ID:* CM-T041 | *Epic:* CM-EPIC-07 | *Phase:* 7 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+Per-room and per-user quotas; forced attachment downloads; preview allowlist (images through blob URLs only); HTML and SVG never rendered inline; warning for executable types.
+
+h3. Acceptance criteria
+* Quota and size tests.
+* Playwright confirms HTML and SVG uploads never render inline.
+* Filenames with path traversal characters do not influence storage keys.
+
+h3. Security considerations
+T-11, T-26.
+
+h3. Dependencies
+CM-T038
+
+h3. Evidence required
+none"
+"1042","8","Task","CM-T042 Encrypted notes","Backlog","High","P1","crypto","frontend","backend","","M3 Encrypted Collaboration","8","High","EV-08-01, EV-08-02","CM-EPIC-08","","CM-T042","CM-T036","1036","","","- Canary scan finds no note title or body in the database.
+- A stale revision returns 409; ciphertext moved to another revision fails authentication.
+- XSS payloads in notes render as text (Playwright).","T-07, T-12, T-32.","*Placeholder ID:* CM-T042 | *Epic:* CM-EPIC-08 | *Phase:* 8 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+DF-12: fresh NEK per revision, revision number in AAD, optimistic concurrency, edit and delete rights (AZ-19 to AZ-22), expiry rules, note-read audit at EXTENDED and FULL, text-only rendering.
+
+h3. Acceptance criteria
+* Canary scan finds no note title or body in the database.
+* A stale revision returns 409; ciphertext moved to another revision fails authentication.
+* XSS payloads in notes render as text (Playwright).
+
+h3. Security considerations
+T-07, T-12, T-32.
+
+h3. Dependencies
+CM-T036
+
+h3. Evidence required
+EV-08-01, EV-08-02"
+"1043","8","Task","CM-T043 Recipient-bound secrets with envelope encryption and expiration","Backlog","High","P1","crypto","backend","frontend","","M3 Encrypted Collaboration","9","High","EV-09-04","CM-EPIC-08","","CM-T043","CM-T036, CM-T027","1036","1027","","- The stored row holds only the AES-256-GCM ciphertext, IV, wrapped SEK, suite and context identifiers (INV-17).
+- The RSA wrapper rejects anything but a 32-byte key, and no code path RSA-encrypts the payload (review and test).
+- Other members cannot obtain the ciphertext through the API, and a test shows they cannot unwrap the SEK with their own keys.
+- Lifetime bounds are enforced per profile; expired secrets are refused; creation is refused while the room is write-locked.","CD-06, CD-17; T-05, T-07.","*Placeholder ID:* CM-T043 | *Epic:* CM-EPIC-08 | *Phase:* 9 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+DF-09 creation: a fresh SEK per secret; the payload encrypted with AES-256-GCM under the SEK (AAD ctx {{secret.payload}}); only the 32-byte SEK wrapped to the recipient's ACTIVE key with RSA-OAEP (label ctx {{secret.sek-wrap}}); the recipient must be an ACTIVE member with that key; the room must be ACTIVE; lifetime bounds (PC-09); metadata-only listing; revocation (AZ-25).
+
+h3. Acceptance criteria
+* The stored row holds only the AES-256-GCM ciphertext, IV, wrapped SEK, suite and context identifiers (INV-17).
+* The RSA wrapper rejects anything but a 32-byte key, and no code path RSA-encrypts the payload (review and test).
+* Other members cannot obtain the ciphertext through the API, and a test shows they cannot unwrap the SEK with their own keys.
+* Lifetime bounds are enforced per profile; expired secrets are refused; creation is refused while the room is write-locked.
+
+h3. Security considerations
+CD-06, CD-17; T-05, T-07.
+
+h3. Dependencies
+CM-T036, CM-T027
+
+h3. Evidence required
+EV-09-04"
+"1044","8","Task","CM-T044 Atomic burn-after-reading reveal","Backlog","High","P1","backend","security","testing","","M3 Encrypted Collaboration","9","High","EV-09-01, EV-09-02, EV-09-03","CM-EPIC-08","","CM-T044","CM-T043","1043","","","- Many parallel reveal requests produce exactly one success.
+- GET requests never consume a secret; a second reveal fails.
+- After reveal, the database row holds no payload ciphertext or wrapped SEK.","INV-13; limitations L-03 and L-12 shown in the UI and report.","*Placeholder ID:* CM-T044 | *Epic:* CM-EPIC-08 | *Phase:* 9 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+DF-09 reveal: POST only, locking transaction, payload ciphertext and wrapped SEK set to NULL in the same transaction, at-most-once delivery, UI warning that the recipient can still copy the text, burn mandatory in RESTRICTED (PC-10).
+
+h3. Acceptance criteria
+* Many parallel reveal requests produce exactly one success.
+* GET requests never consume a secret; a second reveal fails.
+* After reveal, the database row holds no payload ciphertext or wrapped SEK.
+
+h3. Security considerations
+INV-13; limitations L-03 and L-12 shown in the UI and report.
+
+h3. Dependencies
+CM-T043
+
+h3. Evidence required
+EV-09-01, EV-09-02, EV-09-03"
+"1045","8","Task","CM-T045 External one-time secret links (stretch)","Backlog","Low","P3","crypto","frontend","backend","security","M3 Encrypted Collaboration","9","High","","CM-EPIC-08","","CM-T045","CM-T044, CM-T047","1044","1047","","- A network-inspection test shows the fragment never reaches the server.
+- CONFIDENTIAL and RESTRICTED rooms receive 403.","T-33.","*Placeholder ID:* CM-T045 | *Epic:* CM-EPIC-08 | *Phase:* 9 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+Key carried only in the URL fragment, POST-to-reveal, STANDARD rooms only (PC-11), maximum 24 hours, {{Referrer-Policy: no-referrer}}, clear ""already opened"" message.
+
+h3. Acceptance criteria
+* A network-inspection test shows the fragment never reaches the server.
+* CONFIDENTIAL and RESTRICTED rooms receive 403.
+
+h3. Security considerations
+T-33.
+
+h3. Dependencies
+CM-T044, CM-T047
+
+h3. Evidence required
+none"
+"1046","9","Task","CM-T046 Policy catalogue as versioned code","Backlog","High","P1","security","backend","","","M4 Governance and Key Lifecycle","10","High","","CM-EPIC-09","","CM-T046","CM-T029","1029","","","- A test compares the catalogue with a fixture derived from the table in security-policy-profiles.md.
+- No database table can change policy values at runtime.","A database-level attacker cannot weaken all rooms by editing a table.","*Placeholder ID:* CM-T046 | *Epic:* CM-EPIC-09 | *Phase:* 10 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Implement PC-01 to PC-16 as an immutable, versioned catalogue in {{packages/shared}}; rooms store profile and policy version; UI labels come from the catalogue.
+
+h3. Acceptance criteria
+* A test compares the catalogue with a fixture derived from the table in {{security-policy-profiles.md}}.
+* No database table can change policy values at runtime.
+
+h3. Security considerations
+A database-level attacker cannot weaken all rooms by editing a table.
+
+h3. Dependencies
+CM-T029
+
+h3. Evidence required
+none"
+"1047","9","Task","CM-T047 Server-side policy enforcement gates","Backlog","High","P1","security","backend","","","M4 Governance and Key Lifecycle","10","High","EV-10-02","CM-EPIC-09","","CM-T047","CM-T046, CM-T021","1046","1021","","- Each gate has allowed and denied tests.
+- Gates never read profile or role data from the request.","INV-08.","*Placeholder ID:* CM-T047 | *Epic:* CM-EPIC-09 | *Phase:* 10 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Gates in the evaluation order of the profiles document, applied to every room route through the route registry; audit levels (PC-13); stable error codes.
+
+h3. Acceptance criteria
+* Each gate has allowed and denied tests.
+* Gates never read profile or role data from the request.
+
+h3. Security considerations
+INV-08.
+
+h3. Dependencies
+CM-T046, CM-T021
+
+h3. Evidence required
+EV-10-02"
+"1048","9","Task","CM-T048 Profile change rules and expiration clamping","Backlog","Medium","P2","security","backend","","","M4 Governance and Key Lifecycle","10","Medium","EV-10-03","CM-EPIC-09","","CM-T048","CM-T047","1047","","","- Clamping tests; downgrade requires a 5-minute step-up.
+- After an upgrade to CONFIDENTIAL, members without MFA are denied until they enable it.","Prevents silent weakening of a room (principle 15).","*Placeholder ID:* CM-T048 | *Epic:* CM-EPIC-09 | *Phase:* 10 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* Medium
+
+h3. Description
+Upgrade and downgrade rules, clamping of existing expiry dates on upgrade, revocation of non-compliant invitations, high-severity audit event on downgrade.
+
+h3. Acceptance criteria
+* Clamping tests; downgrade requires a 5-minute step-up.
+* After an upgrade to CONFIDENTIAL, members without MFA are denied until they enable it.
+
+h3. Security considerations
+Prevents silent weakening of a room (principle 15).
+
+h3. Dependencies
+CM-T047
+
+h3. Evidence required
+EV-10-03"
+"1049","9","Task","CM-T049 Policy enforcement test matrix","Backlog","High","P1","testing","security","","","M4 Governance and Key Lifecycle","10","High","EV-10-01","CM-EPIC-09","","CM-T049","CM-T047","1047","","","- Every PC control is covered; the suite runs in CI and blocks merges on failure.","Proves that profiles are real controls, not badges.","*Placeholder ID:* CM-T049 | *Epic:* CM-EPIC-09 | *Phase:* 10 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Generated tests for every control and profile with an allowed and a denied case, asserting status code, error code and audit event.
+
+h3. Acceptance criteria
+* Every PC control is covered; the suite runs in CI and blocks merges on failure.
+
+h3. Security considerations
+Proves that profiles are real controls, not badges.
+
+h3. Dependencies
+CM-T047
+
+h3. Evidence required
+EV-10-01"
+"1050","10","Task","CM-T050 Rekey state machine and rekey operation API","Backlog","High","P1","crypto","backend","frontend","","M4 Governance and Key Lifecycle","11","High","EV-11-01, EV-11-03, EV-11-06, EV-11-07","CM-EPIC-10","","CM-T050","CM-T036","1036","","","- Only the starter can finalize; concurrent starts return REKEY_IN_PROGRESS; the OWNER can cancel.
+- Finalize rejects a wrong recipient set (422), a changed epoch or version, and closed or expired operations (409). A repeated identical finalize returns the original result.
+- A rekey that never finalizes is recoverable after the lease expires, and no partial key state exists.
+- After activation, writes naming the old version return KEY_VERSION_STALE, and old content stays readable.
+- Every transition emits an audit event.","T-21, T-37. Departed members never receive the new version.","*Placeholder ID:* CM-T050 | *Epic:* CM-EPIC-10 | *Phase:* 11 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Implement ADR-013 and key-lifecycle sections 1.2 to 1.5: room key states; rekey operations (start, finalize, cancel) with a 10-minute lease and one live operation per room; the membership-epoch snapshot and server-computed recipient set; atomic activation; idempotent finalize by payload digest; stale and closed operation handling; worker cleanup of abandoned operations; manual rotation without the write lock; the admin flow with recipient review.
+
+h3. Acceptance criteria
+* Only the starter can finalize; concurrent starts return {{REKEY_IN_PROGRESS}}; the OWNER can cancel.
+* Finalize rejects a wrong recipient set (422), a changed epoch or version, and closed or expired operations (409). A repeated identical finalize returns the original result.
+* A rekey that never finalizes is recoverable after the lease expires, and no partial key state exists.
+* After activation, writes naming the old version return {{KEY_VERSION_STALE}}, and old content stays readable.
+* Every transition emits an audit event.
+
+h3. Security considerations
+T-21, T-37. Departed members never receive the new version.
+
+h3. Dependencies
+CM-T036
+
+h3. Evidence required
+EV-11-01, EV-11-03, EV-11-06, EV-11-07"
+"1051","10","Task","CM-T051 Member loss triggers REKEY_REQUIRED and the write lock","Backlog","High","P1","crypto","backend","security","","M4 Governance and Key Lifecycle","11","High","EV-11-02, EV-11-04, EV-11-05","CM-EPIC-10","","CM-T051","CM-T050, CM-T031","1050","1031","","- The removed member gets 404 on every room endpoint and has no envelopes left.
+- Writes and invitations return 409 REKEY_REQUIRED until a rekey completes; reads continue.
+- A pending rekey operation becomes STALE when membership changes.
+- A test holding the old RKM cannot unwrap DEKs created after the rekey.","INV-07; T-21; L-04 and L-24 demonstrated.","*Placeholder ID:* CM-T051 | *Epic:* CM-EPIC-10 | *Phase:* 11 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Removal (AZ-09), leaving (AZ-11), membership suspension (account disabled) and account deletion. In one transaction the membership changes, all of the member's envelopes are deleted, the membership epoch increments, pending uploads are cancelled and the room enters REKEY_REQUIRED. Content writes and invitations are blocked while the room is REKEY_REQUIRED or REKEYING (PC-16). The removing admin is prompted to rekey immediately.
+
+h3. Acceptance criteria
+* The removed member gets 404 on every room endpoint and has no envelopes left.
+* Writes and invitations return 409 {{REKEY_REQUIRED}} until a rekey completes; reads continue.
+* A pending rekey operation becomes STALE when membership changes.
+* A test holding the old RKM cannot unwrap DEKs created after the rekey.
+
+h3. Security considerations
+INV-07; T-21; L-04 and L-24 demonstrated.
+
+h3. Dependencies
+CM-T050, CM-T031
+
+h3. Evidence required
+EV-11-02, EV-11-04, EV-11-05"
+"1052","10","Task","CM-T052 Key-version retirement, destruction, wrap-count bound and cryptoperiod","Backlog","Medium","P2","crypto","backend","","","M4 Governance and Key Lifecycle","11","High","","CM-EPIC-10","","CM-T052","CM-T050","1050","","","- Tests with small thresholds in test configuration trigger each path.
+- Destroyed versions keep only commitment and metadata.","Enforces key-usage bounds (CP-16).","*Placeholder ID:* CM-T052 | *Epic:* CM-EPIC-10 | *Phase:* 11 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Worker destroys unreferenced RETIRED versions (envelopes deleted); wrap-count bound (CP-16) and cryptoperiods (PC-14) set REKEY_REQUIRED, with a reminder 14 days before cryptoperiod expiry.
+
+h3. Acceptance criteria
+* Tests with small thresholds in test configuration trigger each path.
+* Destroyed versions keep only commitment and metadata.
+
+h3. Security considerations
+Enforces key-usage bounds (CP-16).
+
+h3. Dependencies
+CM-T050
+
+h3. Evidence required
+none"
+"1053","10","Task","CM-T053 Compromised identity-key procedure","Backlog","Medium","P2","crypto","security","documentation","","M4 Governance and Key Lifecycle","11","High","","CM-EPIC-10","","CM-T053","CM-T051","1051","","","- E2E: reset a vault, admins re-share, the user regains access as the history rule allows.
+- The compromise path marks every affected room; runbook documented.","Key lifecycle sections 3 and 6.","*Placeholder ID:* CM-T053 | *Epic:* CM-EPIC-10 | *Phase:* 11 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Vault reset (old key SUPERSEDED, envelopes deleted), optional compromise flag that sets all of the user's rooms to REKEY_REQUIRED, re-share flow (AZ-14) with fingerprint rules, and an incident runbook.
+
+h3. Acceptance criteria
+* E2E: reset a vault, admins re-share, the user regains access as the history rule allows.
+* The compromise path marks every affected room; runbook documented.
+
+h3. Security considerations
+Key lifecycle sections 3 and 6.
+
+h3. Dependencies
+CM-T051
+
+h3. Evidence required
+none"
+"1054","11","Task","CM-T054 Audit event schema, canonical serialization and hash chaining","Backlog","High","P1","security","backend","crypto","","M4 Governance and Key Lifecycle","12","High","EV-12-01","CM-EPIC-11","","CM-T054","CM-T014, CM-T023","1014","1023","","- Concurrent appends produce gap-free sequence numbers and a valid chain.
+- Property tests confirm lossless database round trips of canonical records.
+- Recomputed hashes equal stored hashes.","T-20.","*Placeholder ID:* CM-T054 | *Epic:* CM-EPIC-11 | *Phase:* 12 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+ADR-009 sections 1 to 3: fixed field set, RFC 8785 canonicalization, chain-head lock, append in the same transaction as the action, {{hashVersion}}.
+
+h3. Acceptance criteria
+* Concurrent appends produce gap-free sequence numbers and a valid chain.
+* Property tests confirm lossless database round trips of canonical records.
+* Recomputed hashes equal stored hashes.
+
+h3. Security considerations
+T-20.
+
+h3. Dependencies
+CM-T014, CM-T023
+
+h3. Evidence required
+EV-12-01"
+"1055","11","Task","CM-T055 Audit emission for security-relevant actions per audit level","Backlog","High","P1","backend","security","","","M4 Governance and Key Lifecycle","12","High","","CM-EPIC-11","","CM-T055","CM-T054, CM-T047","1054","1047","","- Each catalogued action emits its event (tests).
+- Details never contain secrets, content or IP addresses (tests).","Accountability (control 8.15) without leaking data (INV-10).","*Placeholder ID:* CM-T055 | *Epic:* CM-EPIC-11 | *Phase:* 12 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Event catalogue with allowlisted detail keys per action; BASELINE, EXTENDED and FULL levels (PC-13); platform-level events; denied requests.
+
+h3. Acceptance criteria
+* Each catalogued action emits its event (tests).
+* Details never contain secrets, content or IP addresses (tests).
+
+h3. Security considerations
+Accountability (control 8.15) without leaking data (INV-10).
+
+h3. Dependencies
+CM-T054, CM-T047
+
+h3. Evidence required
+none"
+"1056","11","Task","CM-T056 Chain verification service and room audit view","Backlog","High","P1","backend","frontend","security","","M4 Governance and Key Lifecycle","12","High","EV-12-02","CM-EPIC-11","","CM-T056","CM-T055","1055","","","- Verification detects tampering in tests and records the first bad sequence number.
+- The room view shows only events of that room.","T-20.","*Placeholder ID:* CM-T056 | *Epic:* CM-EPIC-11 | *Phase:* 12 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Hourly incremental and daily full verification in the worker, stored verification runs, PLATFORM_ADMIN verification endpoint, room audit view for OWNER and ADMIN (AZ-28).
+
+h3. Acceptance criteria
+* Verification detects tampering in tests and records the first bad sequence number.
+* The room view shows only events of that room.
+
+h3. Security considerations
+T-20.
+
+h3. Dependencies
+CM-T055
+
+h3. Evidence required
+EV-12-02"
+"1057","11","Task","CM-T057 Signed checkpoints, anchoring and Level 1 key custody","Backlog","High","P1","crypto","cloud","security","","M4 Governance and Key Lifecycle","12","High","EV-12-04, EV-12-05","CM-EPIC-11","","CM-T057","CM-T056","1056","","","- Checkpoints verify with the repository public key; checkpoints signed with a revoked key after its revocation time are rejected.
+- The worker refuses to sign when the chain diverges from the last anchored checkpoint and records an INVALID run.
+- The anchor credential cannot delete or overwrite objects (tested where the provider or emulator supports it).
+- The witness procedure is documented and executed once; the OCD-08 decision is recorded.","Closes the regenerated-chain gap up to the last anchor (L-13). Does not protect against an attacker holding the signing key (L-25, T-38).","*Placeholder ID:* CM-T057 | *Epic:* CM-EPIC-11 | *Phase:* 12 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Ed25519 checkpoint signing (CP-14) with the key mounted only into the worker; storage in the database and in the anchor bucket (compliance-mode retention lock where available, write-only credential); public keys and the revocation list in the repository; checkpoints after security-critical events; the weekly external witness procedure; refusal to sign a chain that no longer matches the last anchor. Decide on RFC 3161 timestamps (OCD-08).
+
+h3. Acceptance criteria
+* Checkpoints verify with the repository public key; checkpoints signed with a revoked key after its revocation time are rejected.
+* The worker refuses to sign when the chain diverges from the last anchored checkpoint and records an INVALID run.
+* The anchor credential cannot delete or overwrite objects (tested where the provider or emulator supports it).
+* The witness procedure is documented and executed once; the OCD-08 decision is recorded.
+
+h3. Security considerations
+Closes the regenerated-chain gap up to the last anchor (L-13). Does not protect against an attacker holding the signing key (L-25, T-38).
+
+h3. Dependencies
+CM-T056
+
+h3. Evidence required
+EV-12-04, EV-12-05"
+"1058","11","Task","CM-T058 Offline audit verifier and tampering demonstration","Backlog","High","P1","security","testing","crypto","","M4 Governance and Key Lifecycle","12","High","EV-12-03, EV-12-06","CM-EPIC-11","","CM-T058","CM-T057","1057","","","- The verifier reports the first mismatch for each tampering type.
+- A recomputed chain is detected through the anchored checkpoint mismatch.
+- Evidence captured for the report.
+- Scenario simulations recorded as evidence (EV-12-06).","Demonstrates ""tamper-evident, not tamper-proof"" honestly.","*Placeholder ID:* CM-T058 | *Epic:* CM-EPIC-11 | *Phase:* 12 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+
+h3. Description
+Command-line verifier and a demonstration script run against a copy of the database: edit an event, delete an event, recompute the chain without the signing key. Also simulate the trust-model scenarios A to D of ADR-009 section 8.
+
+h3. Acceptance criteria
+* The verifier reports the first mismatch for each tampering type.
+* A recomputed chain is detected through the anchored checkpoint mismatch.
+* Evidence captured for the report.
+* Scenario simulations recorded as evidence (EV-12-06).
+
+h3. Security considerations
+Demonstrates ""tamper-evident, not tamper-proof"" honestly.
+
+h3. Dependencies
+CM-T057
+
+h3. Evidence required
+EV-12-03, EV-12-06"
+"1059","12","Task","CM-T059 Crypto Inspector metadata API","Backlog","High","P1","backend","security","","","M5 Visibility","13","High","EV-13-01","CM-EPIC-12","","CM-T059","CM-T039, CM-T043","1039","1043","","- A response-schema test fails on any field outside the allowlist.
+- No key material, wrapped or unwrapped, appears in responses.
+- Non-members receive 404.","INV-10; T-15.","*Placeholder ID:* CM-T059 | *Epic:* CM-EPIC-12 | *Phase:* 13 | *Release:* M5 Visibility | *Security impact:* High
+
+h3. Description
+Endpoints returning the allowlisted inspection fields of {{docs/architecture/crypto-inspector.md}} for files, notes, secrets, rooms and the caller's identity, with the same authorization as reading the item (AZ-27).
+
+h3. Acceptance criteria
+* A response-schema test fails on any field outside the allowlist.
+* No key material, wrapped or unwrapped, appears in responses.
+* Non-members receive 404.
+
+h3. Security considerations
+INV-10; T-15.
+
+h3. Dependencies
+CM-T039, CM-T043
+
+h3. Evidence required
+EV-13-01"
+"1060","12","Task","CM-T060 Crypto Inspector UI","Backlog","High","P1","frontend","crypto","","","M5 Visibility","13","High","EV-13-01, EV-13-02","CM-EPIC-12","","CM-T060","CM-T059","1059","","","- A DOM scan with known test keys finds no key material rendered.
+- A network test shows the locally computed plaintext hash is never sent to the server.
+- Wording reviewed against the honest-claims rule.
+- The Safety Code shown in the Inspector matches the room's Safety Code panel and never appears in network traffic.","Transparency without exposure; supports the cryptography demonstration.","*Placeholder ID:* CM-T060 | *Epic:* CM-EPIC-12 | *Phase:* 13 | *Release:* M5 Visibility | *Security impact:* High
+
+h3. Description
+Panel combining server metadata with client-side results (tag verification, commitment check, locally computed plaintext hash); the room view with key state and the Room Safety Code; a ""what this does not protect"" section linking to the limitations.
+
+h3. Acceptance criteria
+* A DOM scan with known test keys finds no key material rendered.
+* A network test shows the locally computed plaintext hash is never sent to the server.
+* Wording reviewed against the honest-claims rule.
+* The Safety Code shown in the Inspector matches the room's Safety Code panel and never appears in network traffic.
+
+h3. Security considerations
+Transparency without exposure; supports the cryptography demonstration.
+
+h3. Dependencies
+CM-T059
+
+h3. Evidence required
+EV-13-01, EV-13-02"
+"1061","12","Task","CM-T061 Security Dashboard metrics API","Backlog","High","P1","backend","security","","","M5 Visibility","14","Medium","EV-14-02","CM-EPIC-12","","CM-T061","CM-T056, CM-T018","1056","1018","","- Each metric has a test with seeded data that checks the exact value.
+- Empty data produces empty states, never invented values.
+- Responses contain no room names or content.","No fake scores; privacy of room metadata (T-28).","*Placeholder ID:* CM-T061 | *Epic:* CM-EPIC-12 | *Phase:* 14 | *Release:* M5 Visibility | *Security impact:* Medium
+
+h3. Description
+Metrics defined in {{docs/architecture/security-dashboard.md}}, computed from real data by documented queries, available to PLATFORM_ADMIN only, aggregates only, each with an ""as of"" timestamp.
+
+h3. Acceptance criteria
+* Each metric has a test with seeded data that checks the exact value.
+* Empty data produces empty states, never invented values.
+* Responses contain no room names or content.
+
+h3. Security considerations
+No fake scores; privacy of room metadata (T-28).
+
+h3. Dependencies
+CM-T056, CM-T018
+
+h3. Evidence required
+EV-14-02"
+"1062","12","Task","CM-T062 Security Dashboard UI","Backlog","High","P1","frontend","","","","M5 Visibility","14","Medium","EV-14-01","CM-EPIC-12","","CM-T062","CM-T061","1061","","","- Displayed values match the API.
+- No composite ""security score"" anywhere.","Monitoring evidence for ISO/IEC 27001 clause 9.1.","*Placeholder ID:* CM-T062 | *Epic:* CM-EPIC-12 | *Phase:* 14 | *Release:* M5 Visibility | *Security impact:* Medium
+
+h3. Description
+Dashboard showing each metric with its definition and timestamp, the audit-integrity status, and highlighted counts of write-locked rooms awaiting a rekey, recent profile downgrades and Room Safety Code mismatch reports.
+
+h3. Acceptance criteria
+* Displayed values match the API.
+* No composite ""security score"" anywhere.
+
+h3. Security considerations
+Monitoring evidence for ISO/IEC 27001 clause 9.1.
+
+h3. Dependencies
+CM-T061
+
+h3. Evidence required
+EV-14-01"
+"1063","13","Task","CM-T063 Cloud provider selection ADR","Backlog","High","P1","cloud","architecture","","","M7 Cloud Deployment","17","Medium","EV-17-01","CM-EPIC-13","","CM-T063","CM-T082","1082","","","- ADR-012 with a comparison table and decision.
+- Shared-responsibility matrix updated with provider specifics.","Supplier selection (controls 5.19 and 5.23).","*Placeholder ID:* CM-T063 | *Epic:* CM-EPIC-13 | *Phase:* 17 | *Release:* M7 Cloud Deployment | *Security impact:* Medium
+
+h3. Description
+Compare providers against the criteria in {{docs/cloud/service-models.md}} (managed PostgreSQL features, S3 compatibility, object lock, private networking, region, MFA, cost) and record the choice as ADR-014.
+
+h3. Acceptance criteria
+* ADR-012 with a comparison table and decision.
+* Shared-responsibility matrix updated with provider specifics.
+
+h3. Security considerations
+Supplier selection (controls 5.19 and 5.23).
+
+h3. Dependencies
+CM-T082
+
+h3. Evidence required
+EV-17-01"
+"1064","13","Task","CM-T064 VM provisioning and baseline configuration","Backlog","High","P1","cloud","infrastructure","","","M7 Cloud Deployment","17","Medium","EV-17-01, EV-17-02","CM-EPIC-13","","CM-T064","CM-T063","1063","","","- Runbook reproduces the VM; no secrets in the repository.
+- Evidence: console configuration, firewall rules, external port scan.","T-19; principle 12.","*Placeholder ID:* CM-T064 | *Epic:* CM-EPIC-13 | *Phase:* 17 | *Release:* M7 Cloud Deployment | *Security impact:* Medium
+
+h3. Description
+Ubuntu Server LTS VM, provider firewall, SSH keys, named operator account, updates, Docker from the official repository; reproducible runbook in {{infrastructure/deployment}}.
+
+h3. Acceptance criteria
+* Runbook reproduces the VM; no secrets in the repository.
+* Evidence: console configuration, firewall rules, external port scan.
+
+h3. Security considerations
+T-19; principle 12.
+
+h3. Dependencies
+CM-T063
+
+h3. Evidence required
+EV-17-01, EV-17-02"
+"1065","13","Task","CM-T065 Production container images and Compose stack","Backlog","High","P1","infrastructure","","","","M7 Cloud Deployment","17","Medium","EV-17-03","CM-EPIC-13","","CM-T065","CM-T064","1064","","","- docker inspect evidence shows non-root users and no published API port.
+- Image scan has no unresolved Critical findings; image history shows no secrets.","T-16, T-19.","*Placeholder ID:* CM-T065 | *Epic:* CM-EPIC-13 | *Phase:* 17 | *Release:* M7 Cloud Deployment | *Security impact:* Medium
+
+h3. Description
+Multi-stage Dockerfiles, non-root users, read-only root filesystems, images pinned by digest, Compose networks {{edge}} and {{app}}, secrets as files, health checks, image scanning in CI.
+
+h3. Acceptance criteria
+* {{docker inspect}} evidence shows non-root users and no published API port.
+* Image scan has no unresolved Critical findings; image history shows no secrets.
+
+h3. Security considerations
+T-16, T-19.
+
+h3. Dependencies
+CM-T064
+
+h3. Evidence required
+EV-17-03"
+"1066","13","Task","CM-T066 Nginx reverse proxy, TLS and security headers","Backlog","High","P1","infrastructure","security","","","M7 Cloud Deployment","17","High","EV-17-04, EV-17-05","CM-EPIC-13","","CM-T066","CM-T065","1065","","","- External TLS scan result recorded (target grade A or better).
+- Header check passes; HTTP redirects to HTTPS; E2E runs without CSP violations.","T-12, T-31.","*Placeholder ID:* CM-T066 | *Epic:* CM-EPIC-13 | *Phase:* 17 | *Release:* M7 Cloud Deployment | *Security impact:* High
+
+h3. Description
+ACME certificates with automatic renewal, TLS per CP-21, the header set from the deployment document, rate-limit zones, static asset serving, staged HSTS.
+
+h3. Acceptance criteria
+* External TLS scan result recorded (target grade A or better).
+* Header check passes; HTTP redirects to HTTPS; E2E runs without CSP violations.
+
+h3. Security considerations
+T-12, T-31.
+
+h3. Dependencies
+CM-T065
+
+h3. Evidence required
+EV-17-04, EV-17-05"
+"1067","13","Task","CM-T067 Managed PostgreSQL integration","Backlog","High","P1","cloud","database","security","","M7 Cloud Deployment","18","High","EV-18-01, EV-18-02","CM-EPIC-13","","CM-T067","CM-T064","1064","","","- Connections from other addresses, without TLS or with a wrong CA fail (tests).
+- Credentials stored only as secret files on the VM.","T-01, T-31.","*Placeholder ID:* CM-T067 | *Epic:* CM-EPIC-13 | *Phase:* 18 | *Release:* M7 Cloud Deployment | *Security impact:* High
+
+h3. Description
+Provision the database, restrict access to the VM, verify TLS with the provider CA, create the roles from CM-T014, configure backups and point-in-time recovery.
+
+h3. Acceptance criteria
+* Connections from other addresses, without TLS or with a wrong CA fail (tests).
+* Credentials stored only as secret files on the VM.
+
+h3. Security considerations
+T-01, T-31.
+
+h3. Dependencies
+CM-T064
+
+h3. Evidence required
+EV-18-01, EV-18-02"
+"1068","13","Task","CM-T068 Provider-managed object storage integration","Backlog","High","P1","cloud","security","","","M7 Cloud Deployment","18","High","EV-18-03, EV-18-04, EV-18-05","CM-EPIC-13","","CM-T068","CM-T064, CM-T037","1064","1037","","- Anonymous access and foreign-origin CORS requests are denied.
+- Deleting an anchored checkpoint with the worker credential is denied.
+- Canary scan against the deployed bucket with synthetic data passes.","T-02, T-18, T-20.","*Placeholder ID:* CM-T068 | *Epic:* CM-EPIC-13 | *Phase:* 18 | *Release:* M7 Cloud Deployment | *Security impact:* High
+
+h3. Description
+Content bucket (private, versioned, CORS, lifecycle) and anchor bucket (retention lock, write-only credential); scoped credentials.
+
+h3. Acceptance criteria
+* Anonymous access and foreign-origin CORS requests are denied.
+* Deleting an anchored checkpoint with the worker credential is denied.
+* Canary scan against the deployed bucket with synthetic data passes.
+
+h3. Security considerations
+T-02, T-18, T-20.
+
+h3. Dependencies
+CM-T064, CM-T037
+
+h3. Evidence required
+EV-18-03, EV-18-04, EV-18-05"
+"1069","14","Task","CM-T069 SSH, OS and firewall hardening with Lynis baseline","Backlog","High","P1","infrastructure","security","cloud","","M7 Cloud Deployment","19","High","EV-19-01, EV-19-02, EV-19-03, EV-19-05","CM-EPIC-14","","CM-T069","CM-T064","1064","","","- Checklist complete; Lynis reports before and after stored as evidence.
+- Password-based SSH login is refused (test); SSH configuration audit is clean.","T-19.","*Placeholder ID:* CM-T069 | *Epic:* CM-EPIC-14 | *Phase:* 19 | *Release:* M7 Cloud Deployment | *Security impact:* High
+
+h3. Description
+Apply the VM hardening checklist, including the Docker port-publishing caveat, unattended upgrades and time synchronization; run Lynis before and after.
+
+h3. Acceptance criteria
+* Checklist complete; Lynis reports before and after stored as evidence.
+* Password-based SSH login is refused (test); SSH configuration audit is clean.
+
+h3. Security considerations
+T-19.
+
+h3. Dependencies
+CM-T064
+
+h3. Evidence required
+EV-19-01, EV-19-02, EV-19-03, EV-19-05"
+"1070","14","Task","CM-T070 Docker and container runtime hardening","Backlog","Medium","P2","infrastructure","security","","","M7 Cloud Deployment","19","Medium","EV-19-04","CM-EPIC-14","","CM-T070","CM-T065","1065","","","- Docker Bench report stored; findings triaged in Jira.
+- All containers match the security settings table.","T-19.","*Placeholder ID:* CM-T070 | *Epic:* CM-EPIC-14 | *Phase:* 19 | *Release:* M7 Cloud Deployment | *Security impact:* Medium
+
+h3. Description
+Docker daemon configuration (log rotation, {{no-new-privileges}} by default), resource limits, Docker Bench for Security run and triage.
+
+h3. Acceptance criteria
+* Docker Bench report stored; findings triaged in Jira.
+* All containers match the security settings table.
+
+h3. Security considerations
+T-19.
+
+h3. Dependencies
+CM-T065
+
+h3. Evidence required
+EV-19-04"
+"1071","14","Task","CM-T071 Secrets management and credential rotation","Backlog","High","P1","security","cloud","","","M7 Cloud Deployment","19","High","EV-19-06, EV-19-08","CM-EPIC-14","","CM-T071","CM-T065","1065","","","- Inventory documented; rotation performed and recorded in Jira.
+- docker inspect shows no secrets in environment variables.","T-16, T-17.","*Placeholder ID:* CM-T071 | *Epic:* CM-EPIC-14 | *Phase:* 19 | *Release:* M7 Cloud Deployment | *Security impact:* High
+
+h3. Description
+Credential inventory, secret files with restrictive permissions, one executed rotation (for example the database password) as evidence, MFA verified on cloud, GitHub and Jira accounts.
+
+h3. Acceptance criteria
+* Inventory documented; rotation performed and recorded in Jira.
+* {{docker inspect}} shows no secrets in environment variables.
+
+h3. Security considerations
+T-16, T-17.
+
+h3. Dependencies
+CM-T065
+
+h3. Evidence required
+EV-19-06, EV-19-08"
+"1072","14","Task","CM-T072 Backups, restore test, logging and monitoring","Backlog","Medium","P2","cloud","infrastructure","","","M7 Cloud Deployment","19","Medium","EV-19-07","CM-EPIC-14","","CM-T072","CM-T067","1067","","","- Restore test report stored as evidence.
+- Retention periods documented (they affect L-12).","Availability (L-06), control 8.13.","*Placeholder ID:* CM-T072 | *Epic:* CM-EPIC-14 | *Phase:* 19 | *Release:* M7 Cloud Deployment | *Security impact:* Medium
+
+h3. Description
+Backup retention settings, restore to a temporary instance, log rotation, health checks, certificate-expiry and disk alerts, audit verification status visible.
+
+h3. Acceptance criteria
+* Restore test report stored as evidence.
+* Retention periods documented (they affect L-12).
+
+h3. Security considerations
+Availability (L-06), control 8.13.
+
+h3. Dependencies
+CM-T067
+
+h3. Evidence required
+EV-19-07"
+"1073","15","Task","CM-T073 API hardening pass","Backlog","High","P1","backend","security","","","M6 Hardening and Test Automation","15","High","EV-15-01, EV-15-02","CM-EPIC-15","","CM-T073","CM-T047","1047","","","- ZAP baseline with no unresolved High findings.
+- Review checklist stored; findings tracked in Jira.","T-12, T-14, T-15.","*Placeholder ID:* CM-T073 | *Epic:* CM-EPIC-15 | *Phase:* 15 | *Release:* M6 Hardening and Test Automation | *Security impact:* High
+
+h3. Description
+Review every endpoint for validation, error handling, headers and rate limits against the relevant OWASP ASVS sections; evaluate Trusted Types; run a ZAP baseline scan; fix findings.
+
+h3. Acceptance criteria
+* ZAP baseline with no unresolved High findings.
+* Review checklist stored; findings tracked in Jira.
+
+h3. Security considerations
+T-12, T-14, T-15.
+
+h3. Dependencies
+CM-T047
+
+h3. Evidence required
+EV-15-01, EV-15-02"
+"1074","15","Task","CM-T074 Automated security regression suite in CI","Backlog","High","P1","testing","security","","","M6 Hardening and Test Automation","16","High","EV-16-01, EV-16-02","CM-EPIC-15","","CM-T074","CM-T012, CM-T049","1012","1049","","- All suites run on every pull request; coverage thresholds enforced.
+- Traceability table generated automatically.","Principle 13 (security controls must be testable).","*Placeholder ID:* CM-T074 | *Epic:* CM-EPIC-15 | *Phase:* 16 | *Release:* M6 Hardening and Test Automation | *Security impact:* High
+
+h3. Description
+Consolidate the suites listed in the security testing plan, tag tests with threat and control IDs, and generate the traceability table.
+
+h3. Acceptance criteria
+* All suites run on every pull request; coverage thresholds enforced.
+* Traceability table generated automatically.
+
+h3. Security considerations
+Principle 13 (security controls must be testable).
+
+h3. Dependencies
+CM-T012, CM-T049
+
+h3. Evidence required
+EV-16-01, EV-16-02"
+"1075","15","Task","CM-T075 Playwright E2E suite across Chromium, Firefox and WebKit","Backlog","Medium","P2","testing","frontend","","","M6 Hardening and Test Automation","16","Medium","","CM-EPIC-15","","CM-T075","CM-T039, CM-T044","1039","1044","","- Full suite nightly on three engines; smoke subset on every pull request.","Cross-browser crypto correctness (OCD-01).","*Placeholder ID:* CM-T075 | *Epic:* CM-EPIC-15 | *Phase:* 16 | *Release:* M6 Hardening and Test Automation | *Security impact:* Medium
+
+h3. Description
+Full flows: registration, MFA, vault, rooms, invitations, files, notes, secrets, rotation and audit view, with the canary-scan hook.
+
+h3. Acceptance criteria
+* Full suite nightly on three engines; smoke subset on every pull request.
+
+h3. Security considerations
+Cross-browser crypto correctness (OCD-01).
+
+h3. Dependencies
+CM-T039, CM-T044
+
+h3. Evidence required
+none"
+"1076","15","Task","CM-T076 Dependency, container and configuration scanning","Backlog","Medium","P2","security","infrastructure","testing","","M6 Hardening and Test Automation","16","Medium","EV-16-03","CM-EPIC-15","","CM-T076","CM-T012","1012","","","- Scheduled workflow active; findings triaged in Jira; SBOM attached to releases.","T-27.","*Placeholder ID:* CM-T076 | *Epic:* CM-EPIC-15 | *Phase:* 16 | *Release:* M6 Hardening and Test Automation | *Security impact:* Medium
+
+h3. Description
+Weekly scheduled dependency, container and secret scans plus SBOM per release, with a triage process.
+
+h3. Acceptance criteria
+* Scheduled workflow active; findings triaged in Jira; SBOM attached to releases.
+
+h3. Security considerations
+T-27.
+
+h3. Dependencies
+CM-T012
+
+h3. Evidence required
+EV-16-03"
+"1077","15","Task","CM-T077 Security assessment against OWASP ASVS with DAST and manual testing","Backlog","High","P1","security","testing","","","M8 Assessment and Report","20","High","EV-20-01, EV-20-02, EV-20-03","CM-EPIC-15","","CM-T077","CM-T066, CM-T069, CM-T074","1066","1069","1074","- Assessment report stored; every finding recorded with the Security Finding template.
+- Residual risks in the threat model updated.","Independent review (control 5.35), internal audit (clause 9.2).","*Placeholder ID:* CM-T077 | *Epic:* CM-EPIC-15 | *Phase:* 20 | *Release:* M8 Assessment and Report | *Security impact:* High
+
+h3. Description
+Phase 20 assessment: ASVS 5.0 Level 2 checklist, selected WSTG tests, authenticated ZAP scan, infrastructure scans, and a review of the implementation against {{docs/crypto}}.
+
+h3. Acceptance criteria
+* Assessment report stored; every finding recorded with the Security Finding template.
+* Residual risks in the threat model updated.
+
+h3. Security considerations
+Independent review (control 5.35), internal audit (clause 9.2).
+
+h3. Dependencies
+CM-T066, CM-T069, CM-T074
+
+h3. Evidence required
+EV-20-01, EV-20-02, EV-20-03"
+"1078","15","Task","CM-T078 Security finding remediation and regression tests","Backlog","High","P1","security-finding","security","testing","","M8 Assessment and Report","21","High","EV-21-01, EV-21-02, EV-21-03, EV-21-04","CM-EPIC-15","","CM-T078","CM-T077","1077","","","- All Critical and High findings fixed; Medium fixed or accepted with approval.
+- At least one finding documented through its full lifecycle as evidence.","Corrective action (clause 10.2).","*Placeholder ID:* CM-T078 | *Epic:* CM-EPIC-15 | *Phase:* 21 | *Release:* M8 Assessment and Report | *Security impact:* High
+
+h3. Description
+Fix each finding with a regression test that fails before the fix, retest, close; formal acceptance for anything not fixed.
+
+h3. Acceptance criteria
+* All Critical and High findings fixed; Medium fixed or accepted with approval.
+* At least one finding documented through its full lifecycle as evidence.
+
+h3. Security considerations
+Corrective action (clause 10.2).
+
+h3. Dependencies
+CM-T077
+
+h3. Evidence required
+EV-21-01, EV-21-02, EV-21-03, EV-21-04"
+"1079","16","Task","CM-T079 Evidence capture and evidence index","Backlog","High","P1","documentation","","","","M8 Assessment and Report","22","Low","EV-22-03","CM-EPIC-16","","CM-T079","CM-T001","1001","","","- The index is complete for every finished phase; every item passed the redaction checklist.","T-16, T-34 (no secrets in evidence).","*Placeholder ID:* CM-T079 | *Epic:* CM-EPIC-16 | *Phase:* 22 | *Release:* M8 Assessment and Report | *Security impact:* Low
+
+h3. Description
+Maintain {{docs/report/evidence/}} and the evidence index throughout the project, applying the redaction rules.
+
+h3. Acceptance criteria
+* The index is complete for every finished phase; every item passed the redaction checklist.
+
+h3. Security considerations
+T-16, T-34 (no secrets in evidence).
+
+h3. Dependencies
+CM-T001
+
+h3. Evidence required
+EV-22-03"
+"1080","16","Task","CM-T080 ISMS documentation set","Backlog","High","P1","documentation","risk","security","","M8 Assessment and Report","22","Medium","","CM-EPIC-16","","CM-T080","CM-T003","1003","","","- Documents updated; project owner signs off the risk acceptances.","Demonstrates the management-system side of the project.","*Placeholder ID:* CM-T080 | *Epic:* CM-EPIC-16 | *Phase:* 22 | *Release:* M8 Assessment and Report | *Security impact:* Medium
+
+h3. Description
+Update the risk register, complete applicability and evidence in the ISO/IEC 27001 control mapping, write the incident response procedure, record an access review and a supplier (cloud and SaaS) assessment.
+
+h3. Acceptance criteria
+* Documents updated; project owner signs off the risk acceptances.
+
+h3. Security considerations
+Demonstrates the management-system side of the project.
+
+h3. Dependencies
+CM-T003
+
+h3. Evidence required
+none"
+"1081","16","Task","CM-T081 Final report and demonstration","Backlog","High","P1","documentation","","","","M8 Assessment and Report","22","Low","EV-22-01, EV-22-02","CM-EPIC-16","","CM-T081","CM-T078, CM-T079, CM-T080","1078","1079","1080","- Every security claim in the report is checked against docs/security/limitations.md.
+- The demonstration has been rehearsed end to end on the deployed system.","Honest-claims rule.","*Placeholder ID:* CM-T081 | *Epic:* CM-EPIC-16 | *Phase:* 22 | *Release:* M8 Assessment and Report | *Security impact:* Low
+
+h3. Description
+Final report structured by the three subjects, a demonstration script, and optional slides; includes limitations and the test traceability table.
+
+h3. Acceptance criteria
+* Every security claim in the report is checked against {{docs/security/limitations.md}}.
+* The demonstration has been rehearsed end to end on the deployed system.
+
+h3. Security considerations
+Honest-claims rule.
+
+h3. Dependencies
+CM-T078, CM-T079, CM-T080
+
+h3. Evidence required
+EV-22-01, EV-22-02"
+"1082","1","Task","CM-T082 Phase 0.5 architecture hardening and consistency review (gate)","Testing","Highest","P0","architecture","security","documentation","","M0 Architecture Baseline","0.5","High","EV-00-08","CM-EPIC-01","","CM-T082","CM-T005","1005","","","- No document contradicts the corrected design: automated link, identifier and diagram checks plus targeted searches.
+- The architecture gate record lists every attacked area, the result and the unresolved risks.
+- Project owner approval recorded in Jira.","Design flaws are cheapest to fix now. Unresolved risks are recorded, not hidden.","*Placeholder ID:* CM-T082 | *Epic:* CM-EPIC-01 | *Phase:* 0.5 | *Release:* M0 Architecture Baseline | *Security impact:* High
+
+h3. Description
+Apply the external review's corrections consistently across all documents: envelope encryption for secrets, the corrected commitment claims and the Room Safety Code (ADR-012), the rekey state machine (ADR-013), the audit trust model with Level 1 and Level 2 key custody (ADR-009), the object-storage classification (ADR-006), the session and CSRF design, and normalized priorities. Run a consistency review and an attack-focused architecture review. _Completed in Phase 0.5, awaiting approval._
+
+h3. Acceptance criteria
+* No document contradicts the corrected design: automated link, identifier and diagram checks plus targeted searches.
+* The architecture gate record lists every attacked area, the result and the unresolved risks.
+* Project owner approval recorded in Jira.
+
+h3. Security considerations
+Design flaws are cheapest to fix now. Unresolved risks are recorded, not hidden.
+
+h3. Dependencies
+CM-T005
+
+h3. Evidence required
+EV-00-08"
+"1083","1","Task","CM-T083 Jira project setup and backlog import","Backlog","High","P1","documentation","risk","","","M0 Architecture Baseline","0.5","Medium","EV-00-05, EV-00-10","CM-EPIC-01","","CM-T083","CM-T082","1082","","","- The workflow allows SECURITY REVIEW to IN PROGRESS and TESTING to IN PROGRESS, and no transition skips SECURITY REVIEW.
+- 16 epics and 87 work items are imported with parents, priorities, labels, releases and phases; counts match the guide.
+- MFA is enforced and project access is limited to the team.
+- Board screenshot and import summary captured (EV-00-05, EV-00-10).","Jira holds no secrets or production data (T-34).","*Placeholder ID:* CM-T083 | *Epic:* CM-EPIC-01 | *Phase:* 0.5 | *Release:* M0 Architecture Baseline | *Security impact:* Medium
+
+h3. Description
+Create the team-managed Kanban project CipherMesh (key CM) as described in {{docs/management/jira-import-guide.md}}: statuses and transitions, labels, custom fields and releases M0 to M8. Then import {{docs/management/jira-backlog.csv}} and verify the result.
+
+h3. Acceptance criteria
+* The workflow allows SECURITY REVIEW to IN PROGRESS and TESTING to IN PROGRESS, and no transition skips SECURITY REVIEW.
+* 16 epics and 87 work items are imported with parents, priorities, labels, releases and phases; counts match the guide.
+* MFA is enforced and project access is limited to the team.
+* Board screenshot and import summary captured (EV-00-05, EV-00-10).
+
+h3. Security considerations
+Jira holds no secrets or production data (T-34).
+
+h3. Dependencies
+CM-T082
+
+h3. Evidence required
+EV-00-05, EV-00-10"
+"1084","1","Task","CM-T084 Git repository initialization and baseline commit","Done","High","P1","infrastructure","documentation","","","M0 Architecture Baseline","0.5","Medium","EV-00-09","CM-EPIC-01","","CM-T084","CM-T082","1082","","","- .gitignore excludes environment files, keys, dumps, logs, build output and raw evidence; nothing sensitive is staged.
+- The baseline commit hash is recorded in docs/report/evidence-plan.md (EV-00-09).","An auditable starting point for change management (ISO/IEC 27001 control 8.32).","*Placeholder ID:* CM-T084 | *Epic:* CM-EPIC-01 | *Phase:* 0.5 | *Release:* M0 Architecture Baseline | *Security impact:* Medium
+
+h3. Description
+Initialize the local git repository on {{main}}, verify {{.gitignore}}, create the baseline commit with the Phase 0 and Phase 0.5 documentation, and record the hash in the evidence plan. No remote yet. _Completed in Phase 0.5._
+
+h3. Acceptance criteria
+* {{.gitignore}} excludes environment files, keys, dumps, logs, build output and raw evidence; nothing sensitive is staged.
+* The baseline commit hash is recorded in {{docs/report/evidence-plan.md}} (EV-00-09).
+
+h3. Security considerations
+An auditable starting point for change management (ISO/IEC 27001 control 8.32).
+
+h3. Dependencies
+CM-T082
+
+h3. Evidence required
+EV-00-09"
+"1085","6","Task","CM-T085 Room Safety Code","Backlog","High","P1","crypto","frontend","security","","M3 Encrypted Collaboration","6","High","EV-06-05, EV-06-06","CM-EPIC-06","","CM-T085","CM-T036","1036","","","- Known-answer vectors for the derivation and the word mapping pass in all three browser engines.
+- The code changes with key material, key version and room, and never appears in requests, logs or storage (network and storage inspection).
+- A two-browser test harness with different keys shows different codes, while the commitment check alone does not catch it.
+- UI wording states the limits (L-22) and never presents the code as automatic protection.","Detects split views only when members compare (T-29, L-22). Does not detect T-36.","*Placeholder ID:* CM-T085 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+
+h3. Description
+Implement ADR-012 and CP-24: HKDF derivation from the decrypted room key material; the six-word display with the key version and a numeric alternative; the word list (LIB-08); the Safety Code panel with guidance and advisory prompts per profile; optional comparison records and mismatch reports that carry only the key version (AZ-30); the mismatch flow.
+
+h3. Acceptance criteria
+* Known-answer vectors for the derivation and the word mapping pass in all three browser engines.
+* The code changes with key material, key version and room, and never appears in requests, logs or storage (network and storage inspection).
+* A two-browser test harness with different keys shows different codes, while the commitment check alone does not catch it.
+* UI wording states the limits (L-22) and never presents the code as automatic protection.
+
+h3. Security considerations
+Detects split views only when members compare (T-29, L-22). Does not detect T-36.
+
+h3. Dependencies
+CM-T036
+
+h3. Evidence required
+EV-06-05, EV-06-06"
+"1086","4","Task","CM-T086 Decide key-version authentication (OCD-12) before Phase 4","Backlog","Highest","P0","crypto","architecture","security","","M2 Identity and Access","4","High","","CM-EPIC-04","","CM-T086","CM-T082","1082","","","- An ADR with the options, the chosen design, its limits and its effect on the vault, fingerprints, envelopes and rekey finalize.
+- Parameter register, data model, data flows and threat model (T-36, L-23) updated.
+- CM-T025 and later items updated to match.","Closes, or explicitly accepts, the largest open cryptographic gap in the baseline.","*Placeholder ID:* CM-T086 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
+
+h3. Description
+Decide how clients authenticate room-key versions and envelopes, so that a server-side attacker cannot distribute a key of its own (T-36). Evaluate per-user ECDSA P-256 signing keys held in the vault (recommended) against an authenticator chained to the previous room key. Record the decision in an ADR and update the identity, envelope and key-version formats before vault work starts.
+
+h3. Acceptance criteria
+* An ADR with the options, the chosen design, its limits and its effect on the vault, fingerprints, envelopes and rekey finalize.
+* Parameter register, data model, data flows and threat model (T-36, L-23) updated.
+* CM-T025 and later items updated to match.
+
+h3. Security considerations
+Closes, or explicitly accepts, the largest open cryptographic gap in the baseline.
+
+h3. Dependencies
+CM-T082
+
+h3. Evidence required
+none"
+"1087","14","Task","CM-T087 Optional Level 2 audit signing with a provider-managed key (OCD-13)","Backlog","Low","P3","cloud","crypto","security","","M7 Cloud Deployment","19","High","EV-19-09","CM-EPIC-14","","CM-T087","CM-T057, CM-T063","1057","1063","","- No signing key file remains on the VM; checkpoints verify with the provider key's public key.
+- The worker cannot administer or export the key (tested).
+- Evidence EV-19-09 captured; ADR-009 status updated.","Separates key custody from the VM (T-38). Does not help against a full cloud-account compromise.","*Placeholder ID:* CM-T087 | *Epic:* CM-EPIC-14 | *Phase:* 19 | *Release:* M7 Cloud Deployment | *Security impact:* High
+
+h3. Description
+If the selected provider offers asymmetric signing with non-exportable keys, move checkpoint signing to it: a key policy granting the worker ""sign"" only, an MFA-protected administration role, provider signing logs, a checkpoint format that records the algorithm, and a documented migration from the Level 1 key.
+
+h3. Acceptance criteria
+* No signing key file remains on the VM; checkpoints verify with the provider key's public key.
+* The worker cannot administer or export the key (tested).
+* Evidence EV-19-09 captured; ADR-009 status updated.
+
+h3. Security considerations
+Separates key custody from the VM (T-38). Does not help against a full cloud-account compromise.
+
+h3. Dependencies
+CM-T057, CM-T063
+
+h3. Evidence required
+EV-19-09"

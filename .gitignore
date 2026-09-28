@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+.turbo/
+
+# Test and coverage output
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Environment files and secrets: NEVER commit (see CLAUDE.md)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.p8
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+secrets/
+
+# Databases, dumps and backups
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql.gz
+backups/
+
+# Logs
+*.log
+logs/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Raw, unredacted evidence captures (only redacted evidence is committed, see docs/report/evidence-plan.md)
+docs/report/evidence/_raw/
+*.unredacted.*
+
+# Local tool output that existed before the project (empty .dist folder)
+.dist/
+
+# Local Claude Code settings
+.claude/settings.local.json
