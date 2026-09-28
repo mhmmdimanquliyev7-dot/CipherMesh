@@ -249,7 +249,7 @@ Subject tags: **CRY** Cryptography Fundamentals, **CLD** Cloud Security, **ISMS*
 | Item | Value |
 |---|---|
 | Repository | Local git repository, branch `main`, no remote yet |
-| Baseline commit | `PENDING-BASELINE-HASH` |
+| Baseline commit | `cb3b2229788ab2bea023630905077582e02cdd69` (2026-09-28) |
 | Commit message | `docs: establish CipherMesh security architecture and project baseline` |
 | Contents | Phase 0 and Phase 0.5 architecture, security, cryptography, cloud, management and report documentation, and the repository skeleton. No application code |
 | How to verify | `git show --stat <hash>` lists every file in the baseline |
