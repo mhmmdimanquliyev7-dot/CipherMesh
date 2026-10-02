@@ -134,7 +134,7 @@ Secrets never appear in the repository, images, CI logs, Jira or evidence screen
 
 | Environment | Purpose | Data |
 |---|---|---|
-| Local development | Docker Compose with PostgreSQL and a local S3-compatible emulator (selected in Phase 1 after a licence and maintenance check) | Synthetic only |
+| Local development | `infrastructure/docker/compose.dev.yml`: PostgreSQL 17.11 and the SeaweedFS S3 emulator (OD-03, chosen in Phase 1), both digest-pinned and bound to 127.0.0.1 (docs/architecture/engineering-baseline.md section 5) | Synthetic only |
 | Production (demonstration) | The cloud deployment | Synthetic demonstration data only; no real personal data |
 
 Production credentials are never used in development. Test and demonstration data are synthetic (ISO/IEC 27001:2022 controls 8.31 and 8.33).

@@ -1,0 +1,18 @@
+# EV-01-07: dependency audit and software bill of materials
+# Captured: 2026-10-02T11:22Z | pnpm 12.6.0 | base commit 5945d70 plus uncommitted Phase 1 changes
+
+$ pnpm audit:deps
+$ pnpm audit --audit-level high
+No known vulnerabilities found
+exit=0
+
+$ pnpm audit --prod
+No known vulnerabilities found
+exit=0
+
+$ pnpm sbom:generate   (CycloneDX, production dependencies of all workspaces)
+exit=0
+format CycloneDX 1.7 | components 128
+direct runtime dependencies present: express=true zod=true next=true react=true react-dom=true
+
+Runtime dependencies by workspace: see docs/architecture/engineering-baseline.md section 2.

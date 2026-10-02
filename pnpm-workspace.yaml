@@ -1,0 +1,20 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Supply-chain controls (threat T-27, docs/architecture/engineering-baseline.md).
+# Dependency lifecycle scripts are blocked unless allowlisted here.
+strictDepBuilds: true
+# esbuild ships its binary as an optional platform package, so its postinstall is denied.
+allowBuilds: { esbuild: false }
+# Do not install versions published less than three days ago.
+minimumReleaseAge: 4320
+# Reject git and tarball URLs in the dependency tree.
+blockExoticSubdeps: true
+engineStrict: true
+
+# One version of each shared dependency across the workspace.
+catalog:
+  zod: 4.6.5
+  typescript: 6.0.3
+  '@types/node': 24.19.0

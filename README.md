@@ -4,7 +4,7 @@
 
 CipherMesh lets authorized members of a *Secure Room* exchange sensitive files, notes and one-time secrets. Content is encrypted in the member's browser before it is uploaded. The server stores ciphertext, wrapped keys and the metadata it needs to enforce access control, security policy and auditing.
 
-> **Status: Phase 0.5 (architecture hardening and project-management bootstrap) complete, awaiting approval.** No application code exists yet. This repository contains the architecture, security model, cryptographic design, cloud design, threat model, Jira backlog and import package, roadmap and evidence plan that the implementation will follow.
+> **Status: Phase 1 (repository and application foundation) implemented, awaiting approval.** The monorepo, a minimal API (health and readiness only), the web shell, shared packages, tests and CI exist. No accounts, rooms or cryptography are implemented yet.
 
 ## Why this project exists
 
@@ -75,13 +75,40 @@ tests                 Integration, security regression and E2E tests
 docs                  All design, security, cloud, management and report documentation
 ```
 
-## Technology stack (planned)
+## Technology stack
 
-TypeScript, Next.js, React, Tailwind CSS, Node.js, Express, PostgreSQL, Prisma, S3-compatible object storage, WebCrypto, Argon2id, Docker, Docker Compose, Nginx, Ubuntu Server, Vitest, Playwright, GitHub Actions, Jira Cloud.
+TypeScript 6, Next.js 16, React 19, Tailwind CSS 4, Node.js 24, Express 5, zod 4, PostgreSQL, Prisma (from Phase 2), S3-compatible object storage, WebCrypto, Argon2id, Docker, Docker Compose, Nginx, Ubuntu Server, Vitest 5, Playwright, GitHub Actions, Jira Cloud.
 
 ## Getting started
 
-There is nothing to run yet. Phase 1 will add the monorepo tooling, the local Docker Compose environment and setup instructions here.
+Requirements: Node.js 24 LTS, pnpm 12.6 and, for the optional development services, Docker with Compose.
+
+```
+pnpm install --frozen-lockfile
+cp .env.example .env          # then replace every placeholder with local-only values
+pnpm dev                      # web on http://127.0.0.1:3100, API on http://127.0.0.1:4100/api/health
+```
+
+Quality and security checks:
+
+```
+pnpm format:check && pnpm lint && pnpm typecheck
+pnpm test                     # unit, integration and security suites
+pnpm build                    # API bundle and static web export with a hashed CSP
+pnpm smoke:api                # starts the built API and probes it
+pnpm exec playwright install chromium firefox webkit   # once
+pnpm test:e2e                 # the built web shell in three browsers, CSP violations fail the test
+pnpm audit:deps && pnpm scan:secrets && pnpm sbom:generate
+```
+
+Optional development services (PostgreSQL and an S3 emulator, bound to 127.0.0.1 only, not used by the application before Phase 2):
+
+```
+pnpm services:up
+pnpm services:down
+```
+
+Tool versions and the reasons behind them: [docs/architecture/engineering-baseline.md](docs/architecture/engineering-baseline.md).
 
 ## Project management
 

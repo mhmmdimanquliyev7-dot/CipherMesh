@@ -17,8 +17,9 @@ It is one project that must show real depth in three subjects. Security depth ma
 ## 2. Current phase and phase gating
 
 - **Phase 0 (Architecture and project bootstrap): complete and approved.**
-- **Phase 0.5 (Architecture hardening and project-management bootstrap): complete, awaiting approval by the project owner.** Review record: `docs/security/architecture-gate-phase-0-5.md`.
-- Next phase: **Phase 1 (Repository and Application Foundation)**. Do not start it without explicit approval.
+- **Phase 0.5 (Architecture hardening and project-management bootstrap): complete and approved.** Review record: `docs/security/architecture-gate-phase-0-5.md`.
+- **Phase 1 (Repository and Application Foundation): implemented, awaiting approval by the project owner.** Traceability: `docs/management/phase-01-traceability.md`.
+- Next phase: **Phase 2 (Database and Prisma)**. Do not start it without explicit approval.
 - Work is phase-gated. Finish one phase, report, and wait for approval before starting the next.
 - Phase details: `docs/management/project-roadmap.md`. Backlog: `docs/management/jira-backlog.md`.
 
@@ -45,8 +46,8 @@ recipient RSA-OAEP public key -> wrapped SEK (32 bytes) -> AES-256-GCM -> secret
 
 | Area | Choice |
 |---|---|
-| Language | TypeScript (strict) everywhere practical |
-| Frontend | Next.js (static export, proposed in ADR-011), React, Tailwind CSS |
+| Language | TypeScript 6.0 (strict) everywhere practical. TypeScript 7 waits for typescript-eslint support |
+| Frontend | Next.js 16 static export (ADR-011, accepted for export and CSP), React 19, Tailwind CSS 4 |
 | Backend | Node.js (current Active LTS), Express, TypeScript |
 | Database | PostgreSQL (managed in production), Prisma ORM |
 | Object storage | S3-compatible API (managed in production, local emulator in development) |
@@ -55,7 +56,7 @@ recipient RSA-OAEP public key -> wrapped SEK (32 bytes) -> AES-256-GCM -> secret
 | Validation | Schema validation at every trust boundary (planned: zod) |
 | Testing | Vitest (unit), HTTP-level API integration tests, Playwright (E2E), security regression suite |
 | Infrastructure | Ubuntu Server LTS, Docker, Docker Compose, Nginx |
-| Tooling | pnpm workspaces, ESLint, Prettier, GitHub Actions CI |
+| Tooling | pnpm 12 workspaces (build scripts blocked, 3-day release-age delay), ESLint with security guards, Prettier, GitHub Actions CI, gitleaks, CycloneDX SBOM |
 | Management | GitHub (code), Jira Cloud (work tracking) |
 
 Adding a runtime dependency, a service or an infrastructure component requires a justification in the PR.
@@ -109,7 +110,7 @@ Boundary rules: `apps/web` must not import `apps/api`. `packages/crypto` must no
 
 - **NEVER implement custom cryptography.** Use WebCrypto, Node.js `crypto`, and libraries approved in `docs/crypto/crypto-decisions.md`. Compose them only as specified in `docs/crypto/`.
 - Algorithms and parameters come only from the parameter register (CP-xx) in `docs/crypto/crypto-decisions.md`. Changing one requires an ADR update and tests.
-- ADR-007 (RSA-OAEP-3072 key distribution), ADR-010 (browser Argon2id) and ADR-011 (static frontend) are Proposed. Implement them as designed and record the confirming test or benchmark in the ADR before marking it Accepted.
+- ADR-007 (RSA-OAEP-3072 key distribution) and ADR-010 (browser Argon2id) are Proposed. Implement them as designed and record the confirming test or benchmark in the ADR before marking it Accepted. ADR-011 is Accepted for the static export and CSP; its identifier routing pattern is confirmed in Phase 5.
 - Encoding is not encryption. Base64 and hex are representations, not protection.
 - Use non-extractable `CryptoKey` objects wherever the API allows, and restrict key usages to the minimum needed.
 - Every encrypted record stores its algorithm suite identifier (`CM1` in the baseline) for crypto agility.
@@ -171,6 +172,8 @@ Boundary rules: `apps/web` must not import `apps/api`. `packages/crypto` must no
 - Playwright E2E runs in Chromium, Firefox and WebKit for vault, rooms, files, notes, secrets and rotation.
 - Never disable authorization, mock away the authorization module or relax a policy in tests. Use fixtures that create real users, memberships and keys.
 - Coverage target: at least 90% statements and branches for `packages/crypto`, the authorization module and the policy engine.
+- Before every commit run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`; run `pnpm test:e2e` when the web client changes. All commands are listed in `docs/architecture/engineering-baseline.md` section 7.
+- New API routes go through the route registry (`apps/api/src/routes/registry.ts`). Never mount Express handlers directly.
 
 ## 11. Documentation requirements
 
@@ -214,10 +217,10 @@ An item is done only when all of the following hold:
 
 ## 15. Key documents
 
-- Architecture: `docs/architecture/` (system-overview, data-flow, trust-boundaries, data-model, crypto-inspector, security-dashboard, security-ui, `adr/`)
+- Architecture: `docs/architecture/` (system-overview, data-flow, trust-boundaries, data-model, crypto-inspector, security-dashboard, security-ui, engineering-baseline, `adr/`)
 - Cryptography: `docs/crypto/` (cryptographic-architecture, key-hierarchy, key-lifecycle, crypto-decisions)
 - Threat model: `docs/threat-model/threat-model.md`
 - Security: `docs/security/` (security-principles, authorization-model, security-policy-profiles, security-testing-plan, session-and-csrf, limitations, isms-control-mapping, architecture-review, architecture-gate-phase-0-5)
 - Cloud: `docs/cloud/` (service-models, shared-responsibility, deployment-architecture)
-- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap)
+- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap, github-repository-settings, phase-01-traceability)
 - Report: `docs/report/evidence-plan.md`

@@ -1,0 +1,17 @@
+{
+  "name": "@ciphermesh/crypto",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Package boundary for CipherMesh client-side cryptography. No cryptography is implemented yet.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

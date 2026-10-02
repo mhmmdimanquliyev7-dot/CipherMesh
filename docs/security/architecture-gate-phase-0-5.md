@@ -95,7 +95,7 @@ The automated checks passed: every link resolves (after this record was added), 
 |---|---|---|
 | CM-T082 | Approval of this Phase 0.5 baseline | Phase 1 |
 | OD-07 | Who acts as security reviewer | Phase 1 |
-| OD-03 | Local S3-compatible emulator | Phase 1 (CM-T011) |
+| OD-03 | Local S3-compatible emulator. **Resolved in Phase 1:** SeaweedFS, because the MinIO community edition was archived (engineering-baseline.md section 5) | Phase 1 (CM-T011) |
 | OD-04 | Invite-only registration or email verification | Phase 3 |
 | OCD-03, OCD-05 | Server Argon2id parameters, pepper | Phase 3 |
 | **CM-T086 (OCD-12)** | **Authenticated key versions and envelopes** | **Phase 4** |

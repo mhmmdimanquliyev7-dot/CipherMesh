@@ -1,0 +1,64 @@
+import { fileURLToPath } from 'node:url';
+import { ESLint } from 'eslint';
+import { beforeAll, describe, expect, it } from 'vitest';
+
+// Proves the ESLint guards for CLAUDE.md section 8 actually fire (CM-T006 acceptance
+// criteria). Forbidden code is linted in the context of real files without touching them.
+const root = fileURLToPath(new URL('../..', import.meta.url));
+let eslint: ESLint;
+
+beforeAll(() => {
+  eslint = new ESLint({ cwd: root });
+});
+
+async function ruleIdsFor(code: string, filePath: string): Promise<string[]> {
+  const [result] = await eslint.lintText(code, { filePath: `${root}${filePath}` });
+  return (result?.messages ?? []).map((message) => `${message.ruleId ?? 'parse'}: ${message.message}`);
+}
+
+describe('ESLint security guards', () => {
+  it.each([
+    ['eval', 'export const run = (s: string): unknown => eval(s);', 'eval is forbidden'],
+    ['new Function', "export const f = new Function('return 1');", 'new Function is forbidden'],
+    ['Math.random', 'export const r = Math.random();', 'Math.random is forbidden'],
+    [
+      'unsafe raw SQL',
+      'declare const db: { $queryRawUnsafe(q: string): void };\ndb.$queryRawUnsafe("x");',
+      'Unsafe raw SQL',
+    ],
+    ['scattered process.env', "export const p = process.env['API_PORT'];", 'validated config module'],
+    ['WebCrypto outside packages/crypto', 'export const s = globalThis.crypto.subtle;', 'packages/crypto'],
+    ['child processes', "import { exec } from 'node:child_process';\nexport { exec };", 'Spawning processes'],
+  ])('rejects %s in API code', async (_label, code, expected) => {
+    const messages = await ruleIdsFor(code, 'apps/api/src/app.ts');
+    expect(messages.join('\n')).toContain(expected);
+  });
+
+  it('rejects dangerouslySetInnerHTML in the web client', async () => {
+    const code = 'export const X = () => <div dangerouslySetInnerHTML={{ __html: "x" }} />;';
+    expect((await ruleIdsFor(code, 'apps/web/src/app/page.tsx')).join('\n')).toContain(
+      'Render user content as text only',
+    );
+  });
+
+  it('rejects Node built-ins and server imports in browser code', async () => {
+    const node = await ruleIdsFor(
+      "import { readFile } from 'node:fs';\nexport { readFile };",
+      'apps/web/src/app/page.tsx',
+    );
+    expect(node.join('\n')).toContain('must not import Node built-ins');
+    const server = await ruleIdsFor(
+      "import { createApp } from '../../../api/src/app';\nexport { createApp };",
+      'apps/web/src/app/page.tsx',
+    );
+    expect(server.join('\n')).toContain('never import server code');
+  });
+
+  it('keeps shared packages browser-compatible', async () => {
+    const messages = await ruleIdsFor(
+      "import { createHash } from 'node:crypto';\nexport { createHash };",
+      'packages/shared/src/http.ts',
+    );
+    expect(messages.join('\n')).toContain('must not import Node built-ins');
+  });
+});

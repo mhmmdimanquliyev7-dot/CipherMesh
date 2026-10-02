@@ -1,0 +1,14 @@
+# Documentation is written by hand; reformatting would churn tables and wording.
+*.md
+*.csv
+docs/
+pnpm-lock.yaml
+node_modules/
+**/dist/
+**/.next/
+**/out/
+**/out-meta/
+coverage/
+playwright-report/
+test-results/
+apps/web/next-env.d.ts

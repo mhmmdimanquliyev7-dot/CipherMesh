@@ -2,7 +2,7 @@
 
 Client-side cryptography for CipherMesh: thin, well-tested wrappers around WebCrypto (AES-256-GCM, RSA-OAEP, HKDF, SHA-256), the browser Argon2id integration, and the canonical context (AAD / OAEP label / HKDF info) builders.
 
-Status: placeholder (Phase 0). Implementation starts in Phase 4.
+Status: package boundary only (Phase 1). The package exports nothing usable, and a test keeps it that way until Phase 4. Implementation starts in Phase 4.
 
 Rules:
 - No custom primitives or modes. Only the constructions specified in docs/crypto/.

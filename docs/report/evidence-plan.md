@@ -47,7 +47,11 @@ Subject tags: **CRY** Cryptography Fundamentals, **CLD** Cloud Security, **ISMS*
 | EV-01-02 | Branch protection settings | GitHub settings screenshot | Change control | ISMS |
 | EV-01-03 | Merge blocked by a failing check | Pull request screenshot | Gates are enforced | ISMS |
 | EV-01-04 | CSP header and a console without violations | Browser devtools | XSS defence in depth | APP |
-| EV-01-05 | Secret scan result | CI log excerpt | Secret-leak prevention | ISMS |
+| EV-01-05 | Secret scan result | CI log excerpt, or local gitleaks output before the remote exists | Secret-leak prevention | ISMS |
+| EV-01-06 | Built API smoke test and safe error responses | `pnpm smoke:api` and integration test output | Minimal health endpoints, generic errors without internal details | APP |
+| EV-01-07 | Dependency audit and SBOM | `pnpm audit:deps` output and SBOM summary | Supply-chain management (T-27) | ISMS, CLD |
+| EV-01-08 | Development services bound to loopback with authentication enforced | `docker compose ps` and access-check output | Development services not exposed; no default credentials | CLD |
+| EV-01-09 | Log redaction and security test results | `pnpm test` output for the redaction, CSRF-gate and route-inventory tests | Secrets never logged (INV-10); deny-by-default routing | APP, ISMS |
 
 ### Phase 2: Database
 | ID | Evidence | How to capture | Demonstrates | Tags |
