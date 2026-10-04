@@ -5,8 +5,9 @@ packages:
 # Supply-chain controls (threat T-27, docs/architecture/engineering-baseline.md).
 # Dependency lifecycle scripts are blocked unless allowlisted here.
 strictDepBuilds: true
-# esbuild ships its binary as an optional platform package, so its postinstall is denied.
-allowBuilds: { esbuild: false }
+# Denied install scripts: esbuild ships its binary as an optional platform package, and the
+# Prisma CLI downloads its schema engine on first use (binaries.prisma.sh, checksum-verified).
+allowBuilds: { '@prisma/engines': false, esbuild: false, prisma: false }
 # Do not install versions published less than three days ago.
 minimumReleaseAge: 4320
 # Reject git and tarball URLs in the dependency tree.
@@ -18,3 +19,14 @@ catalog:
   zod: 4.6.5
   typescript: 6.0.3
   '@types/node': 24.19.0
+  prisma: 7.10.0
+  '@prisma/client': 7.10.0
+  '@prisma/adapter-pg': 7.10.0
+  pg: 8.23.0
+# Security overrides for the Prisma CLI tree (Phase 2 dependency audit). Prisma 7.10.0 pins
+# vulnerable versions; remove these when a Prisma 7 release ships patched ones.
+#   deepmerge-ts: GHSA-ggr8-5vv4-36mx (high). @prisma/config only calls `deepmerge`, unchanged in 8.x.
+#   mysql2: GHSA-3f6p-5ww8-9rcr (high), GHSA-rgwj-5xj2-c3m3 (moderate). Same major version.
+overrides:
+  '@prisma/config>deepmerge-ts': 8.0.2
+  'prisma>mysql2': 3.24.5
