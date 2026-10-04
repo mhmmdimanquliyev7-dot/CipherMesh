@@ -1,7 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// E2E tests run against the built static export (`pnpm build` first), served with the
-// generated security headers. Chromium, Firefox and WebKit, as CLAUDE.md section 10 requires.
+// E2E tests run against the built static export and the built API (`pnpm build` first), served
+// over HTTPS on one origin by tests/e2e/static-server.mjs with the generated security headers,
+// like Nginx in production. The API needs the database (DATABASE_URL). Chromium, Firefox and
+// WebKit, as CLAUDE.md section 10 requires. The self-signed test certificate is accepted only here.
 const port = 4173;
 
 export default defineConfig({
@@ -9,10 +11,11 @@ export default defineConfig({
   forbidOnly: Boolean(process.env['CI']),
   retries: 0,
   reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
-  use: { baseURL: `http://127.0.0.1:${port}` },
+  use: { baseURL: `https://127.0.0.1:${String(port)}`, ignoreHTTPSErrors: true },
   webServer: {
     command: 'node tests/e2e/static-server.mjs',
-    url: `http://127.0.0.1:${port}/`,
+    url: `https://127.0.0.1:${String(port)}/`,
+    ignoreHTTPSErrors: true,
     env: { E2E_PORT: String(port) },
     reuseExistingServer: !process.env['CI'],
   },
