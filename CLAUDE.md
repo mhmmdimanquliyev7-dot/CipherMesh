@@ -18,10 +18,10 @@ It is one project that must show real depth in three subjects. Security depth ma
 
 - **Phase 0 (Architecture and project bootstrap): complete and approved.**
 - **Phase 0.5 (Architecture hardening and project-management bootstrap): complete and approved.** Review record: `docs/security/architecture-gate-phase-0-5.md`.
-- **Phase 1 (Repository and Application Foundation): implemented; the project owner continued to Phase 2.** Not merged into `main` because no GitHub remote exists; its CI-run and branch-protection evidence is still pending. Traceability: `docs/management/phase-01-traceability.md`.
-- **Phase 2 (Database and Prisma): implemented on the stacked branch `feature/CM-T013-database-prisma`; the project owner continued to Phase 3.** Traceability: `docs/management/phase-02-traceability.md`. Database controls: `docs/security/database-security.md`.
-- **Phase 3 (Authentication): implemented on the stacked branch `feature/CM-T015-authentication`, awaiting approval by the project owner.** Traceability: `docs/management/phase-03-traceability.md`. Controls: `docs/security/authentication-security.md`.
-- Next phase: **Phase 4 (Cryptographic Identity and Vault)**. Do not start it without explicit approval.
+- **Phase 1 (Repository and Application Foundation): implemented; the project owner continued to Phase 2.** Merged into `main` through pull request #1 with CI passing; its branch-protection evidence is still pending. Traceability: `docs/management/phase-01-traceability.md`.
+- **Phase 2 (Database and Prisma): implemented and merged into `main` through pull request #7; the project owner continued to Phase 3.** Traceability: `docs/management/phase-02-traceability.md`. Database controls: `docs/security/database-security.md`.
+- **Phase 3 (Authentication): implemented and merged into `main` through pull request #8, awaiting approval by the project owner.** Traceability: `docs/management/phase-03-traceability.md`. Controls: `docs/security/authentication-security.md`.
+- Next phase: **Phase 4 (Cryptographic Identity and Vault)**. Do not start it without explicit approval. Its branch starts from the updated `main`.
 - Work is phase-gated. Finish one phase, report, and wait for approval before starting the next.
 - Phase details: `docs/management/project-roadmap.md`. Backlog: `docs/management/jira-backlog.md`.
 
@@ -194,7 +194,7 @@ Boundary rules: `apps/web` must not import `apps/api`. `packages/crypto` must no
 
 ## 12. Git workflow
 
-- The repository was initialized locally in Phase 0.5 with a baseline commit on `main`. No remote exists yet; when GitHub is connected, `main` becomes protected.
+- The repository was initialized locally in Phase 0.5 with a baseline commit on `main`. Its GitHub remote is `mhmmdimanquliyev7-dot/CipherMesh`, where a ruleset protects `main`. Phases 1 to 3 arrived through pull requests #1, #7 and #8 with merge commits. New branches start from the updated `main`.
 - `main` is protected. Changes arrive only through pull requests with passing CI. No direct commits and no force pushes.
 - Branch names: `feature/CM-<n>-short-description`, `fix/CM-<n>-...`, `security/CM-<n>-...`, `docs/CM-<n>-...`, `infra/CM-<n>-...`.
 - Commit messages use Conventional Commits with the Jira key, for example `feat(api): add session revocation endpoint (CM-17)`.
