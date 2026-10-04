@@ -1,6 +1,6 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-04, end of Prompt 05. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-04, end of Prompt 05. Repository and workflow state updated on 2026-10-04 (UTC) after the GitHub integration of Phases 1 to 3. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
@@ -8,9 +8,9 @@ Snapshot: 2026-10-04, end of Prompt 05. The source of truth is the repository: C
 |---|---|
 | Completed | Prompt 05 / Phase 3, Authentication (CM-T015 to CM-T022): implemented, awaiting project owner approval |
 | Next | Prompt 06 / Phase 4, Cryptographic Identity and Vault. Do not start without explicit approval |
-| Current branch | `feature/CM-T015-authentication` (head `4b77d00`) |
-| Parent branch | `feature/CM-T013-database-prisma` (head `92418c3`) |
-| Stacking | Three stacked branches, none merged: `main` (`5945d70`) ← `feature/CM-T006-application-foundation` (`900b664`) ← `feature/CM-T013-database-prisma` ← `feature/CM-T015-authentication`. No GitHub remote exists, so no pull request or CI run has happened. Never rewrite these histories. Create the Prompt 06 branch from `feature/CM-T015-authentication` |
+| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`). It contains Phases 0 to 3; the Phase 3 merge commit is `8a8e10c` |
+| Integration | Phases 1, 2 and 3 were merged through pull requests #1, #7 and #8 with merge commits (`ad179b8`, `786cef1`, `8a8e10c`). GitHub Actions CI passed on the final head of each pull request; for PR #8 that came after the two fixes listed below. The phase branches remain on GitHub, take no further commits, and their histories must never be rewritten |
+| Prompt 06 branch | **Create it from the updated `main`** (`git checkout main && git pull --ff-only`), never from a phase branch |
 
 Recent commits (oldest first):
 
@@ -20,6 +20,9 @@ Recent commits (oldest first):
 | `900b664` | Phase 1 application foundation (CM-T006 to CM-T012) |
 | `50eaabb`, `1952980`, `147f633`, `92418c3` | Phase 2 schema, roles and migrations; API database connection; database tests and CI; docs |
 | `1542247`, `5225cff`, `0ecf4fa`, `3b3f0a3`, `4b77d00` | Phase 3 auth_challenges migration; authentication; web screens; tests; docs |
+| `fc611cf` | This engineering handoff |
+| `753cc99`, `0a7f1e1` | Fixes from the Phase 3 pull-request CI: random per-run authentication keys for the CI seed step; zod `jitless` so the shared schemas cause no CSP violation (CSP unchanged, new E2E checks) |
+| `ad179b8`, `786cef1`, `8a8e10c` | Merge commits of pull requests #1, #7 and #8 |
 
 ## 2. Architecture implemented so far
 
@@ -70,20 +73,22 @@ All of CLAUDE.md section 6 (INV-01 to INV-19). For Prompt 06 especially:
 - ADR-002, ADR-003, ADR-007 (Proposed), ADR-010 (Proposed), ADR-008, ADR-011.
 - `docs/architecture/data-flow.md` DF-03 and DF-04; `docs/architecture/data-model.md` 4.5; `docs/security/authentication-security.md`; `docs/threat-model/threat-model.md` T-22, T-23, T-25, T-36, sections 8 and 9; `docs/security/limitations.md` L-01, L-07, L-08, L-15, L-17, L-23.
 
-## 8. Test counts (last full run, 2026-10-04)
+## 8. Test counts (last full run, 2026-10-04, locally and in the final PR #8 CI run)
 
 | Suite | Tests |
 |---|---|
-| unit | 168 |
+| unit | 169 |
 | integration | 19 |
 | security | 75 |
 | auth (`tests/auth`, real API and database) | 186 |
 | database (`tests/database`) | 105 |
-| **`pnpm test` total** | **553 in 36 files** |
-| `pnpm test:e2e` (Chromium, Firefox, WebKit) | 18 |
-| `pnpm security:negative-controls` | 10 of 10 defects caught |
+| **`pnpm test` total** | **554 in 36 files** |
+| `pnpm test:e2e` (Chromium, Firefox, WebKit) | 27 |
+| `pnpm security:negative-controls` | 10 of 10 defects caught (local run, Prompt 05) |
 
-The auth, database, E2E and smoke runs need the local database.
+The auth, database, E2E and smoke runs need the local database. CI provides a throwaway PostgreSQL service and random per-run role passwords and authentication keys.
+
+Known intermittent failure, not yet fixed: `tests/database/deletion.test.ts` "the worker may delete expired sessions…" occasionally gets 0 deleted rows. Both it and `tests/database/retention.test.ts` use the same shared test database, and Vitest runs files in parallel. `runAuthRetention` deletes every session that ended more than 30 days ago, which includes the deletion test's 40-day-old session if it runs between that test's insert and delete. The proposed fix gives that session an end time inside the 30-day window, or isolates the retention test's database, and belongs in its own fix pull request.
 
 ## 9. Known limitations and residual risks
 
@@ -111,8 +116,10 @@ The auth, database, E2E and smoke runs need the local database.
 
 ## 11. Outstanding work outside the repository
 
-- Create the GitHub remote; open pull requests for Phases 1 to 3 in order; run CI.
-- Branch protection, plus evidence EV-01-01 (CI run), EV-01-02 and EV-01-03.
+- Done: GitHub remote created; Phases 1 to 3 merged through pull requests #1, #7 and #8, each with CI passing on its final head.
+- Branch protection (CM-T012): `main` has a ruleset (pull request required, resolved review threads, no force push or deletion), but its list of required status checks is empty, so a pull request with failing checks could still merge. Add the three CI jobs as required checks to meet "pull requests cannot merge with failing checks". Then capture EV-01-01 (CI run), EV-01-02 and EV-01-03 from GitHub.
+- GitGuardian: tag the three PR #8 incidents (37860799 to 37860801) as false positives (synthetic test credentials), as done for Phase 1. The classification is in the PR #8 comments.
+- Dependabot pull requests #2 to #6 are open. #2 (PostgreSQL 18) conflicts with the approved PostgreSQL 17 and needs an ADR. #6 (`@types/node` 26) is ahead of Node 24 in `.nvmrc`. Review the others through CI and SECURITY REVIEW.
 - Jira: import the backlog (`docs/management/jira-import-guide.md`); move CM-T006 to CM-T022 through IN PROGRESS, SECURITY REVIEW and TESTING. Nothing is DONE yet.
 - Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, and the roadmap's Jira history items for Phases 2 and 3.
 - Captured evidence: `docs/report/evidence/index.md`.
