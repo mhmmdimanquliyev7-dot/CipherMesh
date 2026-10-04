@@ -21,10 +21,10 @@ Status: Phase 1 implemented on 2026-10-02, awaiting project owner approval. Cove
 | CM-T010 Logging with redaction | Redaction unit tests for every listed field | `apps/api/src/logging` | `redact.test.ts`, `logger.test.ts` | Met |
 | | Canary secrets sent through endpoints never appear in logs | Request log without bodies, query strings or headers | `tests/security/http-baseline.test.ts` | Met |
 | CM-T011 Local development environment | One command starts database and storage; ports on 127.0.0.1 | `infrastructure/docker/compose.dev.yml`, `pnpm services:up` | Manual verification (EV-01-08) | Met |
-| | No real credentials; emulator choice documented | `.env.example` placeholders; OD-03 in engineering-baseline.md | gitleaks | Met. Synthetic seed data is deferred to Phase 2, because no schema exists |
+| | No real credentials; emulator choice documented | `.env.example` placeholders; OD-03 in engineering-baseline.md | gitleaks | Met. Synthetic seed data followed in Phase 2 ([phase-02-traceability.md](phase-02-traceability.md)) |
 | CM-T012 CI pipeline | Pull requests cannot merge with failing checks | `.github/workflows/ci.yml` | actionlint | **Not met yet.** Needs the GitHub remote and branch protection ([github-repository-settings.md](github-repository-settings.md)) |
 | | Actions pinned to commit SHAs; token read-only | Workflow pins and `permissions: contents: read` | actionlint | Met |
-| | Branch protection and blocked-merge evidence | | | **Pending** (EV-01-02, EV-01-03). The PostgreSQL CI service is added in Phase 2 |
+| | Branch protection and blocked-merge evidence | | | **Pending** (EV-01-02, EV-01-03). The PostgreSQL CI service was added in Phase 2 |
 
 ## 2. Work started ahead of its phase
 

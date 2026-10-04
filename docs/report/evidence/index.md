@@ -24,3 +24,16 @@ Rules: [../evidence-plan.md](../evidence-plan.md) section 2. Every file is redac
 | EV-01-07 | [phase-01/EV-01-07_dependency-audit-and-sbom.txt](phase-01/EV-01-07_dependency-audit-and-sbom.txt) | 2026-10-02 | CM-T012 | No known vulnerabilities; CycloneDX SBOM generated |
 | EV-01-08 | [phase-01/EV-01-08_dev-services.txt](phase-01/EV-01-08_dev-services.txt) | 2026-10-02 | CM-T011 | PostgreSQL and the S3 emulator listen on 127.0.0.1 only; wrong credentials rejected |
 | EV-01-09 | [phase-01/EV-01-09_test-results.txt](phase-01/EV-01-09_test-results.txt) | 2026-10-02 | CM-T007, CM-T009, CM-T010 | All 129 unit, integration and security tests pass, including redaction, CSRF gate and route inventory |
+
+## Phase 2
+
+Captured on the stacked branch `feature/CM-T013-database-prisma` against the local PostgreSQL container and throwaway test databases. The CI-run versions of these items need the GitHub remote.
+
+| ID | File | Date | Jira | Caption |
+|---|---|---|---|---|
+| EV-02-01 | [phase-02/EV-02-01_forbidden-field-check.txt](phase-02/EV-02-01_forbidden-field-check.txt) | 2026-10-04 | CM-T013 | Forbidden-field check passes on 203 classified fields; 33 negative controls fail as expected |
+| EV-02-02 | [phase-02/EV-02-02_audit-append-only.txt](phase-02/EV-02-02_audit-append-only.txt) | 2026-10-04 | CM-T014 | UPDATE, DELETE and TRUNCATE on `audit_events` refused for the API role (grants) and for the owner and a misgranted role (trigger) |
+| EV-02-03 | [phase-02/EV-02-03_role-grants.txt](phase-02/EV-02-03_role-grants.txt) | 2026-10-04 | CM-T014 | Role attributes, ownership, table grants per role; DDL and role creation refused for `cm_api` |
+| EV-02-04 | [phase-02/EV-02-04_migrations-and-drift.txt](phase-02/EV-02-04_migrations-and-drift.txt) | 2026-10-04 | CM-T013 | Migrations from an empty database, idempotent re-run, drift check passing and failing on an out-of-band change |
+| EV-02-05 | [phase-02/EV-02-05_database-tests-and-seed.txt](phase-02/EV-02-05_database-tests-and-seed.txt) | 2026-10-04 | CM-T011, CM-T013, CM-T014 | All 103 database tests pass; synthetic seed output |
+| EV-02-06 | [phase-02/EV-02-06_database-url-rules.txt](phase-02/EV-02-06_database-url-rules.txt) | 2026-10-04 | CM-T013 | Database URL rules (role, TLS), redaction, and the built API with fail-closed and working readiness |

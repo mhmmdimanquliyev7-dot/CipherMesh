@@ -1,6 +1,6 @@
-# Engineering Baseline (Phase 1)
+# Engineering Baseline (Phases 1 and 2)
 
-Status: Phase 1, 2026-10-02. Records the tool and version decisions, the request pipeline and the local development setup established by CM-T006 to CM-T012. Related: [ADR-001](adr/ADR-001-monorepo-architecture.md), [ADR-011](adr/ADR-011-static-frontend-delivery.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
+Status: Phase 1, 2026-10-02; database layer added in Phase 2 (2026-10-04). Records the tool and version decisions, the request pipeline and the local development setup established by CM-T006 to CM-T014. Related: [ADR-001](adr/ADR-001-monorepo-architecture.md), [ADR-011](adr/ADR-011-static-frontend-delivery.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
 
 ## 1. Versions
 
@@ -20,7 +20,9 @@ Versions were checked against the npm registry and peer-dependency ranges on 202
 | Prettier | 3.9.9 | Formats code only; documentation is excluded |
 | Playwright | 1.63.0 | Chromium, Firefox and WebKit |
 | tsx / esbuild | 4.23.15 / 0.28.2 | API development runner and production bundler (tsx already depends on esbuild) |
-| PostgreSQL (development) | 17.11, image pinned by digest | Supported until 2029; managed services offer it. Phase 2 confirms the production version |
+| PostgreSQL (development) | 17.11, image pinned by digest | Supported until 2029; managed services offer it. Phase 2 confirmed 17 as the target major version for the managed database (CM-T067) |
+| Prisma (CLI, client, pg adapter) | 7.10.0 | Latest stable major. Prisma 8 is only a release candidate (`8.0.0-rc.19` carries the `latest` tag on 2026-10-04), so it was not selected. Prisma 7 supports Node 24 and TypeScript 6. Uses the `prisma-client` generator and the `@prisma/adapter-pg` driver adapter (no Rust query engine at runtime). Preview feature `partialIndexes` for the partial unique indexes required by the data model |
+| pg (node-postgres) | 8.23.0 | Driver used by the Prisma adapter and by the database tooling and tests |
 | SeaweedFS (development) | 4.47, image pinned by digest | See section 5 |
 | gitleaks | 8.30.1, image pinned by digest | Secret scanning locally and in CI |
 
@@ -28,7 +30,7 @@ Versions were checked against the npm registry and peer-dependency ranges on 202
 
 | Workspace | Runtime dependencies | Why |
 |---|---|---|
-| apps/api | express, zod, @ciphermesh/shared, @ciphermesh/validation | HTTP server; configuration and input validation |
+| apps/api | express, zod, @prisma/client, @prisma/adapter-pg, pg, @ciphermesh/shared, @ciphermesh/validation | HTTP server; configuration and input validation; database access (Phase 2) |
 | apps/web | next, react, react-dom, @ciphermesh/shared | Approved frontend stack |
 | packages/validation | zod, @ciphermesh/shared | Boundary schemas |
 | packages/shared, packages/crypto | none | |
@@ -44,7 +46,8 @@ Deliberately not added:
 - The API is bundled by esbuild into `apps/api/dist/server.js`. Workspace sources are bundled, and third-party dependencies stay external.
 - `moduleResolution: Bundler` everywhere, with strict compiler options: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax` and `noImplicitReturns`.
 - Supply-chain settings in `pnpm-workspace.yaml`:
-  - `strictDepBuilds`, with dependency build scripts denied by default. esbuild's postinstall is explicitly denied; its binary comes from an optional platform package.
+  - `strictDepBuilds`, with dependency build scripts denied by default. esbuild's postinstall is explicitly denied; its binary comes from an optional platform package. The install scripts of `prisma` and `@prisma/engines` are denied as well: the CLI downloads its schema engine on first use from `binaries.prisma.sh` and verifies its checksum. That download is a supply-chain dependency of the tooling, not of the runtime (T-27).
+  - The root `postinstall` script runs `prisma generate` through `scripts/db/prisma.mjs`. The generated client (`apps/api/src/generated/prisma`) is never committed.
   - `minimumReleaseAge` of three days.
   - `blockExoticSubdeps`.
   - `engineStrict`.
@@ -90,7 +93,18 @@ The same-origin gate (INV-19) is part of the foundation rather than waiting for 
 
 **Why SeaweedFS (OD-03).** The MinIO community edition stopped publishing images in October 2025, entered maintenance mode in December 2025 and was archived in April 2026. SeaweedFS is Apache-2.0 licensed, actively released, and runs as a single container with S3 authentication from environment variables. Garage was the alternative: AGPL-3.0, and it needs extra layout configuration. The application code uses the S3 API behind an interface (Phase 7), so the emulator can be replaced.
 
-PostgreSQL uses port 55432 rather than 5432, because a native PostgreSQL commonly occupies the default port on developer machines. The API does not connect to either service before Phase 2.
+PostgreSQL uses port 55432 rather than 5432, because a native PostgreSQL commonly occupies the default port on developer machines. From Phase 2 the API connects to PostgreSQL as `cm_api`; object storage follows in Phase 7.
+
+### 5.1 Database setup (Phase 2)
+
+```
+pnpm services:up      # PostgreSQL and the S3 emulator on 127.0.0.1
+pnpm db:bootstrap     # roles cm_migrator, cm_api, cm_worker, cm_verifier and the `ciphermesh` database
+pnpm db:migrate       # prisma migrate deploy as cm_migrator
+pnpm db:seed          # optional synthetic data (DISABLED accounts, no credentials, no key material)
+```
+
+Roles, grants, constraints and the reasoning are in [../security/database-security.md](../security/database-security.md). The Prisma CLI runs only through `scripts/db/prisma.mjs`, which allows `generate`, `validate`, `format`, `version`, `migrate deploy`, `migrate status` and `migrate diff`, and switches off Prisma telemetry (`CHECKPOINT_DISABLE`). `migrate dev`, `migrate reset`, `db push` and `db execute` are refused: schema changes arrive only as reviewed migration files.
 
 ## 6. Web security headers
 
@@ -109,9 +123,11 @@ The file sits next to the export and is not served. The E2E server applies it to
 |---|---|
 | `pnpm install --frozen-lockfile` | Reproducible install from the committed lockfile |
 | `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | Formatting, type-aware lint with security guards, strict type checking |
-| `pnpm test` (or `test:unit`, `test:integration`, `test:security`) | Vitest suites |
+| `pnpm test` (or `test:unit`, `test:integration`, `test:security`, `test:database`) | Vitest suites. The database suite needs PostgreSQL (section 5.1) and fails, rather than skips, without it |
+| `pnpm db:validate`, `pnpm db:check-schema`, `pnpm db:drift`, `pnpm db:status` | Prisma schema validation, forbidden-field check, drift between the database and the schema, migration status |
+| `pnpm db:bootstrap`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:generate` | Local roles and database, migrations, synthetic seed, Prisma client generation |
 | `pnpm build` | API bundle and web static export with CSP generation |
-| `pnpm smoke:api` | Starts the built API and probes it; checks graceful shutdown on Linux |
+| `pnpm smoke:api` | Starts the built API twice: in production mode with an unreachable TLS-only database (readiness must fail closed) and against the real database (readiness must succeed). Checks graceful shutdown on Linux and that no database password reaches the log |
 | `pnpm test:e2e` | Playwright against the built export with the generated headers |
 | `pnpm audit:deps`, `pnpm scan:secrets`, `pnpm sbom:generate` | Dependency advisories, gitleaks over the git history, CycloneDX SBOM |
 | `pnpm services:up`, `pnpm services:down` | Development PostgreSQL and S3 emulator |

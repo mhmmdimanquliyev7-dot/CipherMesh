@@ -1,0 +1,28 @@
+EV-02-02: Rejected UPDATE, DELETE and TRUNCATE on the append-only audit table
+Captured: 2026-10-04T07:06:42.972Z on branch feature/CM-T013-database-prisma (stacked on 900b664)
+Environment: local PostgreSQL 17.11 container (127.0.0.1:55432), throwaway database cm_test_<random>
+Redaction: no passwords, connection strings or real personal data appear below; database names are random test names.
+
+As cm_api (runtime role):
+  INSERT INTO audit_events (seq 1, SYNTHETIC_TEST_EVENT) -> OK
+  UPDATE audit_events SET outcome = 'FAILURE' WHERE seq = 1
+    -> ERROR 42501: permission denied for table audit_events
+  DELETE FROM audit_events WHERE seq = 1
+    -> ERROR 42501: permission denied for table audit_events
+  TRUNCATE audit_events
+    -> ERROR 42501: permission denied for table audit_events
+
+As cm_migrator (table owner, holds every privilege; the trigger layer):
+  UPDATE audit_events SET outcome = 'FAILURE' WHERE seq = 1
+    -> ERROR 42501: audit_events is append-only: UPDATE is not allowed
+  DELETE FROM audit_events WHERE seq = 1
+    -> ERROR 42501: audit_events is append-only: DELETE is not allowed
+  TRUNCATE audit_events
+    -> ERROR 42501: audit_events is append-only: TRUNCATE is not allowed
+
+Rows after all attempts: [{"seq":"1","action":"SYNTHETIC_TEST_EVENT","outcome":"SUCCESS"}]
+
+With a deliberately wrong grant (GRANT UPDATE, DELETE, TRUNCATE ON audit_events TO cm_api):
+  UPDATE as cm_api -> ERROR 42501: audit_events is append-only: UPDATE is not allowed
+
+Limit (L-26): the owner can disable the trigger. This is why the hash chain and external checkpoints follow in Phase 12 (ADR-009).

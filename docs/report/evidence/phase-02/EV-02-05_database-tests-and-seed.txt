@@ -1,0 +1,113 @@
+EV-02-05: Database security test results and the synthetic seed
+Captured: 2026-10-04T07:11:06Z on branch feature/CM-T013-database-prisma (stacked on 900b664)
+Redaction: no passwords or connection strings appear below; test databases have random names.
+
+$ pnpm db:seed
+db:seed: 3 synthetic users present (DISABLED, no credentials, no key material)
+
+$ pnpm test:database --reporter=verbose
+ ✓ |database| tests/database/audit.test.ts > audit_events as the API role > can append and read events
+ ✓ |database| tests/database/audit.test.ts > audit_events as the API role > is refused UPDATE by its grants
+ ✓ |database| tests/database/audit.test.ts > audit_events as the API role > is refused DELETE by its grants
+ ✓ |database| tests/database/audit.test.ts > audit_events as the API role > is refused TRUNCATE by its grants
+ ✓ |database| tests/database/audit.test.ts > audit_events as the table owner (the trigger layer) > is refused UPDATE even though the owner holds every privilege
+ ✓ |database| tests/database/audit.test.ts > audit_events as the table owner (the trigger layer) > is refused DELETE even though the owner holds every privilege
+ ✓ |database| tests/database/audit.test.ts > audit_events as the table owner (the trigger layer) > is refused TRUNCATE even though the owner holds every privilege
+ ✓ |database| tests/database/constraints.test.ts > baseline fixtures > a complete room with key version, owner and envelope satisfies every constraint
+ ✓ |database| tests/database/constraints.test.ts > partial unique indexes (data-model 4.5 to 4.9.1) > allows one ACTIVE key pair per user, and keeps superseded keys without private keys
+ ✓ |database| tests/database/privileges.test.ts > role attributes > no CipherMesh role is a superuser or can create databases, roles or replication
+ ✓ |database| tests/database/privileges.test.ts > role attributes > no CipherMesh role is a member of another role, including predefined roles such as pg_write_all_data
+ ✓ |database| tests/database/privileges.test.ts > role attributes > runtime roles carry statement and idle-transaction timeouts (T-26)
+ ✓ |database| tests/database/privileges.test.ts > ownership > the migration role owns the database, the schema and every object; runtime roles own nothing
+ ✓ |database| tests/database/constraints.test.ts > partial unique indexes (data-model 4.5 to 4.9.1) > allows exactly one ACTIVE OWNER per room
+ ✓ |database| tests/database/constraints.test.ts > partial unique indexes (data-model 4.5 to 4.9.1) > allows one current membership per user and room, and a new one after removal
+ ✓ |database| tests/database/constraints.test.ts > partial unique indexes (data-model 4.5 to 4.9.1) > allows one ACTIVE key version per room and unique version numbers
+ ✓ |database| tests/database/constraints.test.ts > partial unique indexes (data-model 4.5 to 4.9.1) > allows one PENDING rekey operation per room (ADR-013)
+ ✓ |database| tests/database/deletion.test.ts > foreign keys restrict deletion (no cascades) > even the table owner cannot delete a user or a room that other rows reference
+ ✓ |database| tests/database/deletion.test.ts > foreign keys restrict deletion (no cascades) > declares no ON DELETE CASCADE anywhere, and SET NULL only for purged rekey operations
+ ✓ |database| tests/database/deletion.test.ts > member removal (data-model section 5, INV-07) > the API role can remove a member, delete their envelopes and lock the room in one transaction
+ ✓ |database| tests/database/deletion.test.ts > retention deletes by the worker > purging a closed rekey operation keeps the key version it activated
+ ✓ |database| tests/database/deletion.test.ts > retention deletes by the worker > the worker may delete expired sessions and old login attempts; the API role may not
+ ✓ |database| tests/database/constraints.test.ts > partial unique indexes (data-model 4.5 to 4.9.1) > allows one open invitation per invitee and room
+ ✓ |database| tests/database/constraints.test.ts > partial unique indexes (data-model 4.5 to 4.9.1) > treats email addresses case-insensitively
+ ✓ |database| tests/database/constraints.test.ts > partial unique indexes (data-model 4.5 to 4.9.1) > stores at most one envelope per room, key version and recipient key
+ ✓ |database| tests/database/constraints.test.ts > composite foreign keys > rejects an envelope whose recipient key belongs to another user
+ ✓ |database| tests/database/constraints.test.ts > composite foreign keys > rejects envelopes, files and notes for a key version the room does not have
+ ✓ |database| tests/database/constraints.test.ts > composite foreign keys > rejects a secret wrapped for a key that is not the recipient key
+ ✓ |database| tests/database/constraints.test.ts > composite foreign keys > rejects a membership that points to an invitation of another room
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a plaintext password as password_hash (INV-11)
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a bcrypt hash as password_hash (INV-11)
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects an Argon2i (not id) hash as password_hash (INV-11)
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects an ACTIVE key pair without its encrypted private key, and a retired one that keeps it
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with an SPKI that is not RSA-3072 sized
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with an upper-case fingerprint
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with a short fingerprint
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with a KDF below the Argon2id floor (CP-04)
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with a single KDF iteration
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with another KDF
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with a short salt
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with a 16-byte IV
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with a private key too short to be ciphertext of a PKCS#8 key
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a key pair with an unknown algorithm suite
+ ✓ |database| tests/database/privileges.test.ts > grant matrix > runtime roles hold exactly the reviewed table privileges and nothing else
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects an envelope of 383 bytes: RSA-OAEP-3072 output is exactly 384 bytes (INV-17)
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects an envelope of 385 bytes: RSA-OAEP-3072 output is exactly 384 bytes (INV-17)
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects an envelope of a content-sized payload: RSA-OAEP-3072 output is exactly 384 bytes (INV-17)
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a secret whose payload or wrapped SEK survives burning (INV-13)
+ ✓ |database| tests/database/privileges.test.ts > grant matrix > grants no column-level privileges that the table matrix would not show
+ ✓ |database| tests/database/privileges.test.ts > grant matrix > PUBLIC holds no privilege on the database, the schema or any table
+ ✓ |database| tests/database/privileges.test.ts > grant matrix > runtime roles may use the schema but not create objects in it
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot create a table
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot create a temporary table
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot create a function
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot add a column
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot drop a table
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot disable the audit trigger
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot truncate a table
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot delete users (tombstones only)
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot delete rooms (tombstones only)
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot delete encrypted content (tombstones only)
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot read the migration history
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot create a role
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot create a database
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot become the migration role
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot make itself a superuser
+ ✓ |database| tests/database/privileges.test.ts > what the API role cannot do > cannot read server files
+ ✓ |database| tests/database/privileges.test.ts > privilege escalation through GRANT > a GRANT by the API role has no effect: it holds no grant option
+ ✓ |database| tests/database/privileges.test.ts > worker and verifier roles > the worker cannot delete users, change audit rows or read password hashes and private keys
+ ✓ |database| tests/database/privileges.test.ts > worker and verifier roles > the verifier can read audit events and nothing else, and cannot write them
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a deleted file that keeps its wrapped FEK or manifest, and an oversized file (CP-19)
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects a deleted note that keeps its ciphertext or wrapped NEK
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > keeps the room key state consistent with its rekey reasons (INV-07)
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > only allows a rekey operation that targets the next version
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > enforces the two-person rule for invitation approval and never invites an OWNER
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > records exactly one of account ID or identifier HMAC per login attempt, never a raw identifier
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects identifiers that are not UUIDv4
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > keeps sessions within their absolute lifetime and digests at 32 bytes
+ ✓ |database| tests/database/constraints.test.ts > CHECK constraints: what the database refuses to store > rejects malformed audit events
+ ✓ |database| tests/database/client.test.ts > database client > connects lazily as the API role and answers the readiness ping
+ ✓ |database| tests/database/client.test.ts > database client > writes and reads typed rows through Prisma inside a rolled-back transaction
+ ✓ |database| tests/database/client.test.ts > database client > never logs queries, and database errors do not carry row values
+ ✓ |database| tests/database/constraints.test.ts > write-once identity columns > never changes a public identity key after upload, but allows status changes
+ ✓ |database| tests/database/constraints.test.ts > write-once identity columns > never changes the commitment of a key version
+ ✓ |database| tests/database/client.test.ts > database client > reports an unreachable database as not ready within the timeout, without the URL or password
+ ✓ |database| tests/database/client.test.ts > database client > closes its pool and can be closed twice
+ ✓ |database| tests/database/client.test.ts > readiness probe with the real database > answers for a reachable database with a status word only
+ ✓ |database| tests/database/client.test.ts > readiness probe with the real database > answers for a unreachable database with a status word only
+ ✓ |database| tests/database/client.test.ts > unhandled database errors in the API > are logged by class and code only, because Prisma messages can quote query values (INV-10)
+ ✓ |database| tests/database/seed.test.ts > db:seed > inserts only the synthetic, disabled accounts, and is idempotent
+ ✓ |database| tests/database/seed.test.ts > db:seed > every synthetic address uses the reserved .test domain
+ ✓ |database| tests/database/seed.test.ts > db:seed > refuses production and databases outside the loopback interface
+ ✓ |database| tests/database/migrations.test.ts > migrations > start from an empty database: no tables before deploy
+ ✓ |database| tests/database/migrations.test.ts > migrations > apply cleanly from zero as the migration role
+ ✓ |database| tests/database/audit.test.ts > audit_events with misconfigured grants > still rejects UPDATE, DELETE and TRUNCATE when the API role is wrongly granted them
+ ✓ |database| tests/database/audit.test.ts > audit_events with misconfigured grants > documents the limit: the owner can disable the trigger, which is why ADR-009 adds a hash chain and checkpoints
+ ✓ |database| tests/database/seed.test.ts > db:seed > refuses to run as any role other than the API role
+ ✓ |database| tests/database/migrations.test.ts > migrations > record every migration directory as finished, none rolled back
+ ✓ |database| tests/database/migrations.test.ts > migrations > are idempotent: a second deploy applies nothing
+ ✓ |database| tests/database/migrations.test.ts > migrations > leave no drift between the database and prisma/schema.prisma
+ ✓ |database| tests/database/migrations.test.ts > migrations > every live column is declared and classified in the schema, and nothing else exists
+ ✓ |database| tests/database/migrations.test.ts > migrations > the generated migration SQL contains no plaintext content columns or file bytes
+ ✓ |database| tests/database/migrations.test.ts > drift detection negative control > fails when the database differs from the schema (an index removed outside migrations)
+ Test Files  7 passed (7)
+      Tests  103 passed (103)

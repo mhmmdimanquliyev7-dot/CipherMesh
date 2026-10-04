@@ -53,7 +53,7 @@ Status values: **Implemented by design** (designed in Phase 0, built in the list
 | 6.1 to 6.8 | People controls | Not applicable | Student project context; awareness covered informally by project documentation | Not applicable |
 | 7.1 to 7.14 | Physical controls | Provider | Data-centre security belongs to the cloud provider | Provider documentation |
 | 8.1 | User endpoint devices | Partial | Vault auto-lock, no key persistence; device security is the user's (L-01) | EV-04-04 |
-| 8.2 | Privileged access rights | Implemented by design | PLATFORM_ADMIN limits, SSH keys, database roles | EV-02-03, EV-19-01 |
+| 8.2 | Privileged access rights | Implemented by design | PLATFORM_ADMIN limits, SSH keys, database roles (four least-privilege roles and a tested grant matrix built in Phase 2, [database-security.md](database-security.md)) | EV-02-03, EV-19-01 |
 | 8.3 | Information access restriction | Implemented by design | RBAC, object-level rules, encryption as second layer | EV-05-02 |
 | 8.4 | Access to source code | Implemented by design | GitHub permissions, protected `main` | EV-01-02 |
 | 8.5 | Secure authentication | Implemented by design | MFA, server-side sessions, step-up | EV-03-03, EV-03-05 |
@@ -63,7 +63,7 @@ Status values: **Implemented by design** (designed in Phase 0, built in the list
 | 8.10 | Information deletion | Implemented by design | Expiry, burn-after-reading, crypto-shredding of live data; backup caveat (L-12) | EV-09-01 |
 | 8.12 | Data leakage prevention | Implemented by design | Client-side encryption, log redaction, encrypted filenames | EV-07-05 |
 | 8.13 | Information backup | Provider and team | Managed backups plus team-tested restore | EV-19-07 |
-| 8.15 | Logging | Implemented by design | Audit ledger and redacted application logs | EV-12-01 |
+| 8.15 | Logging | Implemented by design | Audit ledger (append-only table protection built in Phase 2, hash chain in Phase 12) and redacted application logs | EV-02-02, EV-12-01 |
 | 8.16 | Monitoring activities | Implemented by design | Security Dashboard, verification runs, health checks | EV-14-01 |
 | 8.17 | Clock synchronization | Implemented by design | NTP on the VM (needed for TOTP and audit) | EV-19-03 |
 | 8.20 | Network security | Implemented by design | Provider and host firewalls, TLS | EV-17-02, EV-19-05 |
@@ -76,7 +76,7 @@ Status values: **Implemented by design** (designed in Phase 0, built in the list
 | 8.28 | Secure coding | Implemented by design | Coding conventions, forbidden-API lint rules | EV-01-01 |
 | 8.29 | Security testing in development and acceptance | Implemented by design | [security-testing-plan.md](security-testing-plan.md) | EV-16-01 |
 | 8.31 | Separation of environments | Implemented by design | Local development versus production; no production credentials in development | Report |
-| 8.32 | Change management | Implemented by design | Jira workflow plus pull requests | EV-21-01 |
-| 8.33 | Test information | Implemented by design | Synthetic data only | Report |
+| 8.32 | Change management | Implemented by design | Jira workflow plus pull requests; database changes only as reviewed migrations, with destructive Prisma commands refused and a drift check in CI (Phase 2) | EV-02-04, EV-21-01 |
+| 8.33 | Test information | Implemented by design | Synthetic data only: the seed uses reserved `.test` addresses, disabled accounts, no credentials and no key material (Phase 2) | EV-02-05 |
 
 Controls not listed were judged not relevant to this project scope. The list is revisited in CM-T080.

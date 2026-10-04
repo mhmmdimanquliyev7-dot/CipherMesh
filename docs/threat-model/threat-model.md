@@ -454,6 +454,16 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 - **Testing strategy:** The verifier rejects checkpoints signed with a revoked key after the revocation time and reports conflicting checkpoints for the same sequence number. The hardening checklist verifies the key file's location and permissions.
 - **Rating:** Likelihood Medium, Impact Medium, inherent **Medium**. Treatment: Mitigate and Accept. Residual: **Medium** at Level 1, **Low** at Level 2.
 
+### T-39 Over-privileged database roles and schema drift
+- **STRIDE:** Elevation of privilege, Tampering
+- **Assets:** A-02, A-05, A-07, A-08
+- **Threat:** A runtime database role holds more privileges than it needs, or the live schema differs from the reviewed migrations, so a compromised or buggy API process can change the schema, the audit table, other roles or data it should never touch.
+- **Attack scenario:** The API connects as the migration role or an administrator because of a configuration mistake; a manual hotfix adds a column or drops an index outside the migrations; a later migration grants DELETE or TRUNCATE broadly. An attacker with code execution in the API container then alters tables, disables the audit trigger or deletes tombstoned records.
+- **Security controls:** Four roles with fixed attributes (no superuser, CREATEDB, CREATEROLE, BYPASSRLS, membership or ownership for runtime roles); an explicit grant matrix in a reviewed migration; the API configuration accepts only `cm_api`; migration credentials never on the VM; statement and idle-transaction timeouts for runtime roles; a Prisma CLI wrapper that refuses `db push`, `migrate dev` and `migrate reset`; a drift check in CI that requires an explicit "no difference" result.
+- **Residual risk:** The migration role and the provider administrator still hold full control (L-26, L-28). A reviewed migration can widen grants, so the protection relies on review and on the privilege test failing first.
+- **Testing strategy:** `tests/database/privileges.test.ts` compares live privileges with an independent copy of the matrix and checks role attributes, ownership and escalation attempts; `tests/database/migrations.test.ts` runs the drift check with a negative control; `tests/security/startup-config.test.ts` rejects other roles in `DATABASE_URL`.
+- **Rating:** Likelihood Medium, Impact High, inherent **High**. Treatment: Mitigate. Residual: **Low**.
+
 ## 5. Risk register summary
 
 | ID | Threat | Likelihood | Impact | Inherent | Treatment | Residual | Related limitation |
@@ -496,6 +506,7 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 | T-36 | Injected room-key version by a server-side attacker | L | H | Medium | Mitigate (planned, OCD-12), Accept until then | Medium | L-23 |
 | T-37 | Rekey abuse and incomplete rekeys | M | M | Medium | Mitigate | Low | L-24 |
 | T-38 | Audit signing-key compromise | M | M | Medium | Mitigate, Accept | Medium (Level 1) | L-25 |
+| T-39 | Over-privileged database roles and schema drift | M | H | High | Mitigate | Low | L-26, L-28 |
 
 Residual risks rated **High** (T-23) and every **Accept** decision require explicit acknowledgement by the project owner at the end of Phase 0 and again before the final report.
 
@@ -504,14 +515,33 @@ Residual risks rated **High** (T-23) and every **Accept** decision require expli
 | Category | Threats |
 |---|---|
 | Spoofing | T-03, T-08, T-09, T-10, T-13, T-17, T-23, T-25, T-29, T-30, T-35, T-36, T-38 |
-| Tampering | T-04, T-06, T-07, T-11, T-13, T-14, T-18, T-20, T-24, T-27, T-29, T-31, T-32, T-37 |
+| Tampering | T-04, T-06, T-07, T-11, T-13, T-14, T-18, T-20, T-24, T-27, T-29, T-31, T-32, T-37, T-39 |
 | Repudiation | T-04, T-20, T-38 |
 | Information disclosure | T-01, T-02, T-05, T-06, T-12, T-14, T-15, T-16, T-18, T-21, T-22, T-23, T-24, T-25, T-28, T-31, T-33, T-34, T-36 |
 | Denial of service | T-11, T-26, T-32, T-37 |
-| Elevation of privilege | T-04, T-05, T-06, T-11, T-12, T-14, T-17, T-19, T-21, T-27, T-30, T-37 |
+| Elevation of privilege | T-04, T-05, T-06, T-11, T-12, T-14, T-17, T-19, T-21, T-27, T-30, T-37, T-39 |
 
 ## 7. Maintenance
 
 - Update this model when a change adds an asset, trust boundary, entry point or data flow (CLAUDE.md, section 11).
 - Every security finding from testing is linked to an existing threat or creates a new one.
 - Re-rate residual risks after Phase 12 (all controls implemented), after Phase 19 (cloud hardening) and after Phase 21 (remediation).
+
+## 8. Phase 2 implementation check (database)
+
+Phase 2 implemented the data layer behind TB-05. It adds no new trust boundary or external entry point: PostgreSQL, its roles and the API-to-database flow were already in the model. It adds one threat (T-39) and makes the following controls real. Ratings are unchanged until the re-rating after Phase 12.
+
+| Threat | What Phase 2 implemented | What is still missing |
+|---|---|---|
+| T-01 Stolen database | Schema stores ciphertext, wrapped keys, digests and metadata only; forbidden-field checker; CHECK constraints on sizes and NULL rules; analysis in [../security/database-security.md](../security/database-security.md) section 6 | The canary scan of database dumps needs real client-side encryption (Phase 6 onward); TLS and network restriction of the managed database (CM-T067, Phase 18) |
+| T-03 Stolen password hashes | `password_hash` accepts only Argon2id PHC strings | Hashing itself and parameters (Phase 3) |
+| T-14 Injection | Lint bans `Prisma.raw` and database imports outside `apps/api/src/db`; the readiness query is a tagged template | No feature queries exist yet |
+| T-15, T-16 Disclosure of secrets | `DATABASE_URL` held in a redacting wrapper; logger redacts credential URLs; driver errors logged without messages; readiness reveals a status word only | |
+| T-20 Audit modification | Append-only grants and triggers, tested with misconfigured grants | Hash chain, checkpoints, verifier (Phase 12). Until then an owner-level change is undetectable (L-26) |
+| T-21 Removed member | Membership, envelope deletion and REKEY_REQUIRED fit in one transaction for the API role (tested) | The removal endpoint (Phase 5) |
+| T-25 Public-key substitution | A stored public key and fingerprint cannot be changed in place (trigger) | A new key row is still possible for an attacker with API write access; detection relies on fingerprints (L-07) |
+| T-26 Denial of service | Statement and idle-transaction timeouts for runtime roles; bounded pool | |
+| T-27 Supply chain | Prisma install scripts denied; telemetry off; pinned versions with release-age delay | The schema engine is downloaded at first use (checksum-verified) |
+| T-36 Injected key version | A key version's commitment cannot change once written | Injection of a new version by a server-side attacker (OCD-12) is unchanged |
+| T-37 Rekey abuse | One PENDING operation per room; target is base + 1; locked rooms carry reasons | The state machine (Phase 5 or 6) |
+| T-39 Over-privileged roles, drift | Implemented as described in T-39 | Managed database provisioning (CM-T067, Phase 18) |

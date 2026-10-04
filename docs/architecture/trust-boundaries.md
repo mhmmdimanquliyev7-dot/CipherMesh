@@ -88,6 +88,7 @@ TB-10 (member to member) is logical: it runs through the API and is not drawn se
 - **Crosses:** metadata, ciphertext, wrapped keys, Argon2id hashes, session digests, audit events.
 - **Controls:** TLS with certificate verification (`verify-full` or the provider equivalent); access restricted to the VM by private networking or an IP allowlist; separate database roles for migrations, API and worker with least privilege; append-only grants on the audit table; provider encryption at rest as an additional layer. Migration and database-owner credentials are never stored on the VM.
 - **Residual:** a database-level attacker can read metadata and tamper with records. Tampering with ciphertext is detected by AES-GCM. Tampering with the audit chain is detected up to the last anchored checkpoint.
+- **Implementation (Phase 2):** roles `cm_migrator`, `cm_api`, `cm_worker`, `cm_verifier` with a tested grant matrix; append-only triggers on `audit_events`; the API accepts only `cm_api` and requires `sslmode=verify-full` in production. Details: [../security/database-security.md](../security/database-security.md).
 
 ### TB-06 Object storage (API and browser)
 - **Crosses:** encrypted file blobs only.
