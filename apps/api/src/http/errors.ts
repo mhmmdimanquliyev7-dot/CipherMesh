@@ -4,18 +4,29 @@ import { describeDatabaseError, isDatabaseError } from '../db/errors';
 import type { Logger } from '../logging/logger';
 import { getRequestId } from './context';
 
-/** An expected error with a safe, generic message. */
+/**
+ * An expected error with a safe, generic message. `headers` carries response headers that belong
+ * to the error, such as `retry-after` or a `set-cookie` that clears a dead authentication cookie.
+ */
 export class HttpError extends Error {
   readonly status: number;
   readonly code: ErrorCode;
   readonly issues: readonly ValidationIssue[] | undefined;
+  readonly headers: Readonly<Record<string, string | readonly string[]>>;
 
-  constructor(status: number, code: ErrorCode, message: string, issues?: readonly ValidationIssue[]) {
+  constructor(
+    status: number,
+    code: ErrorCode,
+    message: string,
+    issues?: readonly ValidationIssue[],
+    headers: Readonly<Record<string, string | readonly string[]>> = {},
+  ) {
     super(message);
     this.name = 'HttpError';
     this.status = status;
     this.code = code;
     this.issues = issues;
+    this.headers = headers;
   }
 }
 
@@ -59,6 +70,7 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
   return (err: unknown, req, res, _next) => {
     const requestId = getRequestId(res);
     if (err instanceof HttpError) {
+      for (const [name, value] of Object.entries(err.headers)) res.setHeader(name, value);
       sendError(res, err.status, err.code, err.message, err.issues);
       return;
     }

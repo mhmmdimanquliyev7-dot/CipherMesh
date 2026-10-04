@@ -4,14 +4,34 @@ import type { Lifecycle } from '../lifecycle';
 import { defineRoute, type AnyRoute, type PublicRouteEntry } from './registry';
 
 /**
- * The complete list of routes reachable without authentication. Adding an entry needs a
- * security review (authorization model, principle 1 deny by default). Phase 3 adds
- * registration, login and MFA verification here.
+ * System routes reachable without authentication. Adding a public route needs a security review
+ * (authorization model, principle 1 deny by default). The authentication entry points are listed
+ * in routes/auth.ts (AUTH_PUBLIC_ROUTES).
  */
 export const PUBLIC_ROUTE_ALLOWLIST: readonly PublicRouteEntry[] = Object.freeze([
   { method: 'GET', path: '/health' },
   { method: 'GET', path: '/ready' },
 ]);
+
+/**
+ * Readiness is public and unauthenticated, so its database check is cached: however often the
+ * probe is called, at most one database query runs per interval, and concurrent probes share the
+ * query in flight. This removes an unauthenticated database amplification path (Phase 2 review).
+ */
+export function createReadinessProbe(
+  database: DatabaseHealth,
+  ttlMs = 2_000,
+  now: () => number = Date.now,
+): DatabaseHealth {
+  let cached: { at: number; result: Promise<boolean> } | undefined;
+  return {
+    ping: () => {
+      const t = now();
+      if (cached === undefined || t - cached.at >= ttlMs) cached = { at: t, result: database.ping() };
+      return cached.result;
+    },
+  };
+}
 
 /**
  * Liveness and readiness. They reveal a status word only: no versions, hostnames,

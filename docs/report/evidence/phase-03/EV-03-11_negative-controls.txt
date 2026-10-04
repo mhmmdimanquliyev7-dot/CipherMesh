@@ -1,0 +1,21 @@
+EV-03-11: Negative controls (deliberate defects must make the security tests fail)
+Captured: 2026-10-04T11:51:44Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Redaction: no passwords, tokens, cookie values, TOTP secrets or codes appear below.
+
+$ pnpm security:negative-controls
+| ID | Deliberate defect | Detected by | Result |
+|---|---|---|---|
+| NC-03-01 | CSRF same-origin verification removed | tests/auth/csrf.test.ts | CAUGHT (tests failed) |
+| NC-03-02 | Recovery codes made reusable | tests/auth/recovery.test.ts | CAUGHT (tests failed) |
+| NC-03-03 | MFA step removed from login | tests/auth/mfa.test.ts | CAUGHT (tests failed) |
+| NC-03-04 | TOTP time-step replay allowed | tests/auth/mfa.test.ts | CAUGHT (tests failed) |
+| NC-03-05 | Password field no longer redacted in logs | apps/api/src/logging/redact.test.ts | CAUGHT (tests failed) |
+| NC-03-06 | Route mounted outside the route registry | tests/security/route-inventory.test.ts | CAUGHT (tests failed) |
+| NC-03-07 | Session cookie readable by page scripts (HttpOnly removed) | apps/api/src/auth/primitives.test.ts, tests/auth/login.test.ts | CAUGHT (tests failed) |
+| NC-03-08 | Step-up gate always satisfied | tests/auth/step-up.test.ts | CAUGHT (tests failed) |
+| NC-03-09 | Disabled accounts keep their sessions | tests/auth/session.test.ts | CAUGHT (tests failed) |
+| NC-03-10 | Unknown accounts skip the dummy Argon2id verification (timing enumeration) | tests/auth/login.test.ts | CAUGHT (tests failed) |
+
+Baseline on unmodified code: PASS
+
+Every mutated file was restored; a checksum of apps/api/src was identical before and after the run.

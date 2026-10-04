@@ -40,6 +40,19 @@ test('the shell loads under the strict CSP without violations', async ({ page })
   expect(consoleViolations).toEqual([]);
 });
 
+// Pages that bundle the shared zod schemas load directly, so a violation cannot hide behind
+// prefetch timing: zod's eval probe once reported 'script-src eval' here (Phase 3 CI, ADR-011).
+for (const path of ['/login', '/register', '/account']) {
+  test(`${path} loads under the strict CSP without violations`, async ({ page }) => {
+    const consoleViolations = await collectViolations(page);
+    const response = await page.goto(path);
+    expect(response?.status()).toBe(200);
+    await page.waitForLoadState('networkidle');
+    expect(await page.evaluate(() => window.__cspViolations)).toEqual([]);
+    expect(consoleViolations).toEqual([]);
+  });
+}
+
 test('unknown pages return 404 with the CipherMesh not-found page and the same headers', async ({ page }) => {
   const consoleViolations = await collectViolations(page);
   const response = await page.goto('/does-not-exist');

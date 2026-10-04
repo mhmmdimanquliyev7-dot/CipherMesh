@@ -31,6 +31,23 @@ const SENSITIVE_FIELDS = [
   'DATABASE_URL',
   'MIGRATION_DATABASE_URL',
   'connectionString',
+  // Authentication fields (Phase 3)
+  'passwordConfirmation',
+  'oldPassword',
+  'newPassword',
+  'currentPassword',
+  'otp',
+  'totp',
+  'totpCode',
+  'mfaCode',
+  'otpauth',
+  'otpauthUri',
+  'recoveryCode',
+  'recoveryCodes',
+  'csrfToken',
+  'preAuthToken',
+  'challenge',
+  'set-cookie',
 ];
 
 describe('redact', () => {
@@ -54,6 +71,44 @@ describe('redact', () => {
     expect(redact({ url: presigned })).toEqual({ url: REDACTED });
     expect(redact({ header: 'Bearer abc.def.ghi' })).toEqual({ header: REDACTED });
     expect(redact({ note: '-----BEGIN PRIVATE KEY-----\nMIIB...' })).toEqual({ note: REDACTED });
+  });
+
+  it('redacts URLs that carry credentials, such as database connection strings (CM-T013)', () => {
+    const canary = 'canary-db-password';
+    for (const value of [
+      `postgresql://cm_api:${canary}@db.internal:5432/ciphermesh?sslmode=verify-full`,
+      `connect failed for postgres://cm_migrator:${canary}@127.0.0.1:55432/ciphermesh`,
+      `redis://:${canary}@cache.example:6379`,
+    ]) {
+      expect(JSON.stringify(redact({ detail: value }))).not.toContain(canary);
+    }
+    // URLs without credentials stay readable.
+    expect(redact({ link: 'https://example.org/a:b@c' })).toEqual({ link: 'https://example.org/a:b@c' });
+  });
+
+  it('redacts authentication secrets wherever they appear as values (Phase 3)', () => {
+    const values = [
+      'otpauth://totp/CipherMesh:user%40example.test?secret=GEZDGNBVGY3TQOJQ&issuer=CipherMesh',
+      '__Host-cm_session=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-ABCDE',
+      'cookie: theme=dark; __Host-cm_preauth=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-ABCDE',
+      'used code 7K3M9-QXW2T-4HZ8P-N6VJR yesterday',
+    ];
+    for (const value of values) expect(redact({ note: value })).toEqual({ note: REDACTED });
+    // Ordinary request IDs and error codes stay readable.
+    expect(redact({ requestId: '0d78ba41-a490-4ccc-bc46-444556a2aa73', code: 'INVALID_CODE' })).toEqual({
+      requestId: '0d78ba41-a490-4ccc-bc46-444556a2aa73',
+      code: 'INVALID_CODE',
+    });
+  });
+
+  it('redacts nested authentication bodies and error objects carrying them', () => {
+    const error = Object.assign(new Error('login failed'), {
+      body: { email: 'x@example.test', password: 'canary-pw', totp: '654321' },
+    });
+    const output = JSON.stringify(redact({ err: error, request: { body: { newPassword: 'canary-new' } } }));
+    expect(output).not.toContain('canary-pw');
+    expect(output).not.toContain('canary-new');
+    expect(output).not.toContain('654321');
   });
 
   it('never logs raw bytes, which may be key material', () => {

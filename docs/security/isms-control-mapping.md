@@ -39,8 +39,8 @@ Status values: **Implemented by design** (designed in Phase 0, built in the list
 | 5.13 | Labelling of information | Implemented by design | Profile shown on every room and in API responses | EV-10-02 |
 | 5.14 | Information transfer | Implemented by design | Client-side encrypted files, notes and secrets; TLS | EV-07-01, EV-17-04 |
 | 5.15 | Access control | Implemented by design | [authorization-model.md](authorization-model.md) | EV-05-01 |
-| 5.16 | Identity management | Implemented by design | Account lifecycle, PLATFORM_ADMIN bootstrap through CLI only | EV-03-05 |
-| 5.17 | Authentication information | Implemented by design | Argon2id, passphrase policy, recovery codes, separate Vault Passphrase | EV-03-01, EV-04-01 |
+| 5.16 | Identity management | Implemented by design | Account lifecycle (registration, disabling and re-enabling with immediate session revocation), PLATFORM_ADMIN only through the server-side CLI with MFA required (built in Phase 3) | EV-03-05, EV-03-10 |
+| 5.17 | Authentication information | Implemented by design | Argon2id with benchmarked parameters, CP-06 password policy with a breach blocklist, single-use recovery codes stored as digests, TOTP secrets encrypted at rest, separate Vault Passphrase (built in Phase 3, [authentication-security.md](authentication-security.md)) | EV-03-01, EV-03-02, EV-04-01 |
 | 5.18 | Access rights | Implemented by design | Invitations, approvals, removal with an immediate write lock and a client-driven rekey (ADR-013); access review in CM-T080 | EV-11-02 |
 | 5.19 to 5.22 | Supplier relationships | Partial | Provider selection ADR; Jira and GitHub treated as suppliers; shared-responsibility matrix | EV-17-01 |
 | 5.23 | Information security for use of cloud services | Implemented by design | [service-models.md](../cloud/service-models.md), [shared-responsibility.md](../cloud/shared-responsibility.md) | EV-18-01, EV-18-03 |
@@ -56,7 +56,7 @@ Status values: **Implemented by design** (designed in Phase 0, built in the list
 | 8.2 | Privileged access rights | Implemented by design | PLATFORM_ADMIN limits, SSH keys, database roles (four least-privilege roles and a tested grant matrix built in Phase 2, [database-security.md](database-security.md)) | EV-02-03, EV-19-01 |
 | 8.3 | Information access restriction | Implemented by design | RBAC, object-level rules, encryption as second layer | EV-05-02 |
 | 8.4 | Access to source code | Implemented by design | GitHub permissions, protected `main` | EV-01-02 |
-| 8.5 | Secure authentication | Implemented by design | MFA, server-side sessions, step-up | EV-03-03, EV-03-05 |
+| 8.5 | Secure authentication | Implemented by design | TOTP MFA, opaque server-side sessions with rotation and revocation, login backoff without lockout, CSRF defences including login CSRF, step-up (built in Phase 3) | EV-03-03 to EV-03-09 |
 | 8.7 | Protection against malware | Partial | Forced attachment downloads, no inline rendering, CSP; no scanning of encrypted files (L-11) | EV-08-02 |
 | 8.8 | Management of technical vulnerabilities | Implemented by design | Dependency, container and secret scanning; patching | EV-16-03 |
 | 8.9 | Configuration management | Implemented by design | Compose, Nginx and hardening configuration in Git; checklists | EV-19-03 |

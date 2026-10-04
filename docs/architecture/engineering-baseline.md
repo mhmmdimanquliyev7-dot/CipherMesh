@@ -1,6 +1,6 @@
-# Engineering Baseline (Phases 1 and 2)
+# Engineering Baseline (Phases 1 to 3)
 
-Status: Phase 1, 2026-10-02; database layer added in Phase 2 (2026-10-04). Records the tool and version decisions, the request pipeline and the local development setup established by CM-T006 to CM-T014. Related: [ADR-001](adr/ADR-001-monorepo-architecture.md), [ADR-011](adr/ADR-011-static-frontend-delivery.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
+Status: Phase 1, 2026-10-02; database layer added in Phase 2 and authentication in Phase 3 (2026-10-04). Records the tool and version decisions, the request pipeline and the local development setup established by CM-T006 to CM-T022. Related: [ADR-001](adr/ADR-001-monorepo-architecture.md), [ADR-011](adr/ADR-011-static-frontend-delivery.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
 
 ## 1. Versions
 
@@ -23,6 +23,9 @@ Versions were checked against the npm registry and peer-dependency ranges on 202
 | PostgreSQL (development) | 17.11, image pinned by digest | Supported until 2029; managed services offer it. Phase 2 confirmed 17 as the target major version for the managed database (CM-T067) |
 | Prisma (CLI, client, pg adapter) | 7.10.0 | Latest stable major. Prisma 8 is only a release candidate (`8.0.0-rc.19` carries the `latest` tag on 2026-10-04), so it was not selected. Prisma 7 supports Node 24 and TypeScript 6. Uses the `prisma-client` generator and the `@prisma/adapter-pg` driver adapter (no Rust query engine at runtime). Preview feature `partialIndexes` for the partial unique indexes required by the data model |
 | pg (node-postgres) | 8.23.0 | Driver used by the Prisma adapter and by the database tooling and tests |
+| Argon2id (server) | Node.js built-in `crypto.argon2` | LIB-04: no dependency, OpenSSL implementation, RFC 9106 vector verified. Parameters CP-05 |
+| otpauth | 9.5.2 | LIB-06, TOTP (RFC 6238). One dependency: `@noble/hashes` 2.4.0 |
+| uqr | 0.1.3 | Web client only: QR code matrix for TOTP enrollment, rendered as SVG elements. No dependencies; replaces an image request or HTML injection |
 | SeaweedFS (development) | 4.47, image pinned by digest | See section 5 |
 | gitleaks | 8.30.1, image pinned by digest | Secret scanning locally and in CI |
 
@@ -30,8 +33,8 @@ Versions were checked against the npm registry and peer-dependency ranges on 202
 
 | Workspace | Runtime dependencies | Why |
 |---|---|---|
-| apps/api | express, zod, @prisma/client, @prisma/adapter-pg, pg, @ciphermesh/shared, @ciphermesh/validation | HTTP server; configuration and input validation; database access (Phase 2) |
-| apps/web | next, react, react-dom, @ciphermesh/shared | Approved frontend stack |
+| apps/api | express, zod, @prisma/client, @prisma/adapter-pg, pg, otpauth, @ciphermesh/shared, @ciphermesh/validation | HTTP server; configuration and input validation; database access (Phase 2); TOTP (Phase 3) |
+| apps/web | next, react, react-dom, uqr, @ciphermesh/shared, @ciphermesh/validation | Approved frontend stack; QR codes and response validation (Phase 3) |
 | packages/validation | zod, @ciphermesh/shared | Boundary schemas |
 | packages/shared, packages/crypto | none | |
 
@@ -117,6 +120,8 @@ The file sits next to the export and is not served. The E2E server applies it to
 
 `next dev` uses eval-based hot reloading. CSP is therefore applied to the production export only, never to the development server.
 
+zod 4 compiles object parsers with `new Function`, and when the first object schema is constructed it probes whether that is allowed. Under this CSP the probe is reported as a `script-src eval` violation even though zod catches it. `packages/validation/src/zod.ts` therefore sets `z.config({ jitless: true })`, and every shared schema takes `z` from that module, which the package declares as its only side-effect module. `tests/e2e/web-shell.spec.ts` loads every page that bundles the schemas and fails on any violation.
+
 ## 7. Verification commands
 
 | Command | What it does |
@@ -128,7 +133,12 @@ The file sits next to the export and is not served. The E2E server applies it to
 | `pnpm db:bootstrap`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:generate` | Local roles and database, migrations, synthetic seed, Prisma client generation |
 | `pnpm build` | API bundle and web static export with CSP generation |
 | `pnpm smoke:api` | Starts the built API twice: in production mode with an unreachable TLS-only database (readiness must fail closed) and against the real database (readiness must succeed). Checks graceful shutdown on Linux and that no database password reaches the log |
-| `pnpm test:e2e` | Playwright against the built export with the generated headers |
+| `pnpm test:e2e` | Playwright against the built export and the built API over HTTPS on one origin (`tests/e2e/static-server.mjs`: throwaway self-signed certificate from OpenSSL, generated headers, `/api` reverse proxy with one forwarding hop). Needs `DATABASE_URL` |
+| `pnpm test:auth` | Authentication security suites against the real API and a throwaway database |
+| `pnpm security:negative-controls` | Ten deliberate defects, each of which must make the security suites fail |
+| `pnpm bench:argon2` | Argon2id benchmark and RFC 9106 check (CP-05) |
+| `pnpm admin:platform-role grant\|revoke <email>` | Server-side PLATFORM_ADMIN management (CM-T022) |
+| `pnpm worker:retention` | Deletes expired sessions, pre-authentication states and old login attempts, as `cm_worker` |
 | `pnpm audit:deps`, `pnpm scan:secrets`, `pnpm sbom:generate` | Dependency advisories, gitleaks over the git history, CycloneDX SBOM |
 | `pnpm services:up`, `pnpm services:down` | Development PostgreSQL and S3 emulator |
 | `pnpm dev` | Web on `127.0.0.1:3100` and API on `127.0.0.1:4100`, with reload. Both bind to loopback only. Ports 3000 and 4000 were avoided because other local stacks commonly use them |

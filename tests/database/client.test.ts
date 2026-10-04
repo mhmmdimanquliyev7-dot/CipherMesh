@@ -12,6 +12,7 @@ import { createLogger } from '../../apps/api/src/logging/logger';
 import { defineRoute } from '../../apps/api/src/routes/registry';
 import { emptyQuerySchema, z } from '@ciphermesh/validation';
 import { PLACEHOLDER_PHC } from '../helpers/db-fixtures';
+import { TEST_AUTH_KEYS } from '../helpers/api';
 import { loadDatabaseTestEnv, testDatabase } from '../helpers/database';
 
 // The API database module (CM-T013): lazy connection, readiness, shutdown, no query logging and
@@ -109,7 +110,12 @@ describe('readiness probe with the real database', () => {
     ['unreachable', false, 503, { status: 'not-ready' }],
   ])('answers for a %s database with a status word only', async (_label, reachable, status, body) => {
     const url = reachable ? db.url('api') : 'postgresql://cm_api:canary-pw-123456@127.0.0.1:1/ciphermesh';
-    const config = loadConfig({ NODE_ENV: 'test', APP_ORIGIN: 'https://ciphermesh.test', DATABASE_URL: url });
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      APP_ORIGIN: 'https://ciphermesh.test',
+      DATABASE_URL: url,
+      ...TEST_AUTH_KEYS,
+    });
     const probeDb = createDatabase({ url: config.database.url, logger, poolMax: 1 });
     const lifecycle = createLifecycle();
     const { app } = createApp({ config, logger, lifecycle, database: probeDb });
@@ -153,7 +159,12 @@ describe('unhandled database errors in the API', () => {
       },
     });
     const captured: string[] = [];
-    const config = loadConfig({ NODE_ENV: 'test', APP_ORIGIN: 'https://ciphermesh.test', DATABASE_URL: db.url('api') });
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      APP_ORIGIN: 'https://ciphermesh.test',
+      DATABASE_URL: db.url('api'),
+      ...TEST_AUTH_KEYS,
+    });
     const { app } = createApp({
       config,
       logger: createLogger({ level: 'debug', sink: { write: (line) => captured.push(line) } }),

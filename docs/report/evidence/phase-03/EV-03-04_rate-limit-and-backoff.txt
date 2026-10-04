@@ -1,0 +1,18 @@
+EV-03-04: 429 responses after login bursts: per-account backoff and per-address limit
+Captured: 2026-10-04T09:04:31.623Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Environment: real API (Argon2id m=65536,t=3,p=4) on loopback, throwaway PostgreSQL database as cm_api.
+Redaction: passwords, tokens, cookie values, TOTP secrets, codes and hash bytes are replaced by <redacted>.
+Accounts are synthetic (example.test) and the database was dropped after capture.
+
+Per-account progressive backoff (no permanent lockout):
+  attempt 1 (wrong password, new address) -> 401
+  attempt 2 (wrong password, new address) -> 401
+  attempt 3 (wrong password, new address) -> 401
+  attempt 4 (wrong password, new address) -> 401
+  attempt 5 (wrong password, new address) -> 401
+  attempt 6 (wrong password, new address) -> 429 Retry-After: 30
+  attempt 7 (CORRECT password while blocked) -> 429 Retry-After: 30
+
+Per-address limit, 21 logins for random accounts from one address: 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 429
+
+The schedule (30 s, doubling to 15 min, reset by success) and the recovery after the delay are asserted in tests/auth/abuse.test.ts (EV-03-09 run).

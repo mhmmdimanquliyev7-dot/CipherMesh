@@ -1,32 +1,61 @@
+import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../../apps/api/src/app';
 import { loadConfig } from '../../apps/api/src/config/env';
+import { createDatabase } from '../../apps/api/src/db/client';
 import { createLifecycle } from '../../apps/api/src/lifecycle';
 import { createLogger } from '../../apps/api/src/logging/logger';
+import { AUTH_PUBLIC_ROUTES } from '../../apps/api/src/routes/auth';
 import { PUBLIC_ROUTE_ALLOWLIST } from '../../apps/api/src/routes/system';
 
-// Route inventory (security testing plan, `route-inventory` suite): the production
-// application exposes exactly the allowlisted public routes and nothing else.
+// Route inventory (security testing plan, `route-inventory` suite): the production application
+// exposes exactly the reviewed public routes; every other route requires a session.
 const logger = createLogger({ level: 'fatal', sink: { write: () => undefined } });
 const PRODUCTION_ENV = {
   NODE_ENV: 'production',
   APP_ORIGIN: 'https://ciphermesh.example',
   // Never connected to: route registration needs no database.
   DATABASE_URL: 'postgresql://cm_api:unused-test-value@db.ciphermesh.example/ciphermesh?sslmode=verify-full',
+  TOTP_ENCRYPTION_KEY: randomBytes(32).toString('base64url'),
+  TOTP_ENCRYPTION_KEY_ID: 'inventory-test',
+  IDENTIFIER_HMAC_KEY: randomBytes(32).toString('base64url'),
 };
-const database = { ping: () => Promise.resolve(true) };
+
+function productionApp(testing?: Parameters<typeof createApp>[0]['testing']) {
+  const config = loadConfig(PRODUCTION_ENV);
+  const database = createDatabase({ url: config.database.url, logger });
+  return createApp({ config, logger, lifecycle: createLifecycle(), database, ...(testing ? { testing } : {}) });
+}
+
+/** The reviewed public surface. Changing it needs a security review and an update here. */
+const EXPECTED_PUBLIC = [
+  'GET /health',
+  'GET /ready',
+  'POST /auth/register',
+  'POST /auth/login',
+  'POST /auth/mfa/verify',
+  'POST /auth/mfa/recovery',
+];
 
 describe('route inventory', () => {
-  it('registers only allowlisted public routes, each with an action ID', () => {
-    const config = loadConfig(PRODUCTION_ENV);
-    const { routes } = createApp({ config, logger, lifecycle: createLifecycle(), database });
-    expect(routes.map(({ method, path }) => ({ method, path }))).toEqual([...PUBLIC_ROUTE_ALLOWLIST]);
-    expect(routes.every((route) => route.access === 'public' && /^[A-Z]/.test(route.action))).toBe(true);
+  it('exposes exactly the reviewed public routes; everything else requires a session', () => {
+    const { routes } = productionApp();
+    const publicRoutes = routes.filter((r) => r.access === 'public').map((r) => `${r.method} ${r.path}`);
+    expect(publicRoutes).toEqual(EXPECTED_PUBLIC);
+    const others = routes.filter((r) => r.access !== 'public');
+    expect(others.length).toBeGreaterThan(10);
+    expect(others.every((r) => r.access === 'authenticated')).toBe(true);
+    expect(routes.every((r) => /^[A-Z]/.test(r.action))).toBe(true);
+  });
+
+  it('the allowlists contain exactly the reviewed public routes', () => {
+    expect([...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES].map((r) => `${r.method} ${r.path}`)).toEqual(
+      EXPECTED_PUBLIC,
+    );
   });
 
   it('mounts no route outside the registry', () => {
-    const config = loadConfig(PRODUCTION_ENV);
-    const { app } = createApp({ config, logger, lifecycle: createLifecycle(), database });
+    const { app } = productionApp();
     // Express keeps app-level layers on app.router.stack; a layer with `route` is a handler
     // mounted directly (app.get, app.post, ...), which would bypass the registry's checks.
     const stack = (app as unknown as { router: { stack: { route?: unknown }[] } }).router.stack;
@@ -34,23 +63,14 @@ describe('route inventory', () => {
     expect(stack.filter((layer) => layer.route !== undefined)).toEqual([]);
   });
 
-  it('refuses test routes in production, so the public surface cannot be widened', () => {
-    const config = loadConfig(PRODUCTION_ENV);
-    expect(() =>
-      createApp({
-        config,
-        logger,
-        lifecycle: createLifecycle(),
-        database,
-        testing: { routes: [], publicAllowlist: [] },
-      }),
-    ).toThrow(/production/);
+  it('refuses test seams in production, so the public surface and the clock cannot be changed', () => {
+    expect(() => productionApp({ routes: [], publicAllowlist: [] })).toThrow(/production/);
+    expect(() => productionApp({ clock: () => new Date(0) })).toThrow(/production/);
   });
 
-  it('allowlists only the health and readiness probes in Phase 1', () => {
-    expect(PUBLIC_ROUTE_ALLOWLIST).toEqual([
-      { method: 'GET', path: '/health' },
-      { method: 'GET', path: '/ready' },
-    ]);
+  it('no GET route is an authentication action that changes state', () => {
+    const { routes } = productionApp();
+    const gets = routes.filter((r) => r.method === 'GET').map((r) => r.path);
+    expect(gets).toEqual(['/health', '/ready', '/auth/session', '/auth/sessions']);
   });
 });

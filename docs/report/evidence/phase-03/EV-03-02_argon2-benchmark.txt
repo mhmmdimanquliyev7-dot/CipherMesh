@@ -1,0 +1,51 @@
+EV-03-02: Server Argon2id benchmark (CP-05, OCD-03)
+Captured: 2026-10-04T11:51:44Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Redaction: no passwords, tokens, cookie values, TOTP secrets or codes appear below.
+
+== VM-sized: container limited to 2 CPUs and 2 GiB (image node:24.19.0-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43)
+$ docker run --rm --cpus=2 --memory=2g --read-only -v scripts/bench:/bench:ro node:24.19.0-alpine node /bench/argon2.mjs
+PASS RFC 9106 Argon2id test vector (section 5.3)
+Hardware: 12th Gen Intel(R) Core(TM) i7-12700H, 2 logical CPUs, 15.4 GiB RAM
+Runtime: Node.js 24.19.0, OpenSSL 3.5.7, UV_THREADPOOL_SIZE=4 (default)
+
+| Parameters | Concurrency | Median latency (ms) | p95 latency (ms) | Hashes per second | Memory in use (MiB) |
+|---|---|---|---|---|---|
+| CP-05 floor: m=19456 KiB, t=2, p=1 | 1 | 42 | 43 | 24.9 | 19 |
+| CP-05 floor: m=19456 KiB, t=2, p=1 | 2 | 41 | 45 | 47.8 | 38 |
+| CP-05 floor: m=19456 KiB, t=2, p=1 | 4 | 94 | 100 | 42.8 | 76 |
+| CP-05 floor: m=19456 KiB, t=2, p=1 | 8 | 142 | 199 | 42.6 | 76 |
+| OWASP alternative: m=47104 KiB, t=1, p=1 | 1 | 58 | 60 | 17.1 | 46 |
+| OWASP alternative: m=47104 KiB, t=1, p=1 | 2 | 65 | 70 | 30.9 | 92 |
+| OWASP alternative: m=47104 KiB, t=1, p=1 | 4 | 121 | 175 | 27.9 | 184 |
+| OWASP alternative: m=47104 KiB, t=1, p=1 | 8 | 230 | 321 | 26.6 | 184 |
+| m=64 MiB, t=3, p=1: m=65536 KiB, t=3, p=1 | 1 | 183 | 193 | 5.4 | 64 |
+| m=64 MiB, t=3, p=1: m=65536 KiB, t=3, p=1 | 2 | 193 | 200 | 10.2 | 128 |
+| m=64 MiB, t=3, p=1: m=65536 KiB, t=3, p=1 | 4 | 426 | 496 | 8.7 | 256 |
+| m=64 MiB, t=3, p=1: m=65536 KiB, t=3, p=1 | 8 | 865 | 962 | 8.7 | 256 |
+| CP-05 target (RFC 9106 second option): m=65536 KiB, t=3, p=4 | 1 | 104 | 112 | 9.6 | 64 |
+| CP-05 target (RFC 9106 second option): m=65536 KiB, t=3, p=4 | 2 | 294 | 300 | 7.0 | 128 |
+| CP-05 target (RFC 9106 second option): m=65536 KiB, t=3, p=4 | 4 | 701 | 781 | 5.5 | 256 |
+| CP-05 target (RFC 9106 second option): m=65536 KiB, t=3, p=4 | 8 | 1380 | 1497 | 5.4 | 256 |
+
+== Development laptop (no limits)
+$ pnpm bench:argon2
+PASS RFC 9106 Argon2id test vector (section 5.3)
+Hardware: 12th Gen Intel(R) Core(TM) i7-12700H, 20 logical CPUs, 31.6 GiB RAM
+Runtime: Node.js 24.19.0, OpenSSL 3.5.7, UV_THREADPOOL_SIZE=4 (default)
+
+| Parameters | Concurrency | Median latency (ms) | p95 latency (ms) | Hashes per second | Memory in use (MiB) |
+|---|---|---|---|---|---|
+| CP-05 floor: m=19456 KiB, t=2, p=1 | 1 | 35 | 37 | 28.4 | 19 |
+| CP-05 floor: m=19456 KiB, t=2, p=1 | 4 | 45 | 49 | 85.3 | 76 |
+| CP-05 floor: m=19456 KiB, t=2, p=1 | 8 | 87 | 91 | 88.7 | 76 |
+| OWASP alternative: m=47104 KiB, t=1, p=1 | 1 | 60 | 65 | 16.8 | 46 |
+| OWASP alternative: m=47104 KiB, t=1, p=1 | 4 | 78 | 88 | 49.3 | 184 |
+| OWASP alternative: m=47104 KiB, t=1, p=1 | 8 | 142 | 222 | 39.7 | 184 |
+| m=64 MiB, t=3, p=1: m=65536 KiB, t=3, p=1 | 1 | 332 | 350 | 3.1 | 64 |
+| m=64 MiB, t=3, p=1: m=65536 KiB, t=3, p=1 | 4 | 364 | 386 | 10.9 | 256 |
+| m=64 MiB, t=3, p=1: m=65536 KiB, t=3, p=1 | 8 | 656 | 714 | 11.3 | 256 |
+| CP-05 target (RFC 9106 second option): m=65536 KiB, t=3, p=4 | 1 | 139 | 158 | 7.2 | 64 |
+| CP-05 target (RFC 9106 second option): m=65536 KiB, t=3, p=4 | 4 | 223 | 253 | 17.3 | 256 |
+| CP-05 target (RFC 9106 second option): m=65536 KiB, t=3, p=4 | 8 | 394 | 474 | 17.6 | 256 |
+
+Decision: m=65536 KiB, t=3, p=4 with at most one hash per CPU (max 4) and a queue of 32 (crypto-decisions.md section 7).

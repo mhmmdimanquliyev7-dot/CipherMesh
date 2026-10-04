@@ -34,6 +34,8 @@ export interface DatabaseOptions {
   readonly url: SecretValue;
   readonly logger: Logger;
   readonly poolMax?: number;
+  /** Shown in pg_stat_activity, so operators can tell the API from worker jobs. */
+  readonly applicationName?: string;
 }
 
 const PING_TIMEOUT_MS = 2_000;
@@ -46,7 +48,7 @@ export function createDatabase(options: DatabaseOptions): Database {
       max: options.poolMax ?? 10,
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 30_000,
-      application_name: 'ciphermesh-api',
+      application_name: options.applicationName ?? 'ciphermesh-api',
     },
     {
       onPoolError: (error) => {

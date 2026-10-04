@@ -1,0 +1,17 @@
+EV-03-05: MFA enrollment and login on a throwaway account (secret and codes redacted)
+Captured: 2026-10-04T09:04:33.623Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Environment: real API (Argon2id m=65536,t=3,p=4) on loopback, throwaway PostgreSQL database as cm_api.
+Redaction: passwords, tokens, cookie values, TOTP secrets, codes and hash bytes are replaced by <redacted>.
+Accounts are synthetic (example.test) and the database was dropped after capture.
+
+POST /api/mfa/totp/enroll without a recent step-up -> 401 {"error":{"code":"STEP_UP_REQUIRED","message":"Confirm your identity to continue","requestId":"9a0b5d04-6206-4da4-8605-8e70c391e90a"}}
+POST /api/mfa/totp/enroll after step-up -> 200 {"otpauthUri":"otpauth://totp/CipherMesh:evidence-3d3f1456%40example.test?issuer=CipherMesh&secret=<redacted>&algorithm=SHA1&digits=6&period=30","secret":"<redacted>"}
+POST /api/mfa/totp/confirm with a wrong code -> 401 {"error":{"code":"INVALID_CODE","message":"The code is not valid","requestId":"503aace9-0a22-4d35-b015-b4c512bc0a90"}}
+POST /api/mfa/totp/confirm with a valid code -> 200 {"recoveryCodes":["<redacted>","<redacted>","<redacted>","<redacted>","<redacted>","<redacted>","<redacted>","<redacted>","<redacted>","<redacted>"]}
+users.mfa_totp_secret_enc: 48 bytes (IV + AES-256-GCM ciphertext + tag), key ID test-key-1
+
+POST /api/auth/login (password only) -> 200 {"status":"mfa_required"}
+GET /api/auth/session with only the pre-authentication cookie -> 401 {"error":{"code":"UNAUTHENTICATED","message":"Authentication required","requestId":"0de9649b-3073-485b-b6ed-d6bc321a94cf"}}
+POST /api/auth/mfa/verify with a valid code -> 200 {"status":"authenticated"}
+
+Browser run of the same flow (QR code, recovery codes, storage checks): EV-03-12.

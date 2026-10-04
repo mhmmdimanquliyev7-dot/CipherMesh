@@ -1,5 +1,5 @@
 import { ErrorCode, isUuidV4 } from '@ciphermesh/shared';
-import { z } from 'zod';
+import { z } from './zod';
 
 /**
  * Every object schema at a trust boundary is strict: unknown keys are rejected,

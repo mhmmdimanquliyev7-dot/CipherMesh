@@ -52,6 +52,11 @@ enum SessionRevokeReason {
   SESSION_LIMIT
 }
 
+/// The only pre-authentication step in the baseline: a verified password awaiting the MFA code.
+enum AuthChallengePurpose {
+  LOGIN_MFA
+}
+
 enum LoginOutcome {
   SUCCESS
   BAD_CREDENTIALS
@@ -235,6 +240,7 @@ model User {
   deletedAt         DateTime?    @map("deleted_at") @db.Timestamptz(3)
 
   sessions            Session[]
+  authChallenges      AuthChallenge[]
   recoveryCodes       RecoveryCode[]
   loginAttempts       LoginAttempt[]
   keyPairs            UserKeyPair[]
@@ -314,6 +320,35 @@ model Session {
   @@index([userId, absoluteExpiresAt])
   @@index([absoluteExpiresAt])
   @@map("sessions")
+}
+
+/// data-model 4.3.1 (Phase 3). Pre-authentication state between a verified password and the MFA
+/// step (session-and-csrf.md section 3): 5 minutes, single use, at most 5 code attempts. It is not
+/// a session and grants no access to authenticated routes. Only the token digest is stored.
+model AuthChallenge {
+  /// class: ID
+  id          String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// class: ID
+  userId      String               @map("user_id") @db.Uuid
+  /// class: DIG (SHA-256 of the 256-bit pre-authentication token)
+  tokenDigest Bytes                @unique @map("token_digest")
+  /// class: META
+  purpose     AuthChallengePurpose
+  /// class: META (time of the successful password verification)
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// class: META
+  expiresAt   DateTime             @map("expires_at") @db.Timestamptz(3)
+  /// class: META
+  attempts    Int                  @default(0)
+  /// class: META
+  consumedAt  DateTime?            @map("consumed_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  // Pending challenges per user; worker cleanup of expired rows.
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("auth_challenges")
 }
 
 /// data-model 4.4. Never stores the submitted password or the raw identifier of an unknown account.

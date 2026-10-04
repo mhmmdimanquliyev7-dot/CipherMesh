@@ -37,9 +37,9 @@ describe('route registry', () => {
 
   it.each([
     [
-      'authenticated routes before authentication exists',
+      'authenticated routes without an authenticator (fail closed)',
       route({ access: { kind: 'authenticated' } }),
-      /authentication pipeline/,
+      /without an authenticator/,
     ],
     ['public routes missing from the allowlist', route({ path: '/other' }), /allowlist/],
     [
@@ -57,5 +57,18 @@ describe('route registry', () => {
 
   it('refuses duplicate registrations', () => {
     expect(() => buildRouter([route(), route()], allow)).toThrow(/registered twice/);
+  });
+
+  it('refuses an authenticated route that is also on the public allowlist', () => {
+    const authenticator = {
+      authenticate: () => Promise.resolve({ failure: 'missing' as const }),
+      now: () => new Date(),
+    };
+    expect(() => buildRouter([route({ access: { kind: 'authenticated' } })], allow, authenticator)).toThrow(
+      /on the public allowlist/,
+    );
+    expect(() =>
+      buildRouter([route({ path: '/private', access: { kind: 'authenticated' } })], allow, authenticator),
+    ).not.toThrow();
   });
 });

@@ -7,6 +7,7 @@
 //   service). Readiness must succeed. This run is required, not skipped: start the database
 //   first (`pnpm services:up && pnpm db:bootstrap && pnpm db:migrate`).
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +26,13 @@ const freePort = () =>
 
 /** @type {string[]} */
 const failures = [];
+
+/** Random authentication keys for this run only (Phase 3 configuration). Never printed. */
+const AUTH_KEYS = {
+  TOTP_ENCRYPTION_KEY: randomBytes(32).toString('base64url'),
+  TOTP_ENCRYPTION_KEY_ID: 'smoke',
+  IDENTIFIER_HMAC_KEY: randomBytes(32).toString('base64url'),
+};
 
 /**
  * @param {string} label
@@ -101,6 +109,7 @@ try {
       NODE_ENV: 'production',
       APP_ORIGIN: 'https://ciphermesh.example',
       DATABASE_URL: 'postgresql://cm_api:smoke-placeholder-value@127.0.0.1:1/ciphermesh?sslmode=verify-full',
+      ...AUTH_KEYS,
     },
     [
       ['/api/health', 200, '{"status":"ok"}'],
@@ -115,7 +124,7 @@ try {
   }
   await smoke(
     'development mode, real database as cm_api',
-    { NODE_ENV: 'development', APP_ORIGIN: 'https://localhost:8443', DATABASE_URL: databaseUrl },
+    { NODE_ENV: 'development', APP_ORIGIN: 'https://localhost:8443', DATABASE_URL: databaseUrl, ...AUTH_KEYS },
     [
       ['/api/health', 200, '{"status":"ok"}'],
       ['/api/ready', 200, '{"status":"ready"}'],

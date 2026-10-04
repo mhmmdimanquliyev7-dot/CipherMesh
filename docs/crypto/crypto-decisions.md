@@ -10,13 +10,13 @@ Status: Phase 0.5 baseline. **This file is the single source of truth for algori
 | CP-02 | Asymmetric key wrapping | RSA-OAEP, 3072-bit modulus, e = 65537, SHA-256 for OAEP and MGF1, OAEP label = canonical context | **Proposed**, [ADR-007](../architecture/adr/ADR-007-asymmetric-key-wrapping.md). Maximum message 318 bytes. Used only on 32-byte random values: room key material, SEKs and the vault pair-check value. Never used on content (INV-17) |
 | CP-03 | Key derivation for key separation | HKDF-SHA-256 (RFC 5869), salt = 32 zero bytes, info = canonical context, output 256 bits | Inputs are uniformly random (RKM) or Argon2id output (VRK) |
 | CP-04 | Vault KDF (browser) | Argon2id v1.3 (RFC 9106), 128-bit random salt per vault, 256-bit output. **Floor:** m = 19456 KiB, t = 2, p = 1. **Target:** m = 65536 KiB, t = 3, p = 1 | Final values chosen in Phase 4 from a benchmark and recorded here. [ADR-010](../architecture/adr/ADR-010-browser-argon2id.md) |
-| CP-05 | Server password hashing | Argon2id v1.3, 128-bit salt, 256-bit output, PHC string. **Floor:** m = 19456 KiB, t = 2, p = 1. **Target:** m = 65536 KiB, t = 3, p = 4 | Target is the RFC 9106 second recommended option, adopted if the VM benchmark keeps a hash under about 500 ms at expected concurrency. Rehash on login when parameters change |
-| CP-06 | Secret input policy | Auth password 12 to 128 characters. Vault Passphrase 16 to 256 characters. Both checked against a local blocklist; no composition rules; Unicode NFKC normalization before hashing or derivation | Normalization keeps derivation identical across devices and input methods |
+| CP-05 | Server password hashing | Argon2id v1.3 (RFC 9106), 128-bit random salt, 256-bit output, PHC string. **Final (Phase 3): m = 65536 KiB, t = 3, p = 4** (the target, RFC 9106 second recommended option). **Floor** for accepting stored hashes: m = 19456 KiB, t = 2, p = 1 | Adopted after the Phase 3 benchmark (section 7): 294 ms median on a 2-vCPU, 2 GiB container at the API's concurrency limit of 2, under the 500 ms rule. Hashes with other parameters are rehashed at the next successful login. The API runs at most min(4, CPUs) computations at once with 32 queued; beyond that it answers 503 (T-26). Re-run `pnpm bench:argon2` on the production VM in Phase 17 and record it here |
+| CP-06 | Secret input policy | Auth password 12 to 128 characters. Vault Passphrase 16 to 256 characters. Both checked against a local blocklist; no composition rules; Unicode NFKC normalization before hashing or derivation | Normalization keeps derivation identical across devices and input methods. **Auth password implemented in Phase 3:** lengths in Unicode code points after NFKC, never truncated; lone surrogates refused; local blocklist of 30,402 breached passwords of 12 or more characters (UK NCSC top 100,000 and the Pwdb top one million, SecLists, pinned and checksum-verified, built by `scripts/auth/build-password-blocklist.mjs`); passwords containing the email local part, display name or product name refused. Nothing is sent to a third party |
 | CP-07 | Hash function | SHA-256 (FIPS 180-4) | Fingerprints, ciphertext hashes, audit chain, digests of high-entropy tokens. Never for passwords |
 | CP-08 | Sessions | 256-bit random token, base64url, stored as SHA-256 digest. Idle timeout 30 minutes, absolute lifetime 12 hours, at most 10 active sessions per user, pre-authentication (MFA pending) state 5 minutes | Rotation and invalidation events in [session-and-csrf.md](../security/session-and-csrf.md). [ADR-008](../architecture/adr/ADR-008-server-side-sessions.md) |
 | CP-09 | TOTP | RFC 6238, HMAC-SHA-1, 6 digits, 30-second step, accept plus or minus 1 step, 160-bit secret, replay protection by last used step | SHA-1 is kept for authenticator-app compatibility. HMAC-SHA-1 does not depend on SHA-1 collision resistance |
 | CP-10 | Recovery codes | 10 codes, each at least 100 bits of entropy, stored as SHA-256 digests, single use | High-entropy random values may use a fast hash; passwords may not |
-| CP-11 | Server-side encryption of TOTP secrets | AES-256-GCM under `TOTP_ENCRYPTION_KEY` (32 bytes, secret file), random 96-bit IV, AAD = canonical context with user ID, key ID stored for rotation | The only server-decryptable user secret |
+| CP-11 | Server-side encryption of TOTP secrets | AES-256-GCM under `TOTP_ENCRYPTION_KEY` (32 bytes, secret file), random 96-bit IV, AAD = canonical context with user ID, key ID stored for rotation | The only server-decryptable user secret. **Implemented in Phase 3:** stored as IV, ciphertext and tag (48 bytes for a 160-bit secret); AAD is the context `cm.srv.totp` with `keyId` and `userId`; any mismatch fails closed. One active key; rotating it needs a re-encryption tool that does not exist yet (L-31) |
 | CP-12 | Login identifier HMAC | HMAC-SHA-256 under `IDENTIFIER_HMAC_KEY` over the NFKC-normalized, lower-cased identifier | Lets rate limiting correlate unknown identifiers without storing them |
 | CP-13 | Audit hash chain | eventHash = SHA-256(ASCII "CM-AUDIT-v1", byte 0x00, JCS(record)). The record contains `seq` and `prevHash`; `prevHash` of seq 1 is 64 hex zeros | [ADR-009](../architecture/adr/ADR-009-tamper-evident-audit-ledger.md) |
 | CP-14 | Audit checkpoint signature | Level 1 (baseline): Ed25519 (RFC 8032) via Node.js `crypto`, private key in a secret file mounted only into the worker container, public keys and revoked key IDs committed to the repository. Level 2 (optional): provider-managed non-exportable signing key (OCD-13). Checkpoints hourly, after security-critical events and on demand; external witness copy at least weekly | Trust model in [ADR-009](../architecture/adr/ADR-009-tamper-evident-audit-ledger.md) section 8. Optional RFC 3161 timestamp token (OCD-08) |
@@ -43,9 +43,9 @@ Every AAD, OAEP label and HKDF info value is the RFC 8785 serialization of an ob
 | LIB-01 | Browser cryptography | Approved | WebCrypto (SubtleCrypto): AES-GCM, RSA-OAEP, HKDF, SHA-256 |
 | LIB-02 | Server cryptography | Approved | Node.js built-in `crypto` and WebCrypto: SHA-256, HMAC, AES-GCM, Ed25519, CSPRNG, `timingSafeEqual` |
 | LIB-03 | Browser Argon2id (WASM) | Open, Phase 4 (OCD-02) | Candidates: `hash-wasm`, `argon2-browser`, `@noble/hashes` (pure JavaScript, slower). Must pass RFC 9106 test vectors, run in a Web Worker, be actively maintained, have a permissive licence and no install scripts |
-| LIB-04 | Server Argon2id | Open, Phase 3 (OCD-03) | Candidates: `argon2` (bindings to the reference implementation), `@node-rs/argon2`. Same criteria plus prebuilt binaries for the production image |
+| LIB-04 | Server Argon2id | **Selected, Phase 3** | Node.js built-in `crypto.argon2` (Node 24.7 or later, backed by OpenSSL 3.5). Chosen over `argon2` and `@node-rs/argon2` because it adds no dependency, no native build and no install script, and comes from the already approved LIB-02 runtime. Reproduces the RFC 9106 Argon2id test vector (benchmark script and unit tests). The PHC string encoding is in `apps/api/src/auth/password.ts` |
 | LIB-05 | RFC 8785 canonicalization | Open, Phase 4 (OCD-04) | Candidates: `canonicalize` (reference implementation by an RFC author) or a small in-repo implementation of the restricted subset in CP-15, verified against the RFC 8785 test vectors |
-| LIB-06 | TOTP | Open, Phase 3 | Candidates: `otplib`, `otpauth`. Must pass RFC 6238 test vectors |
+| LIB-06 | TOTP | **Selected, Phase 3** | `otpauth` 9.5.2 (MIT; one dependency, `@noble/hashes` 2.4.0; released 2026-09-03). Chosen over `otplib` 13 (six internal packages). Passes the RFC 6238 SHA-1 test vectors (`apps/api/src/auth/totp.test.ts`). Codes are compared by the library in constant time |
 | LIB-07 | Password strength estimation | Optional, Phase 4 | Candidate: `zxcvbn-ts` |
 | LIB-08 | Room Safety Code word list | Open, Phase 6 | A public list of exactly 2048 distinct, short, phonetically distinct words with a licence that permits redistribution, stored as a data file with its source and checksum |
 
@@ -89,15 +89,19 @@ Rules for every library: pinned through the lockfile, reviewed in a pull request
 | CD-18 | Room Safety Code for manual cross-member key consistency checks | Detects split views only when members compare it over an independent channel. Six words (66 bits) make brute-force matching impractical. Never presented as automatic protection (ADR-012) |
 | CD-19 | Rekey is a client-driven, server-validated state machine; the room is write-locked from the moment a member is lost until a new version is activated | The server cannot create keys, so it enforces the lock and validates the result instead. The lease and idempotent finalize make interrupted rekeys recoverable (ADR-013) |
 
+| CD-20 | No server-side password pepper in the baseline (OCD-05) | A pepper helps only if the database leaks without the application secrets. The deployment keeps the TOTP and HMAC keys in secret files on the same VM, so the main leak paths (backup, provider-side exposure) are covered by Argon2id cost, the password policy and MFA. A pepper would add a key that can never be rotated without every user logging in. Revisit if the database moves to a separate trust domain |
+| CD-21 | Server Argon2id comes from Node.js crypto (LIB-04) | No third-party code in the password path; the implementation is OpenSSL's, maintained with the runtime. Verified against RFC 9106 |
+| CD-22 | The server builds its own canonical context `cm.srv.totp` for a flat object of strings and safe integers | The general RFC 8785 implementation is a Phase 4 decision (OCD-04). For this restricted subset, RFC 8785 serialization equals JSON.stringify of each value with sorted keys; the builder refuses anything else. Phase 4 test vectors must reproduce these bytes |
+
 ## 6. Open crypto decisions
 
 | ID | Question | Recommended direction | Decide by |
 |---|---|---|---|
 | OCD-01 | Confirm RSA-OAEP-3072 or adopt HPKE (RFC 9180) for key distribution | Keep RSA-OAEP-3072 unless the Phase 6 cross-browser test of OAEP labels fails | Before Phase 6 |
 | OCD-02 | Browser Argon2id library and final parameters | Benchmark candidates on a mid-range laptop and phone; target 0.5 to 1.5 seconds | Phase 4 |
-| OCD-03 | Server Argon2id library and final parameters | Benchmark on the production VM size | Phase 3 |
+| OCD-03 | Server Argon2id library and final parameters | **Closed in Phase 3:** LIB-04 and CP-05 above, benchmark in section 7. The production VM re-run is a Phase 17 task | Phase 3 |
 | OCD-04 | RFC 8785 implementation | Either option in LIB-05, with RFC test vectors in CI | Phase 4 |
-| OCD-05 | Server-side password pepper | Defer. It helps only against database-only theft and adds key-management burden | Phase 3 |
+| OCD-05 | Server-side password pepper | **Decided in Phase 3: no pepper in the baseline** (CD-20) | Phase 3 |
 | OCD-06 | Fingerprint pinning (trust on first use): keep the public fingerprints a user has seen in browser storage and warn when one changes | Stretch goal; stores only public data | After Phase 12 |
 | OCD-07 | Re-encryption of historical content after removal in RESTRICTED rooms | Stretch goal; document cost and benefit | After Phase 11 |
 | OCD-08 | RFC 3161 trusted timestamps for audit checkpoints | Recommended enhancement if a free TSA is reliable | Phase 12 |
@@ -106,3 +110,19 @@ Rules for every library: pinned through the lockfile, reviewed in a pull request
 | OCD-11 | WebAuthn passkeys as a second factor | Stretch; stronger phishing resistance than TOTP | After Phase 3 |
 | OCD-12 | Authenticate room-key versions and envelopes so that a server-side attacker cannot distribute a key of its own (T-36) | Recommended: per-user ECDSA P-256 signing keys (native in WebCrypto) held in the vault; the fingerprint covers both public keys; key-version packages and envelopes are signed and verified against the creator's key and role. Fallback: an authenticator over each new version computed with a key derived from the previous version's key material, which stops attackers who never held a room key but not former members colluding with the server | **Before Phase 4** (identity key format), CM-T086 |
 | OCD-13 | Level 2 audit signing with a provider-managed, non-exportable signing key | Optional hardening after provider selection; requires the checkpoint format to record the algorithm | Phase 19, CM-T087 |
+
+## 7. Phase 3 benchmark (CP-05, OCD-03)
+
+`pnpm bench:argon2` (`scripts/bench/argon2.mjs`) first checks the RFC 9106 Argon2id test vector, then measures each parameter set with 1, 2, 4 and 8 concurrent hashes (8 rounds each). Runtime: Node.js 24.19.0, OpenSSL 3.5.7. Raw output: [../report/evidence/phase-03/EV-03-02_argon2-benchmark.txt](../report/evidence/phase-03/EV-03-02_argon2-benchmark.txt).
+
+**VM-sized environment** (container limited to 2 CPUs and 2 GiB on an Intel Core i7-12700H, image `node:24.19.0-alpine`), median latency in ms:
+
+| Parameters | 1 at a time | 2 concurrent | 4 concurrent | 8 concurrent |
+|---|---|---|---|---|
+| Floor: m = 19456, t = 2, p = 1 | 35 | | 90 | 184 |
+| m = 65536, t = 3, p = 1 | 183 | 193 | 426 | 865 |
+| **Target: m = 65536, t = 3, p = 4** | **104** | **294** | 701 | 1380 |
+
+**Decision.** The target meets the "about 500 ms at expected concurrency" rule only if concurrency is bounded, so the API limits Argon2id computations to one per CPU (at most four) and queues at most 32; further requests get 503 with `Retry-After: 1`. On a 2-vCPU VM that means 294 ms median and about 7 hashes per second, with at most 128 MiB of Argon2 memory in use. Per-address limits and per-account backoff (CM-T018) keep unauthenticated traffic far below that rate. With p = 1 the same memory and passes give similar per-guess cost to an attacker and better throughput under contention; the RFC option was kept because it meets the rule and is the documented target.
+
+The development laptop (20 logical CPUs) measured 139 ms for one hash and 223 ms at concurrency 4. The production VM size is not fixed yet: the benchmark must be repeated there (Phase 17) and this section updated.

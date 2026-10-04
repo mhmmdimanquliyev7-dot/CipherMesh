@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { apiErrorBodySchema, emptyQuerySchema, healthResponseSchema, parseWith, uuidV4Schema, z } from './index';
 
+describe('zod configuration', () => {
+  it('runs jitless, so no schema probes for eval under the strict CSP (ADR-011)', () => {
+    expect(z.config().jitless).toBe(true);
+  });
+});
+
 describe('strict schemas', () => {
   it('reject unknown keys, including __proto__ created by JSON.parse', () => {
     const polluted: unknown = JSON.parse('{"status":"ok","__proto__":{"admin":true}}');

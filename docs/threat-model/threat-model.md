@@ -147,7 +147,7 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 - **Threat:** Targeted guessing against one account.
 - **Attack scenario:** The attacker guesses a known user's password, then tries all 6-digit TOTP codes or recovery codes.
 - **Security controls:** Per-account progressive backoff (no permanent lockout, to avoid lockout denial of service); at most 5 TOTP attempts per pre-auth state and per time window; TOTP replay protection; recovery codes with at least 100 bits of entropy, single use; audit events for failures.
-- **Residual risk:** Backoff slows but does not stop a patient attacker against a weak password; MFA covers this.
+- **Residual risk:** Backoff slows but does not stop a patient attacker against a weak password; MFA covers this. Because there is no permanent lockout, the backoff can be abused in the other direction: anyone who knows an address can delay that user's next login by up to 15 minutes at a time (L-30). This is the accepted price of avoiding lockout-based denial of service.
 - **Testing strategy:** Tests for TOTP attempt limits, replay rejection, recovery code reuse rejection, and backoff timing.
 - **Rating:** Likelihood Medium, Impact Medium, inherent **Medium**. Treatment: Mitigate. Residual: **Low**.
 
@@ -545,3 +545,21 @@ Phase 2 implemented the data layer behind TB-05. It adds no new trust boundary o
 | T-36 Injected key version | A key version's commitment cannot change once written | Injection of a new version by a server-side attacker (OCD-12) is unchanged |
 | T-37 Rekey abuse | One PENDING operation per room; target is base + 1; locked rooms carry reasons | The state machine (Phase 5 or 6) |
 | T-39 Over-privileged roles, drift | Implemented as described in T-39 | Managed database provisioning (CM-T067, Phase 18) |
+
+## 9. Phase 3 implementation check (authentication)
+
+Phase 3 implemented the authentication controls behind TB-02 and TB-05. New entry points: the four public authentication routes and the authenticated account routes (reviewed allowlist in `tests/security/route-inventory.test.ts`). New data: the pre-authentication state (`auth_challenges`), encrypted TOTP secrets and recovery-code digests, all already foreseen as assets A-05 and A-06. No new trust boundary and no new threat: the one behaviour worth recording (abuse of the backoff to delay a victim's login) is part of T-10 and L-30. Residual ratings are unchanged because the implementation realizes the controls the ratings assumed; they are re-rated after Phase 12 as planned. Traceability: [../security/authentication-security.md](../security/authentication-security.md), [../management/phase-03-traceability.md](../management/phase-03-traceability.md).
+
+| Threat | Implemented and tested in Phase 3 | Still open |
+|---|---|---|
+| T-03 Stolen password hashes | Argon2id m = 64 MiB, t = 3, p = 4 (benchmarked), PHC strings only (CHECK), rehash on login, CP-06 policy with a 30,402-entry breach blocklist, MFA; the account password never unlocks the vault | Production VM benchmark (Phase 17); no pepper by decision (CD-20) |
+| T-08 Session theft | 256-bit opaque tokens, digest-only storage, `__Host-` HttpOnly Secure SameSite=Strict cookie, idle and absolute expiry, rotation, revocation, 10-session limit, step-up for sensitive actions, fixation tests, browser storage checks in three engines | XSS inside the origin can still act through the session (T-12) |
+| T-09 Credential stuffing | Per-address limits before any hashing or write, identical handling of unknown identifiers, breach blocklist, MFA, login attempts recorded for the dashboard | Nginx limits (Phase 17); distributed low-rate attacks remain the residual |
+| T-10 Online brute force | Per-account progressive backoff (password and MFA code failures), five attempts per pre-authentication state, TOTP step replay protection, recovery codes with 100 bits, re-verification limits | Targeted delay of a victim's login (L-30) |
+| T-13 CSRF | Same-origin verification, custom header and JSON on every state change including login and registration; no CORS; 104 attack cases; real `Origin` under `no-referrer` confirmed in three engines | |
+| T-15 Disclosure | Generic login errors, projections without hashes or digests, database errors logged without values, 404 for platform endpoints and foreign sessions, secret-free security events | Registration reveals taken addresses (L-35) |
+| T-16 Exposed secrets | TOTP and HMAC keys validated at startup, never printed (`SecretValue`), redaction of passwords, codes, otpauth URIs and cookie values; a test searches the full log for every secret used | Secret files on the VM (Phase 17) |
+| T-26 Resource exhaustion | Argon2id concurrency limit with a bounded queue and 503, readiness probe cached (one database query per 2 seconds at most) | Nginx limits (Phase 17) |
+| T-30 Recovery and MFA abuse | Enrollment, disabling and recovery-code regeneration require a step-up; MFA becomes active only after a valid code; recovery-code login revokes other sessions; administrators must keep MFA; PLATFORM_ADMIN only through the server-side CLI | Administrator-assisted reset is a documented procedure without tooling (PA-04) |
+| T-35 Identity spoofing | Emails remain unverified and are labelled so in the UI | Unchanged (L-21) |
+

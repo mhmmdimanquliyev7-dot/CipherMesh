@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from './env';
@@ -5,11 +6,17 @@ import { ConfigError, loadConfig } from './env';
 const CANARY_PASSWORD = 'canary-db-password-123';
 const LOCAL_DB = `postgresql://cm_api:${CANARY_PASSWORD}@127.0.0.1:55432/ciphermesh`;
 const REMOTE_DB = `postgresql://cm_api:${CANARY_PASSWORD}@db.ciphermesh.example:5432/ciphermesh`;
-const valid = { NODE_ENV: 'development', APP_ORIGIN: 'https://localhost:8443', DATABASE_URL: LOCAL_DB };
+const KEYS = {
+  TOTP_ENCRYPTION_KEY: randomBytes(32).toString('base64url'),
+  TOTP_ENCRYPTION_KEY_ID: 'test-1',
+  IDENTIFIER_HMAC_KEY: randomBytes(32).toString('base64url'),
+};
+const valid = { NODE_ENV: 'development', APP_ORIGIN: 'https://localhost:8443', DATABASE_URL: LOCAL_DB, ...KEYS };
 const production = {
   NODE_ENV: 'production',
   APP_ORIGIN: 'https://example.org',
   DATABASE_URL: `${REMOTE_DB}?sslmode=verify-full`,
+  ...KEYS,
 };
 
 function problemsOf(env: Record<string, string | undefined>): string[] {
@@ -36,7 +43,9 @@ describe('loadConfig', () => {
   });
 
   it('refuses to start without NODE_ENV or APP_ORIGIN', () => {
-    expect(problemsOf({})).toEqual(expect.arrayContaining(['NODE_ENV', 'APP_ORIGIN', 'DATABASE_URL']));
+    expect(problemsOf({})).toEqual(
+      expect.arrayContaining(['NODE_ENV', 'APP_ORIGIN', 'DATABASE_URL', 'TOTP_ENCRYPTION_KEY', 'IDENTIFIER_HMAC_KEY']),
+    );
   });
 
   it.each([
@@ -53,6 +62,47 @@ describe('loadConfig', () => {
   it('requires an https origin in production', () => {
     expect(problemsOf({ ...production, APP_ORIGIN: 'http://example.org' })).toEqual(['APP_ORIGIN']);
     expect(loadConfig(production).isProduction).toBe(true);
+  });
+
+  describe('authentication keys (CP-11, CP-12)', () => {
+    it.each([
+      ['a missing TOTP key', { TOTP_ENCRYPTION_KEY: undefined }, 'TOTP_ENCRYPTION_KEY'],
+      ['a short TOTP key', { TOTP_ENCRYPTION_KEY: randomBytes(16).toString('base64url') }, 'TOTP_ENCRYPTION_KEY'],
+      [
+        'a placeholder TOTP key',
+        { TOTP_ENCRYPTION_KEY: 'replace-with-32-random-bytes-base64url-encode' },
+        'TOTP_ENCRYPTION_KEY',
+      ],
+      [
+        'a hex instead of base64url key',
+        { IDENTIFIER_HMAC_KEY: randomBytes(32).toString('hex') },
+        'IDENTIFIER_HMAC_KEY',
+      ],
+      ['a missing key ID', { TOTP_ENCRYPTION_KEY_ID: undefined }, 'TOTP_ENCRYPTION_KEY_ID'],
+      ['a key ID with spaces', { TOTP_ENCRYPTION_KEY_ID: 'key one' }, 'TOTP_ENCRYPTION_KEY_ID'],
+      ['the same key for both purposes', { IDENTIFIER_HMAC_KEY: KEYS.TOTP_ENCRYPTION_KEY }, 'IDENTIFIER_HMAC_KEY'],
+      ['an unsupported proxy hop count', { TRUST_PROXY_HOPS: '2' }, 'TRUST_PROXY_HOPS'],
+    ])('rejects %s', (_label, override, variable) => {
+      expect(problemsOf({ ...valid, ...override })).toContain(variable);
+    });
+
+    it('never prints the keys through the configuration object or its error', () => {
+      const config = loadConfig(valid);
+      const rendering = `${JSON.stringify(config)} ${inspect(config, { depth: 10 })}`;
+      expect(rendering).not.toContain(KEYS.TOTP_ENCRYPTION_KEY);
+      expect(rendering).not.toContain(KEYS.IDENTIFIER_HMAC_KEY);
+      try {
+        loadConfig({ ...valid, IDENTIFIER_HMAC_KEY: KEYS.TOTP_ENCRYPTION_KEY });
+        expect.unreachable();
+      } catch (error) {
+        expect(String(error)).not.toContain(KEYS.TOTP_ENCRYPTION_KEY);
+      }
+    });
+
+    it('trusts no proxy unless configured', () => {
+      expect(loadConfig(valid).trustProxyHops).toBe(0);
+      expect(loadConfig({ ...valid, TRUST_PROXY_HOPS: '1' }).trustProxyHops).toBe(1);
+    });
   });
 
   describe('DATABASE_URL (TB-05, CP-21)', () => {

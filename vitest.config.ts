@@ -17,6 +17,16 @@ export default defineConfig({
       { test: { name: 'integration', include: ['tests/integration/**/*.test.ts'] } },
       { test: { name: 'security', include: ['tests/security/**/*.test.ts'] } },
       {
+        // Authentication security suites (Phase 3): real API, real Argon2id, real PostgreSQL.
+        test: {
+          name: 'auth',
+          include: ['tests/auth/**/*.test.ts'],
+          globalSetup: ['tests/database/global-setup.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
         test: {
           name: 'database',
           include: ['tests/database/**/*.test.ts'],

@@ -1,0 +1,26 @@
+EV-03-12: Browser checks in Chromium, Firefox and WebKit
+Captured: 2026-10-04T11:51:44Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Redaction: no passwords, tokens, cookie values, TOTP secrets or codes appear below.
+
+$ pnpm test:e2e
+  ok  4 [chromium] › tests\e2e\web-shell.spec.ts:26:1 › the shell loads under the strict CSP without violations (1.3s)
+  ok  3 [webkit] › tests\e2e\web-shell.spec.ts:26:1 › the shell loads under the strict CSP without violations (2.0s)
+  ok  7 [chromium] › tests\e2e\web-shell.spec.ts:43:1 › unknown pages return 404 with the CipherMesh not-found page and the same headers (937ms)
+  ok  2 [chromium] › tests\e2e\auth.spec.ts:44:1 › session cookies are HttpOnly, Secure, SameSite=Strict and invisible to page scripts (3.2s)
+  ok  8 [webkit] › tests\e2e\web-shell.spec.ts:43:1 › unknown pages return 404 with the CipherMesh not-found page and the same headers (1.8s)
+  ok  6 [webkit] › tests\e2e\auth.spec.ts:44:1 › session cookies are HttpOnly, Secure, SameSite=Strict and invisible to page scripts (3.8s)
+  ok  9 [chromium] › tests\e2e\auth.spec.ts:77:1 › fetch() sends the real Origin for state changes under Referrer-Policy: no-referrer (989ms)
+  ok  5 [firefox] › tests\e2e\web-shell.spec.ts:26:1 › the shell loads under the strict CSP without violations (3.7s)
+  ok 10 [webkit] › tests\e2e\auth.spec.ts:77:1 › fetch() sends the real Origin for state changes under Referrer-Policy: no-referrer (2.0s)
+  ok 12 [firefox] › tests\e2e\web-shell.spec.ts:43:1 › unknown pages return 404 with the CipherMesh not-found page and the same headers (1.8s)
+  ok  1 [firefox] › tests\e2e\auth.spec.ts:44:1 › session cookies are HttpOnly, Secure, SameSite=Strict and invisible to page scripts (7.6s)
+  ok 11 [chromium] › tests\e2e\auth.spec.ts:95:1 › MFA enrollment and login keep the secret and recovery codes out of storage (4.7s)
+  ok 15 [chromium] › tests\e2e\auth.spec.ts:143:1 › negative control: the storage check detects a token that page scripts could read (413ms)
+  ok 14 [firefox] › tests\e2e\auth.spec.ts:77:1 › fetch() sends the real Origin for state changes under Referrer-Policy: no-referrer (1.7s)
+  ok 13 [webkit] › tests\e2e\auth.spec.ts:95:1 › MFA enrollment and login keep the secret and recovery codes out of storage (7.8s)
+  ok 17 [webkit] › tests\e2e\auth.spec.ts:143:1 › negative control: the storage check detects a token that page scripts could read (663ms)
+  ok 16 [firefox] › tests\e2e\auth.spec.ts:95:1 › MFA enrollment and login keep the secret and recovery codes out of storage (4.4s)
+  ok 18 [firefox] › tests\e2e\auth.spec.ts:143:1 › negative control: the storage check detects a token that page scripts could read (770ms)
+  18 passed (18.4s)
+
+Covers: cookie attributes, no secrets in document.cookie/localStorage/sessionStorage/IndexedDB, real Origin under no-referrer, MFA enrollment and recovery-code login, and a negative control for a script-readable cookie.

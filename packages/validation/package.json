@@ -4,7 +4,9 @@
   "private": true,
   "description": "Schemas used at CipherMesh trust boundaries, shared by the API and the web client.",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/zod.ts"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },

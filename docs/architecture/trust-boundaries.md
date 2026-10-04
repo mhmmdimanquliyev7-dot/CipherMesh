@@ -83,6 +83,7 @@ TB-10 (member to member) is logical: it runs through the API and is not drawn se
 ### TB-04 Nginx to API
 - **Crosses:** proxied HTTP requests, client IP in `X-Forwarded-For`.
 - **Controls:** API reachable only on the internal Docker network (no published host port); API trusts forwarded headers only from the Nginx hop; Nginx strips hop-by-hop and spoofable headers; request IDs assigned at the edge.
+- **Implementation (Phase 3):** `TRUST_PROXY_HOPS` decides whether the API reads the client address from exactly one `X-Forwarded-For` hop (1, production behind Nginx) or ignores forwarded headers (0, the default). The address feeds rate limiting and the session list, so it must never be client-chosen.
 
 ### TB-05 Application to managed PostgreSQL
 - **Crosses:** metadata, ciphertext, wrapped keys, Argon2id hashes, session digests, audit events.

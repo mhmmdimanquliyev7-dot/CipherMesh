@@ -1,4 +1,5 @@
 import { PRODUCT_TAGLINE } from '@ciphermesh/shared';
+import Link from 'next/link';
 
 interface Capability {
   readonly name: string;
@@ -8,7 +9,6 @@ interface Capability {
 // Planned capabilities and the roadmap phase that delivers each. Nothing here is
 // available yet, and the page says so rather than implying protection that does not exist.
 const CAPABILITIES: readonly Capability[] = [
-  { name: 'Accounts, sessions and multi-factor authentication', phase: 'Phase 3' },
   { name: 'Vault: personal key pair protected by your Vault Passphrase', phase: 'Phase 4' },
   { name: 'Secure Rooms with role-based access', phase: 'Phase 5' },
   { name: 'Client-side encrypted files, notes and one-time secrets', phase: 'Phases 7 to 9' },
@@ -24,9 +24,17 @@ export default function HomePage() {
         <h1 className="text-3xl font-semibold tracking-tight">{PRODUCT_TAGLINE}</h1>
         <p className="max-w-3xl text-slate-300">
           CipherMesh will encrypt room content in your browser before it is uploaded, so the server stores ciphertext
-          and wrapped keys rather than readable content. This build contains the application foundation only: no
-          accounts, rooms or encryption features are available yet.
+          and wrapped keys rather than readable content. This build provides accounts, sessions and multi-factor
+          authentication. Rooms and encryption features are not available yet.
         </p>
+        <div className="flex gap-4 text-sm">
+          <Link className="text-sky-400 underline" href="/login">
+            Sign in
+          </Link>
+          <Link className="text-sky-400 underline" href="/register">
+            Create an account
+          </Link>
+        </div>
       </section>
 
       <section aria-labelledby="planned-heading" className="space-y-4">

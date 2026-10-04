@@ -52,6 +52,7 @@ export default tseslint.config(
       'apps/web/next-env.d.ts',
       'apps/api/src/generated/**',
       'tmp/**',
+      'apps/api/src/auth/data/**',
     ],
   },
   js.configs.recommended,
