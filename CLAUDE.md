@@ -230,5 +230,5 @@ An item is done only when all of the following hold:
 - Threat model: `docs/threat-model/threat-model.md`
 - Security: `docs/security/` (security-principles, authorization-model, security-policy-profiles, security-testing-plan, session-and-csrf, authentication-security, database-security, limitations, isms-control-mapping, architecture-review, architecture-gate-phase-0-5)
 - Cloud: `docs/cloud/` (service-models, shared-responsibility, deployment-architecture)
-- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap, github-repository-settings, phase-01-traceability, phase-02-traceability, phase-03-traceability)
+- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap, github-repository-settings, phase-01-traceability, phase-02-traceability, phase-03-traceability, current-state for session handoff)
 - Report: `docs/report/evidence-plan.md`
