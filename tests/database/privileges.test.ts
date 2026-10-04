@@ -21,6 +21,7 @@ const EXPECTED: Record<'cm_api' | 'cm_worker' | 'cm_verifier', Record<string, re
     users: [S, I, U],
     recovery_codes: [S, I, U, D],
     sessions: [S, I, U],
+    auth_challenges: [S, I, U],
     login_attempts: [S, I],
     user_key_pairs: [S, I, U],
     rooms: [S, I, U],
@@ -36,6 +37,7 @@ const EXPECTED: Record<'cm_api' | 'cm_worker' | 'cm_verifier', Record<string, re
   },
   cm_worker: {
     sessions: [S, D],
+    auth_challenges: [S, D],
     login_attempts: [S, D],
     rooms: [S, U],
     room_members: [S],
