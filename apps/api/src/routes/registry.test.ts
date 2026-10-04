@@ -25,7 +25,10 @@ const allow: PublicRouteEntry[] = [
 
 describe('route registry', () => {
   it('registers the system routes as the only public routes', () => {
-    const { registered } = buildRouter(systemRoutes(createLifecycle()), PUBLIC_ROUTE_ALLOWLIST);
+    const { registered } = buildRouter(
+      systemRoutes(createLifecycle(), { ping: () => Promise.resolve(true) }),
+      PUBLIC_ROUTE_ALLOWLIST,
+    );
     expect(registered).toEqual([
       { method: 'GET', path: '/health', action: 'SYS-HEALTH', access: 'public' },
       { method: 'GET', path: '/ready', action: 'SYS-READY', access: 'public' },

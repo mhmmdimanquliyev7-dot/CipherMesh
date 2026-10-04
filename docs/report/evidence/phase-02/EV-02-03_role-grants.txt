@@ -1,0 +1,54 @@
+EV-02-03: Role attributes, ownership and table grants per database role
+Captured: 2026-10-04T07:06:43.006Z on branch feature/CM-T013-database-prisma (stacked on 900b664)
+Environment: local PostgreSQL 17.11 container (127.0.0.1:55432), throwaway database cm_test_<random>
+Redaction: no passwords, connection strings or real personal data appear below; database names are random test names.
+
+Role attributes (pg_roles):
+  {"rolname":"cm_api","rolsuper":false,"rolcreatedb":false,"rolcreaterole":false,"rolreplication":false,"rolbypassrls":false,"rolinherit":false,"rolconnlimit":40,"settings":"statement_timeout=15s, idle_in_transaction_session_timeout=30s"}
+  {"rolname":"cm_migrator","rolsuper":false,"rolcreatedb":false,"rolcreaterole":false,"rolreplication":false,"rolbypassrls":false,"rolinherit":false,"rolconnlimit":5,"settings":""}
+  {"rolname":"cm_verifier","rolsuper":false,"rolcreatedb":false,"rolcreaterole":false,"rolreplication":false,"rolbypassrls":false,"rolinherit":false,"rolconnlimit":5,"settings":"statement_timeout=15s, idle_in_transaction_session_timeout=30s"}
+  {"rolname":"cm_worker","rolsuper":false,"rolcreatedb":false,"rolcreaterole":false,"rolreplication":false,"rolbypassrls":false,"rolinherit":false,"rolconnlimit":10,"settings":"statement_timeout=15s, idle_in_transaction_session_timeout=30s"}
+
+Ownership: {"database_owner":"cm_migrator","schema_owner":"cm_migrator","table_owners":"cm_migrator"}
+
+Table grants (information_schema.role_table_grants), runtime roles and PUBLIC:
+  cm_api       audit_events         INSERT, SELECT
+  cm_api       encrypted_files      INSERT, SELECT, UPDATE
+  cm_api       encrypted_notes      INSERT, SELECT, UPDATE
+  cm_api       invitations          INSERT, SELECT, UPDATE
+  cm_api       key_envelopes        DELETE, INSERT, SELECT, UPDATE
+  cm_api       login_attempts       INSERT, SELECT
+  cm_api       recovery_codes       DELETE, INSERT, SELECT, UPDATE
+  cm_api       rekey_operations     INSERT, SELECT, UPDATE
+  cm_api       room_key_versions    INSERT, SELECT, UPDATE
+  cm_api       room_members         INSERT, SELECT, UPDATE
+  cm_api       rooms                INSERT, SELECT, UPDATE
+  cm_api       secrets              INSERT, SELECT, UPDATE
+  cm_api       sessions             INSERT, SELECT, UPDATE
+  cm_api       user_key_pairs       INSERT, SELECT, UPDATE
+  cm_api       users                INSERT, SELECT, UPDATE
+  cm_verifier  audit_events         SELECT
+  cm_worker    audit_events         INSERT, SELECT
+  cm_worker    encrypted_files      SELECT, UPDATE
+  cm_worker    encrypted_notes      SELECT, UPDATE
+  cm_worker    invitations          SELECT, UPDATE
+  cm_worker    key_envelopes        DELETE, SELECT
+  cm_worker    login_attempts       DELETE, SELECT
+  cm_worker    rekey_operations     DELETE, SELECT, UPDATE
+  cm_worker    room_key_versions    SELECT, UPDATE
+  cm_worker    room_members         SELECT
+  cm_worker    rooms                SELECT, UPDATE
+  cm_worker    secrets              SELECT, UPDATE
+  cm_worker    sessions             DELETE, SELECT
+
+Schema and database privileges:
+  {"role":"cm_api","usage":true,"create":false,"connect":true,"temp":false}
+  {"role":"cm_worker","usage":true,"create":false,"connect":true,"temp":false}
+  {"role":"cm_verifier","usage":true,"create":false,"connect":true,"temp":false}
+
+As cm_api: CREATE TABLE public.attacker (id int) -> ERROR 42501: permission denied for schema public
+As cm_api: ALTER TABLE users ADD COLUMN password text -> ERROR 42501: must be owner of table users
+As cm_api: DELETE FROM users -> ERROR 42501: permission denied for table users
+As cm_api: CREATE ROLE attacker -> ERROR 42501: permission denied to create role
+
+The full matrix is asserted by tests/database/privileges.test.ts (see EV-02-05).

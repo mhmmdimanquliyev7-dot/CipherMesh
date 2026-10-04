@@ -18,8 +18,9 @@ It is one project that must show real depth in three subjects. Security depth ma
 
 - **Phase 0 (Architecture and project bootstrap): complete and approved.**
 - **Phase 0.5 (Architecture hardening and project-management bootstrap): complete and approved.** Review record: `docs/security/architecture-gate-phase-0-5.md`.
-- **Phase 1 (Repository and Application Foundation): implemented, awaiting approval by the project owner.** Traceability: `docs/management/phase-01-traceability.md`.
-- Next phase: **Phase 2 (Database and Prisma)**. Do not start it without explicit approval.
+- **Phase 1 (Repository and Application Foundation): implemented; the project owner continued to Phase 2.** Not merged into `main` because no GitHub remote exists; its CI-run and branch-protection evidence is still pending. Traceability: `docs/management/phase-01-traceability.md`.
+- **Phase 2 (Database and Prisma): implemented on the stacked branch `feature/CM-T013-database-prisma`, awaiting approval by the project owner.** Traceability: `docs/management/phase-02-traceability.md`. Database controls: `docs/security/database-security.md`.
+- Next phase: **Phase 3 (Authentication)**. Do not start it without explicit approval.
 - Work is phase-gated. Finish one phase, report, and wait for approval before starting the next.
 - Phase details: `docs/management/project-roadmap.md`. Backlog: `docs/management/jira-backlog.md`.
 
@@ -49,7 +50,7 @@ recipient RSA-OAEP public key -> wrapped SEK (32 bytes) -> AES-256-GCM -> secret
 | Language | TypeScript 6.0 (strict) everywhere practical. TypeScript 7 waits for typescript-eslint support |
 | Frontend | Next.js 16 static export (ADR-011, accepted for export and CSP), React 19, Tailwind CSS 4 |
 | Backend | Node.js (current Active LTS), Express, TypeScript |
-| Database | PostgreSQL (managed in production), Prisma ORM |
+| Database | PostgreSQL 17 (managed in production), Prisma ORM 7 with the pg driver adapter |
 | Object storage | S3-compatible API (managed in production, local emulator in development) |
 | Client crypto | WebCrypto (SubtleCrypto); Argon2id through a vetted WASM library (selected in Phase 4, ADR-010) |
 | Server crypto | Node.js `crypto` and WebCrypto; Argon2id through a vetted native library (selected in Phase 3) |
@@ -172,7 +173,9 @@ Boundary rules: `apps/web` must not import `apps/api`. `packages/crypto` must no
 - Playwright E2E runs in Chromium, Firefox and WebKit for vault, rooms, files, notes, secrets and rotation.
 - Never disable authorization, mock away the authorization module or relax a policy in tests. Use fixtures that create real users, memberships and keys.
 - Coverage target: at least 90% statements and branches for `packages/crypto`, the authorization module and the policy engine.
-- Before every commit run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`; run `pnpm test:e2e` when the web client changes. All commands are listed in `docs/architecture/engineering-baseline.md` section 7.
+- Before every commit run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`; run `pnpm test:e2e` when the web client changes. `pnpm test` includes the database suite and needs the development database (`pnpm services:up && pnpm db:bootstrap && pnpm db:migrate`). All commands are listed in `docs/architecture/engineering-baseline.md` section 7.
+- Schema changes arrive only as reviewed migrations under `prisma/migrations` (generated SQL plus hand-written constraints, triggers and grants). Never use `prisma db push`, `migrate dev` or `migrate reset`; the wrapper `scripts/db/prisma.mjs` refuses them. Every new column needs a `/// class:` comment, and any grant change updates the matrix in `tests/database/privileges.test.ts` and `docs/security/database-security.md`.
+- Database access in the API goes only through `apps/api/src/db` (ESLint enforced).
 - New API routes go through the route registry (`apps/api/src/routes/registry.ts`). Never mount Express handlers directly.
 
 ## 11. Documentation requirements
@@ -220,7 +223,7 @@ An item is done only when all of the following hold:
 - Architecture: `docs/architecture/` (system-overview, data-flow, trust-boundaries, data-model, crypto-inspector, security-dashboard, security-ui, engineering-baseline, `adr/`)
 - Cryptography: `docs/crypto/` (cryptographic-architecture, key-hierarchy, key-lifecycle, crypto-decisions)
 - Threat model: `docs/threat-model/threat-model.md`
-- Security: `docs/security/` (security-principles, authorization-model, security-policy-profiles, security-testing-plan, session-and-csrf, limitations, isms-control-mapping, architecture-review, architecture-gate-phase-0-5)
+- Security: `docs/security/` (security-principles, authorization-model, security-policy-profiles, security-testing-plan, session-and-csrf, database-security, limitations, isms-control-mapping, architecture-review, architecture-gate-phase-0-5)
 - Cloud: `docs/cloud/` (service-models, shared-responsibility, deployment-architecture)
-- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap, github-repository-settings, phase-01-traceability)
+- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap, github-repository-settings, phase-01-traceability, phase-02-traceability)
 - Report: `docs/report/evidence-plan.md`

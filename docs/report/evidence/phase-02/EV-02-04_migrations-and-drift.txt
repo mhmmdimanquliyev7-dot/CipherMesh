@@ -1,0 +1,54 @@
+EV-02-04: Migrations from an empty database, idempotent re-run, drift check and its negative control
+Captured: 2026-10-04T07:06:43.251Z on branch feature/CM-T013-database-prisma (stacked on 900b664)
+Environment: local PostgreSQL 17.11 container (127.0.0.1:55432), throwaway database cm_test_<random>
+Redaction: no passwords, connection strings or real personal data appear below; database names are random test names.
+
+$ pnpm db:migrate   (prisma migrate deploy as cm_migrator on an empty database)
+Datasource "db": PostgreSQL database "cm_test_<random>", schema "public" at "127.0.0.1:55432"
+
+4 migrations found in prisma/migrations
+
+Applying migration `20261002000000_schema_v1`
+Applying migration `20261002000100_integrity_constraints`
+Applying migration `20261002000200_audit_append_only`
+Applying migration `20261002000300_runtime_role_grants`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20261002000000_schema_v1/
+    └─ migration.sql
+  └─ 20261002000100_integrity_constraints/
+    └─ migration.sql
+  └─ 20261002000200_audit_append_only/
+    └─ migration.sql
+  └─ 20261002000300_runtime_role_grants/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+
+$ pnpm db:migrate   (second run)
+Datasource "db": PostgreSQL database "cm_test_<random>", schema "public" at "127.0.0.1:55432"
+
+4 migrations found in prisma/migrations
+
+
+No pending migrations to apply.
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+
+$ pnpm db:drift
+PASS database schema matches prisma/schema.prisma (no drift)
+exit code 0
+
+Negative control: DROP INDEX room_members_one_active_owner outside the migrations, then:
+$ pnpm db:drift
+FAIL schema drift check (exit 2)
+[*] Changed the `room_members` table
+  [+] Added unique index on columns (room_id)
+Loaded Prisma config from prisma.config.ts.
+exit code 1

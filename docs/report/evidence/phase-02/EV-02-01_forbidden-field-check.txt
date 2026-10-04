@@ -1,0 +1,48 @@
+EV-02-01: Forbidden-field check passing, with negative controls
+Captured: 2026-10-04T07:07:38Z on branch feature/CM-T013-database-prisma (stacked on 900b664)
+Redaction: no passwords or connection strings appear below; test databases have random names.
+
+$ pnpm db:check-schema
+PASS prisma/schema.prisma: 15 models, 203 classified fields (ID 49, META 125, PII 6, CT 4, WK 4, SENC 1, DIG 4, INT 9, PUBK 1)
+PASS no field from the data-model "must never exist" list; ciphertext and key fields are bytea
+exit code 0
+
+$ pnpm exec vitest run tests/security/schema-forbidden-fields.test.ts --reporter=verbose
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > passes the real schema
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a plaintext password
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a reversibly encrypted password
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a Vault Passphrase verifier
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a plaintext private key
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a private-key wrapping key
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a room key column
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a room key material
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a room wrapping key
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a plaintext DEK
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a plaintext SEK
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a plaintext filename
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a plaintext MIME type
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a plaintext file hash
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a note title
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a note body
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a secret plaintext
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a raw session token
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a raw recovery code
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a plaintext TOTP secret
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a invitation bearer token
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a key escrow
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a master key
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a Room Safety Code
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a presigned URL
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a IP address in audit events
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a an unreviewed key field
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a an unclassified field
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a an unknown classification
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a ciphertext stored as text
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a a wrapped key stored as text
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a a mapped column with a forbidden name
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a mutable security policy table
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails on a key escrow table
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > fails closed on an empty or unreadable schema
+ ✓ |security| tests/security/schema-forbidden-fields.test.ts > forbidden-field checker > exits 1 from the command line on a bad schema and 0 on the real one
+ Test Files  1 passed (1)
+      Tests  36 passed (36)

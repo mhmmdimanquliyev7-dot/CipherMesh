@@ -18,6 +18,10 @@ const forbiddenSyntax = [
     selector: 'MemberExpression[property.name=/^\\$(query|execute)RawUnsafe$/]',
     message: 'Unsafe raw SQL is forbidden. Use parameterized tagged templates.',
   },
+  {
+    selector: "MemberExpression[object.name='Prisma'][property.name='raw']",
+    message: 'Prisma.raw builds unparameterized SQL. Use tagged templates or Prisma.sql.',
+  },
 ];
 
 const processEnv = {
@@ -46,6 +50,8 @@ export default tseslint.config(
       'playwright-report/**',
       'test-results/**',
       'apps/web/next-env.d.ts',
+      'apps/api/src/generated/**',
+      'tmp/**',
     ],
   },
   js.configs.recommended,
@@ -92,6 +98,26 @@ export default tseslint.config(
             {
               group: ['@ciphermesh/api', '**/apps/api/**', '**/api/src/**'],
               message: 'The web client must never import server code.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // One database access module (CM-T013): the Prisma client, the driver adapter and pg are
+    // imported only in apps/api/src/db, so connection handling and logging stay in one place.
+    files: ['apps/api/src/**'],
+    ignores: ['apps/api/src/db/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [...childProcess, { name: 'pg', message: 'Database access goes through apps/api/src/db only.' }],
+          patterns: [
+            {
+              group: ['@prisma/*', '**/generated/prisma', '**/generated/prisma/**'],
+              message: 'Database access goes through apps/api/src/db only.',
             },
           ],
         },

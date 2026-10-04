@@ -19,6 +19,28 @@ jobs:
     name: Lint, types, tests, build, E2E
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # Throwaway PostgreSQL for the database suite and the smoke test (CM-T013, CM-T014). Same
+    # pinned image as local development. The administrator password exists only for the life of
+    # this runner; it is not a secret of any real system. Role passwords are random per run.
+    services:
+      postgres:
+        image: postgres:17.11-alpine3.24@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+        env:
+          POSTGRES_DB: ciphermesh_ci
+          POSTGRES_USER: ciphermesh_ci
+          POSTGRES_PASSWORD: ci-only-ephemeral-admin
+          POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --health-cmd "pg_isready -U ciphermesh_ci -d ciphermesh_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      POSTGRES_DB: ciphermesh_ci
+      POSTGRES_USER: ciphermesh_ci
+      POSTGRES_PASSWORD: ci-only-ephemeral-admin
+      POSTGRES_PORT: '55432'
+      CHECKPOINT_DISABLE: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,11 +58,28 @@ jobs:
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
-      - name: Unit, integration and security tests
+      - name: Prisma schema validation and forbidden-field check
+        run: |
+          pnpm db:validate
+          pnpm db:check-schema
+      - name: Database role passwords for this run (random, masked)
+        run: |
+          for pair in MIGRATION_DATABASE_URL:cm_migrator DATABASE_URL:cm_api WORKER_DATABASE_URL:cm_worker VERIFIER_DATABASE_URL:cm_verifier; do
+            password="$(openssl rand -hex 24)"
+            echo "::add-mask::${password}"
+            echo "${pair%%:*}=postgresql://${pair##*:}:${password}@127.0.0.1:55432/ciphermesh" >> "$GITHUB_ENV"
+          done
+      - name: Database roles, migrations from zero, drift check, synthetic seed
+        run: |
+          pnpm db:bootstrap
+          pnpm db:migrate
+          pnpm db:drift
+          NODE_ENV=development APP_ORIGIN=https://localhost:8443 pnpm db:seed
+      - name: Unit, integration, security and database tests
         run: pnpm test
       - name: Build
         run: pnpm build
-      - name: Smoke test of the built API, including graceful shutdown
+      - name: Smoke test of the built API (fail-closed readiness, real database, graceful shutdown)
         run: pnpm smoke:api
       - name: Software bill of materials (CycloneDX)
         run: pnpm sbom:generate

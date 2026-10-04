@@ -16,6 +16,7 @@ Status: Phase 0.5 baseline. Related: [../threat-model/threat-model.md](../threat
 | Unit | Crypto wrappers, canonical contexts, authorization decision function, policy engine, audit hashing | Vitest | Every PR |
 | Integration | API with a real PostgreSQL in Docker: auth, sessions, authorization, policy, audit chain, burn atomicity | Vitest with an HTTP test client | Every PR |
 | Security regression | `tests/security`: the suites in section 3 | Vitest, Playwright | Every PR |
+| Database | `tests/database`: migrations from zero, drift, constraints, append-only audit, role privileges, deletion behaviour, database client, seed (section 3.1, implemented in Phase 2) | Vitest against a throwaway PostgreSQL database per run | Every PR |
 | End-to-end | Browser flows in Chromium, Firefox and WebKit | Playwright | Every PR (smoke), nightly (full) |
 | Static analysis | TypeScript strict, ESLint with security rules, forbidden-API lint rules | tsc, ESLint | Every PR |
 | Supply chain | Vulnerable dependencies, secrets, SBOM, container images | OSV-Scanner or `pnpm audit`, gitleaks, CycloneDX, Trivy | Every PR and weekly |
@@ -35,7 +36,8 @@ All scanning and testing targets only CipherMesh infrastructure, following the c
 | `http-baseline` | Security headers on every response, no framework disclosure, server-generated request IDs, no CORS grants, the same-origin gate, and no secrets from headers, query strings or bodies in the log (implemented in Phase 1) | T-12, T-13, T-15 |
 | `malformed-requests` | Malformed and dot-segment paths, oversized URLs and compressed bodies get generic errors without crashes or decompression (implemented in Phase 1) | T-14, T-15, T-26 |
 | `startup-config` | The real server process refuses invalid configuration and never echoes values (implemented in Phase 1) | Principle 10 |
-| `lint-guards` | The ESLint guards for CLAUDE.md section 8 fire on forbidden code (implemented in Phase 1) | T-14, T-27 |
+| `lint-guards` | The ESLint guards for CLAUDE.md section 8 fire on forbidden code (implemented in Phase 1); Phase 2 adds `Prisma.raw` and database imports outside `apps/api/src/db` | T-14, T-27 |
+| `schema-forbidden-fields` | The forbidden-field checker passes the real schema and fails on every "must never exist" field, unclassified fields and text-typed ciphertext (33 negative controls, implemented in Phase 2) | T-01, T-28 |
 | `policy-matrix` | PC-01 to PC-16: one allowed and one denied case per control and profile | T-04, T-21 |
 | `session` | Cookie attributes, fixation, every rotation and invalidation event, idle and absolute expiry, logout, session limit ([session-and-csrf.md](session-and-csrf.md)) | T-08 |
 | `csrf` | `Sec-Fetch-Site` and `Origin` checks, the custom request header, content types, login CSRF, side-effect-free GETs, `Origin` behaviour under `no-referrer` in three engines | T-13 |
@@ -54,6 +56,20 @@ All scanning and testing targets only CipherMesh infrastructure, following the c
 | `upload` | HTML and SVG never render inline; size and quota limits; storage keys independent of filenames | T-11 |
 | `browser-storage` | No key material or plaintext in localStorage, sessionStorage, IndexedDB or cookies after use | T-23 |
 | `identity` | Lookup responses label identifiers as unverified; fingerprint confirmation enforced in RESTRICTED invitations; key changes are audited | T-25, T-35 |
+
+### 3.1 Database suite (`tests/database`, Phase 2)
+
+A global setup creates one database per test run as the local or CI container administrator, hands it to the migration role and applies all migrations with `prisma migrate deploy`. Tests connect as the real roles (`cm_api`, `cm_worker`, `cm_verifier`, `cm_migrator`); nothing is mocked and no grant is widened for testing. Tests that need a pristine or deliberately misconfigured database create their own. Details: [database-security.md](database-security.md) section 9.
+
+| Suite | What it proves | Threats |
+|---|---|---|
+| `migrations` | Clean apply from an empty database, idempotent re-run, no drift, every live column declared and classified, drift negative control | T-01, T-39 |
+| `constraints` | Partial unique indexes, composite foreign keys, CHECK constraints and write-once triggers, asserted by SQLSTATE | T-01, T-25, T-36, T-37 |
+| `audit` | Grant and trigger layers of the append-only table, including misconfigured grants; the owner's ability to disable the trigger is shown as a limit | T-20 |
+| `privileges` | Role attributes, ownership, the exact grant matrix, no PUBLIC privileges, no DDL or escalation by the API role | T-19, T-39 |
+| `deletion` | No cascades, member removal transaction, retention deletes only by the worker | T-21 |
+| `client` | Lazy connection, readiness with real and unreachable databases, no query logging, no URLs or row values in errors and logs | T-15, T-16 |
+| `seed` | Synthetic data only, idempotent, refuses production, remote hosts and other roles | T-16 |
 
 ## 4. Canary scan design
 
@@ -80,7 +96,7 @@ This is the automated proof of invariants INV-01 and INV-16, and a strong piece 
 A pull request cannot merge unless all of these pass:
 
 1. Lint (including forbidden-API rules) and typecheck.
-2. Unit, integration and security regression suites.
+2. Unit, integration, security regression and database suites, after the database checks: Prisma schema validation, the forbidden-field check, migrations from zero as the migration role, and the drift check.
 3. E2E smoke tests.
 4. Secret scan with no findings.
 5. Dependency scan with no unresolved Critical or High findings (exceptions need a documented risk acceptance in Jira).

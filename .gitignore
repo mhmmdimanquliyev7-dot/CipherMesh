@@ -12,6 +12,8 @@ out-meta/
 next-env.d.ts
 # Generated software bill of materials (published as a CI artifact)
 sbom.cdx.json
+# Generated Prisma client (pnpm db:generate, run on install)
+apps/api/src/generated/
 *.tsbuildinfo
 .turbo/
 

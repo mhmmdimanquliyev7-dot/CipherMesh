@@ -59,6 +59,9 @@ Subject tags: **CRY** Cryptography Fundamentals, **CLD** Cloud Security, **ISMS*
 | EV-02-01 | Forbidden-field check passing | Script output | Schema follows the data-model rules | CRY |
 | EV-02-02 | Rejected UPDATE on the audit table | Test output | Append-only protection | ISMS |
 | EV-02-03 | Grants per database role | Query output | Least privilege | CLD, ISMS |
+| EV-02-04 | Migrations from an empty database and the drift check, including its negative control | `pnpm db:migrate`, `pnpm db:drift` and `tests/database/migrations.test.ts` output | Controlled, reviewed schema changes (control 8.32) | ISMS |
+| EV-02-05 | Database security test results and the synthetic seed | `pnpm test:database` output, `pnpm db:seed` output | Constraints, deletion behaviour, client hygiene, synthetic test data (control 8.33) | APP, ISMS |
+| EV-02-06 | Database URL rules and redaction | `env.test.ts`, `startup-config` and `client.test.ts` output | TLS required in production; connection strings never logged | CLD, APP |
 
 ### Phase 3: Authentication
 | ID | Evidence | How to capture | Demonstrates | Tags |

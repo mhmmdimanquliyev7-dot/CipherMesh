@@ -1,6 +1,7 @@
 import { API_PREFIX } from '@ciphermesh/shared';
 import express, { type Express } from 'express';
 import type { AppConfig } from './config/env';
+import type { DatabaseHealth } from './db/client';
 import { requireJsonBody } from './http/content-type';
 import { errorHandler, notFound } from './http/errors';
 import { requestId } from './http/request-id';
@@ -16,6 +17,8 @@ export interface AppDependencies {
   readonly config: AppConfig;
   readonly logger: Logger;
   readonly lifecycle: Lifecycle;
+  /** Used by the readiness probe only. Route handlers receive data access from Phase 3 on. */
+  readonly database: DatabaseHealth;
   /**
    * Extra routes and allowlist entries for tests only. Refused in production, so a
    * deployment can never widen the public surface through this seam.
@@ -29,7 +32,7 @@ export interface CipherMeshApp {
 }
 
 export function createApp(deps: AppDependencies): CipherMeshApp {
-  const { config, logger, lifecycle, testing } = deps;
+  const { config, logger, lifecycle, database, testing } = deps;
   if (testing !== undefined && config.isProduction) {
     throw new Error('Test routes cannot be registered in production');
   }
@@ -51,7 +54,7 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
   app.use(express.json({ limit: config.bodyLimitBytes, strict: true, type: 'application/json', inflate: false }));
 
   const { router, registered } = buildRouter(
-    [...systemRoutes(lifecycle), ...(testing?.routes ?? [])],
+    [...systemRoutes(lifecycle, database), ...(testing?.routes ?? [])],
     [...PUBLIC_ROUTE_ALLOWLIST, ...(testing?.publicAllowlist ?? [])],
   );
   app.use(API_PREFIX, router);

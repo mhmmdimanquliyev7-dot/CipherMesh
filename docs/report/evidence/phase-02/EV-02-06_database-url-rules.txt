@@ -1,0 +1,43 @@
+EV-02-06: Database URL rules, redaction and readiness
+Captured: 2026-10-04T07:07:19Z on branch feature/CM-T013-database-prisma (stacked on 900b664)
+Redaction: no passwords or connection strings appear below; test databases have random names.
+
+$ pnpm exec vitest run apps/api/src/config/env.test.ts apps/api/src/logging/redact.test.ts tests/security/startup-config.test.ts --reporter=verbose
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "databaseUrl"
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "DATABASE_URL"
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "MIGRATION_DATABASE_URL"
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects production without TLS verification
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects production with sslmode=require only
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects production with sslmode=verify-ca
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects production to loopback without TLS
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects a remote host without TLS in development
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects sslmode=disable to a remote host
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects the migration role
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects an administrator account
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects a missing password
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects a missing database name
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects another scheme
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > rejects a value that is not a URL
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > accepts verify-full anywhere and plain connections to loopback outside production
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > never prints the connection string through the configuration object
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > DATABASE_URL (TB-05, CP-21) > never echoes the connection string in its error
+ ✓ |security| tests/security/startup-config.test.ts > API startup with invalid configuration > exits with code 1 and names the variable without its value
+ ✓ |security| tests/security/startup-config.test.ts > API startup with invalid configuration > refuses a production database connection without verified TLS and hides the URL
+ Test Files  3 passed (3)
+      Tests  64 passed (64)
+
+$ pnpm smoke:api   (requires a prior pnpm build)
+--- production mode, database unreachable (TLS required)
+PASS GET /api/health -> 200 {"status":"ok"}
+PASS GET /api/ready -> 503 {"status":"not-ready"}
+PASS GET /api/nothing-here -> 404 {"error":{"code":"NOT_FOUND","message":"Resource not found","requestId":"<uuid>"}}
+SKIP graceful shutdown check: not observable on Windows
+PASS the API log contains no database password
+--- development mode, real database as cm_api
+PASS GET /api/health -> 200 {"status":"ok"}
+PASS GET /api/ready -> 200 {"status":"ready"}
+PASS GET /api/nothing-here -> 404 {"error":{"code":"NOT_FOUND","message":"Resource not found","requestId":"<uuid>"}}
+SKIP graceful shutdown check: not observable on Windows
+PASS the API log contains no database password
+Smoke test passed against the built API bundle.
+exit code 0

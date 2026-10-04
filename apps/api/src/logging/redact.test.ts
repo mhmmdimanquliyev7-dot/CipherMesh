@@ -27,6 +27,10 @@ const SENSITIVE_FIELDS = [
   'adminPassword',
   'x-api-key',
   'safetyCode',
+  'databaseUrl',
+  'DATABASE_URL',
+  'MIGRATION_DATABASE_URL',
+  'connectionString',
 ];
 
 describe('redact', () => {

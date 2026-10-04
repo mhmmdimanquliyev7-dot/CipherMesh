@@ -41,4 +41,16 @@ describe('API startup with invalid configuration', () => {
     expect(`${result.stdout}${result.stderr}`).not.toContain('canary');
     expect(result.stdout).not.toContain('api listening');
   }, 20_000);
+
+  it('refuses a production database connection without verified TLS and hides the URL', async () => {
+    const result = await runServer({
+      NODE_ENV: 'production',
+      APP_ORIGIN: 'https://ciphermesh.example',
+      DATABASE_URL: 'postgresql://cm_api:canary-db-password@db.canary-host.example/ciphermesh?sslmode=require',
+    });
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('DATABASE_URL');
+    expect(`${result.stdout}${result.stderr}`).not.toContain('canary');
+    expect(result.stdout).not.toContain('api listening');
+  }, 20_000);
 });
