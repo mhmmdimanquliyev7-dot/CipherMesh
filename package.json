@@ -21,6 +21,7 @@
     "test:integration": "vitest run --project integration",
     "test:security": "vitest run --project security",
     "test:database": "vitest run --project database",
+    "test:auth": "vitest run --project auth",
     "test:e2e": "playwright test",
     "smoke:api": "node scripts/smoke-api.mjs",
     "audit:deps": "pnpm audit --audit-level high",
@@ -36,6 +37,10 @@
     "db:drift": "node scripts/db/check-drift.mjs",
     "db:check-schema": "node scripts/db/check-schema.mjs",
     "db:seed": "node --import tsx scripts/db/seed.ts",
+    "admin:platform-role": "pnpm --filter @ciphermesh/api admin:platform-role",
+    "worker:retention": "pnpm --filter @ciphermesh/api worker:retention",
+    "bench:argon2": "node scripts/bench/argon2.mjs",
+    "security:negative-controls": "node scripts/security/negative-controls.mjs",
     "postinstall": "node scripts/db/prisma.mjs generate"
   },
   "devDependencies": {
@@ -47,6 +52,7 @@
     "@types/pg": "8.23.1",
     "eslint": "10.11.0",
     "globals": "17.12.0",
+    "otpauth": "9.5.2",
     "pg": "catalog:",
     "prettier": "3.9.9",
     "prisma": "catalog:",

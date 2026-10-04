@@ -20,6 +20,19 @@ export interface AppConfig {
   readonly bodyLimitBytes: number;
   /** Connection to PostgreSQL as the least-privilege API role (CM-T014, TB-05). */
   readonly database: { readonly url: SecretValue };
+  /** Server-held authentication keys (Phase 3). Both are 32 random bytes, base64url encoded. */
+  readonly auth: {
+    /** AES-256-GCM key for TOTP secrets at rest (CP-11) and the ID stored with each ciphertext. */
+    readonly totpEncryptionKey: SecretValue;
+    readonly totpEncryptionKeyId: string;
+    /** HMAC-SHA-256 key for unknown login identifiers (CP-12). */
+    readonly identifierHmacKey: SecretValue;
+  };
+  /**
+   * Number of reverse proxies whose X-Forwarded-For entry is trusted for the client address
+   * (TB-04). 0 locally; 1 behind the single Nginx hop in production (Phase 17).
+   */
+  readonly trustProxyHops: 0 | 1;
 }
 
 const BODY_LIMIT_BYTES = 128 * 1024;
@@ -35,7 +48,18 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   APP_ORIGIN: z.string().refine(isOrigin, { message: 'must be an origin such as https://example.org' }),
   DATABASE_URL: z.string(),
+  TOTP_ENCRYPTION_KEY: z.string().refine(isKey32, { message: 'must be 32 random bytes, base64url encoded' }),
+  TOTP_ENCRYPTION_KEY_ID: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/),
+  IDENTIFIER_HMAC_KEY: z.string().refine(isKey32, { message: 'must be 32 random bytes, base64url encoded' }),
+  TRUST_PROXY_HOPS: z.enum(['0', '1']).default('0'),
 });
+
+/** 32 bytes in canonical unpadded base64url (43 characters). */
+function isKey32(value: string): boolean {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(value)) return false;
+  const bytes = Buffer.from(value, 'base64url');
+  return bytes.length === 32 && bytes.toString('base64url') === value;
+}
 
 /**
  * Cross-field rules, checked on the raw values so they are reported together with any field
@@ -43,16 +67,19 @@ const envSchema = z.object({
  */
 function productionRules(env: Readonly<Record<string, string>>): { variable: string; problem: string }[] {
   const origin = env['APP_ORIGIN'];
-  const problems =
+  const problems: { variable: string; problem: string }[] =
     env['NODE_ENV'] === 'production' && origin !== undefined && !origin.startsWith('https://')
       ? [{ variable: 'APP_ORIGIN', problem: 'must use https in production' }]
       : [];
   const databaseUrl = env['DATABASE_URL'];
   const databaseProblem =
     databaseUrl === undefined ? undefined : checkDatabaseUrl(databaseUrl, env['NODE_ENV'] === 'production');
-  return databaseProblem === undefined
-    ? problems
-    : [...problems, { variable: 'DATABASE_URL', problem: databaseProblem }];
+  if (databaseProblem !== undefined) problems.push({ variable: 'DATABASE_URL', problem: databaseProblem });
+  // Key separation: one key per purpose (key-hierarchy.md).
+  if (env['TOTP_ENCRYPTION_KEY'] !== undefined && env['TOTP_ENCRYPTION_KEY'] === env['IDENTIFIER_HMAC_KEY']) {
+    problems.push({ variable: 'IDENTIFIER_HMAC_KEY', problem: 'must differ from TOTP_ENCRYPTION_KEY' });
+  }
+  return problems;
 }
 
 /**
@@ -64,7 +91,7 @@ function productionRules(env: Readonly<Record<string, string>>): { variable: str
  * - Outside production, a connection without verify-full is accepted only to a loopback host
  *   (the local development container).
  */
-function checkDatabaseUrl(value: string, isProduction: boolean): string | undefined {
+function checkDatabaseUrl(value: string, isProduction: boolean, role: string = API_DATABASE_ROLE): string | undefined {
   let url: URL;
   try {
     url = new URL(value);
@@ -73,7 +100,7 @@ function checkDatabaseUrl(value: string, isProduction: boolean): string | undefi
   }
   if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') return 'must be a postgresql:// URL';
   if (url.hostname === '' || url.pathname.length < 2) return 'must name a host and a database';
-  if (decodeURIComponent(url.username) !== API_DATABASE_ROLE) return `must connect as the ${API_DATABASE_ROLE} role`;
+  if (decodeURIComponent(url.username) !== role) return `must connect as the ${role} role`;
   if (url.password === '') return 'must include the role password';
   const verifyFull = url.searchParams.get('sslmode') === 'verify-full';
   if (isProduction && !verifyFull) return 'must use sslmode=verify-full in production';
@@ -127,7 +154,52 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     appOrigin: e.APP_ORIGIN,
     bodyLimitBytes: BODY_LIMIT_BYTES,
     database: Object.freeze({ url: new SecretValue(e.DATABASE_URL) }),
+    auth: Object.freeze({
+      totpEncryptionKey: new SecretValue(e.TOTP_ENCRYPTION_KEY),
+      totpEncryptionKeyId: e.TOTP_ENCRYPTION_KEY_ID,
+      identifierHmacKey: new SecretValue(e.IDENTIFIER_HMAC_KEY),
+    }),
+    trustProxyHops: e.TRUST_PROXY_HOPS === '1' ? 1 : 0,
   });
+}
+
+/** Configuration of worker jobs (Phase 3: retention). Only the worker role may be used. */
+export interface WorkerConfig {
+  readonly isProduction: boolean;
+  readonly logLevel: LogLevel;
+  readonly database: { readonly url: SecretValue };
+}
+
+export const WORKER_DATABASE_ROLE = 'cm_worker';
+
+export function loadWorkerConfig(env: Readonly<Record<string, string | undefined>>): WorkerConfig {
+  const result = z
+    .object({
+      NODE_ENV: z.enum(['development', 'test', 'production']),
+      LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+      WORKER_DATABASE_URL: z.string().min(1),
+    })
+    .safeParse(env);
+  if (!result.success) {
+    throw new ConfigError(
+      result.error.issues.map((issue) => ({
+        variable: issue.path.map(String).join('.') || '(environment)',
+        problem: issue.code,
+      })),
+    );
+  }
+  const isProduction = result.data.NODE_ENV === 'production';
+  const problem = checkDatabaseUrl(result.data.WORKER_DATABASE_URL, isProduction, WORKER_DATABASE_ROLE);
+  if (problem !== undefined) throw new ConfigError([{ variable: 'WORKER_DATABASE_URL', problem }]);
+  return Object.freeze({
+    isProduction,
+    logLevel: result.data.LOG_LEVEL,
+    database: Object.freeze({ url: new SecretValue(result.data.WORKER_DATABASE_URL) }),
+  });
+}
+
+export function loadWorkerConfigFromProcessEnv(): WorkerConfig {
+  return loadWorkerConfig(process.env);
 }
 
 export function loadConfigFromProcessEnv(): AppConfig {

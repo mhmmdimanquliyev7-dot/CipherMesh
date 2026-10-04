@@ -44,6 +44,16 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'databaseUrl',
   'connectionString',
   'dsn',
+  // Authentication (Phase 3)
+  'passwordConfirmation',
+  'otp',
+  'totp',
+  'totpCode',
+  'mfaCode',
+  'otpauth',
+  'otpauthUri',
+  'challenge',
+  'preAuth',
 ];
 
 /** Any key ending with one of these is sensitive, e.g. `clientSecret`, `adminPassword`. */
@@ -67,6 +77,9 @@ const SENSITIVE_VALUE_PATTERNS: readonly RegExp[] = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/, // PEM private keys
   // Any URL with a password in its user info, e.g. postgresql://role:password@host/db (CM-T013)
   /\b[a-z][a-z0-9+.-]*:\/\/[^\s/?#@:]*:[^\s/?#@]*@/i,
+  /otpauth:\/\//i, // TOTP enrollment URIs carry the secret (Phase 3)
+  /__Host-cm_(session|preauth)=[^;\s]/i, // authentication cookie values in Cookie or Set-Cookie strings
+  /\b[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{5}\b/, // recovery codes as displayed
 ];
 
 const MAX_DEPTH = 8;

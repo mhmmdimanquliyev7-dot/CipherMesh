@@ -16,3 +16,5 @@ apps/web/next-env.d.ts
 apps/api/src/generated/
 # Prisma schema and SQL migrations keep their reviewed formatting.
 prisma/migrations/
+# Generated password blocklist (scripts/auth/build-password-blocklist.mjs).
+apps/api/src/auth/data/

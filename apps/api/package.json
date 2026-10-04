@@ -8,7 +8,9 @@
     "dev": "node --env-file-if-exists=../../.env --watch --import tsx src/server.ts",
     "build": "node scripts/build.mjs",
     "start": "node --enable-source-maps dist/server.js",
-    "typecheck": "tsc --project tsconfig.json"
+    "typecheck": "tsc --project tsconfig.json",
+    "admin:platform-role": "node --env-file-if-exists=../../.env --import tsx src/cli/platform-admin.ts",
+    "worker:retention": "node --env-file-if-exists=../../.env --import tsx src/worker/retention.ts"
   },
   "dependencies": {
     "@ciphermesh/shared": "workspace:*",
@@ -16,6 +18,7 @@
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
     "express": "5.2.1",
+    "otpauth": "9.5.2",
     "pg": "catalog:",
     "zod": "catalog:"
   },
