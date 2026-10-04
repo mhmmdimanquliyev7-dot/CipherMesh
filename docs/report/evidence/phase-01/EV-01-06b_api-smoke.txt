@@ -1,0 +1,13 @@
+# EV-01-06 (part 2): smoke test of the built API bundle (production mode)
+# Captured: 2026-10-02T11:21Z | node v24.19.0 | base commit 5945d70 plus uncommitted Phase 1 changes
+
+$ pnpm smoke:api
+$ node scripts/smoke-api.mjs
+PASS GET /api/health -> 200 {"status":"ok"}
+PASS GET /api/ready -> 200 {"status":"ready"}
+PASS GET /api/nothing-here -> 404 {"error":{"code":"NOT_FOUND","message":"Resource not found","requestId":"9bfda192-3bdf-4656-9438-d88a7c38c563"}}
+SKIP graceful shutdown check: not observable on Windows
+Smoke test passed against the built API bundle.
+exit=0
+
+Note: graceful SIGTERM shutdown is checked by the same script in CI on Linux; Windows cannot deliver SIGTERM to a child process.

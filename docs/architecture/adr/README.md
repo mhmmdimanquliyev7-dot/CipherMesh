@@ -16,7 +16,7 @@ An ADR records one significant decision: its context, the decision, the alternat
 | [ADR-008](ADR-008-server-side-sessions.md) | Opaque server-side sessions | Accepted (lifecycle and CSRF completed in Phase 0.5) |
 | [ADR-009](ADR-009-tamper-evident-audit-ledger.md) | Tamper-evident audit ledger | Accepted (trust model added in Phase 0.5) |
 | [ADR-010](ADR-010-browser-argon2id.md) | Argon2id in the browser for the Vault | Proposed |
-| [ADR-011](ADR-011-static-frontend-delivery.md) | Static Next.js export served by Nginx | Proposed |
+| [ADR-011](ADR-011-static-frontend-delivery.md) | Static Next.js export served by Nginx | Accepted for export and CSP (Phase 1); identifier routing confirmed in Phase 5 |
 | [ADR-012](ADR-012-room-safety-code.md) | Room Safety Code | Accepted |
 | [ADR-013](ADR-013-rekey-state-machine.md) | Client-driven rekey state machine | Accepted |
 

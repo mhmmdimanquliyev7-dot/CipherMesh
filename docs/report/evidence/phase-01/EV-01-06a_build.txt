@@ -1,0 +1,28 @@
+# EV-01-06 (part 1): build of the API bundle and the web static export
+# Captured: 2026-10-02T11:21Z | node v24.19.0 | base commit 5945d70 plus uncommitted Phase 1 changes
+
+$ pnpm build
+$ pnpm --recursive build
+apps/web build$ next build && node scripts/generate-csp.mjs
+apps/api build$ node scripts/build.mjs
+apps/api build:   dist\server.js      19.0kb
+apps/api build:   dist\server.js.map  49.0kb
+apps/api build: Done in 15ms
+apps/api build: Done
+apps/web build: ▲ Next.js 16.3.6 (Turbopack)
+apps/web build: ✓ Running next.config.ts took 94ms
+apps/web build:   Creating an optimized production build ...
+apps/web build: ✓ Compiled successfully in 2.9s
+apps/web build:   Running TypeScript ...
+apps/web build:   Finished TypeScript in 1832ms ...
+apps/web build:   Collecting page data using 4 workers ...
+apps/web build:   Generating static pages using 4 workers (0/3) ...
+apps/web build: ✓ Generating static pages using 4 workers (3/3) in 692ms
+apps/web build:   Finalizing page optimization ...
+apps/web build: Route (app)
+apps/web build: ┌ ○ /
+apps/web build: └ ○ /_not-found
+apps/web build: ○  (Static)  prerendered as static content
+apps/web build: CSP generated for 3 HTML files with 3 inline script hashes.
+apps/web build: Done
+exit=0

@@ -1,0 +1,21 @@
+{
+  "name": "@ciphermesh/validation",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Schemas used at CipherMesh trust boundaries, shared by the API and the web client.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "dependencies": {
+    "@ciphermesh/shared": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

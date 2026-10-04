@@ -1,0 +1,20 @@
+# EV-01-08: development services bound to loopback, with authentication enforced
+# Captured: 2026-10-02T11:22Z | Docker 29.4.3 | Compose file infrastructure/docker/compose.dev.yml
+# Credentials come from the git-ignored .env and are not shown.
+
+$ docker compose ps
+object-storage  image=chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882  ports=127.0.0.1:8333->8333/tcp  Up 15 minutes (healthy)
+postgres  image=postgres:17.11-alpine3.24@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24  ports=127.0.0.1:55432->5432/tcp  Up 15 minutes (healthy)
+
+## Host listeners for the published ports (expect 127.0.0.1 only)
+TCP 127.0.0.1:8333
+TCP 127.0.0.1:55432
+
+## Access checks
+S3 anonymous request          -> HTTP 403 (expect 403)
+S3 wrong access key           -> HTTP 403 (expect 403)
+S3 configured access key      -> HTTP 200 (expect 200)
+PostgreSQL wrong password     -> password authentication failed
+PostgreSQL configured password -> 17.11
+PostgreSQL root filesystem read-only -> true
+no-new-privileges (postgres, s3) -> [no-new-privileges:true] [no-new-privileges:true]

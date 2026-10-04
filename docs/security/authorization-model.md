@@ -4,7 +4,7 @@ Status: Phase 0.5 baseline. Normative. Related: [security-policy-profiles.md](se
 
 ## 1. Principles
 
-1. **Deny by default.** Every route requires an authenticated session unless it is on the explicit public allowlist (registration, login, MFA verification during login, health check).
+1. **Deny by default.** Every route requires an authenticated session unless it is on the explicit public allowlist (registration, login, MFA verification during login, health and readiness checks). In code this is `PUBLIC_ROUTE_ALLOWLIST` in `apps/api/src/routes/system.ts`, enforced by the route registry.
 2. **Server-side only.** Hiding a button is not authorization. The API decides every privileged action.
 3. **Database-loaded state.** Roles, membership, ownership and profile are read from the database on every request. Nothing in the request body or cookie grants privileges.
 4. **Object-level checks.** Every object is loaded through its room and checked against the caller's membership, which is the main defence against BOLA/IDOR.

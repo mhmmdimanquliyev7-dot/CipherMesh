@@ -1,0 +1,38 @@
+# EV-01-01 (local part): fresh install from the lockfile, format, lint, typecheck
+# Captured: 2026-10-02T11:20Z on MINGW64_NT-10.0-26200 | node v24.19.0 | pnpm 12.6.0 | base commit 5945d70 plus uncommitted Phase 1 changes
+
+$ pnpm install --frozen-lockfile
+Scope: all 6 workspace projects
+✓ Lockfile passes supply-chain policies (verified 20m ago)
+Lockfile is up to date, resolution step is skipped
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: D:\.pnpm-store\v11
+  Virtual store is at:             node_modules/.pnpm
+Packages: +245
+devDependencies:
+Done in 2.8s using pnpm v12.6.0
+exit=0
+
+$ pnpm format:check
+$ prettier --check .
+Checking formatting...
+All matched files use Prettier code style!
+exit=0
+
+$ pnpm lint
+$ eslint . --max-warnings 0
+exit=0
+
+$ pnpm typecheck
+$ pnpm --recursive typecheck && tsc --project tsconfig.json
+packages/shared typecheck$ tsc --project tsconfig.json
+packages/crypto typecheck$ tsc --project tsconfig.json
+packages/crypto typecheck: Done
+packages/shared typecheck: Done
+packages/validation typecheck$ tsc --project tsconfig.json
+apps/web typecheck$ tsc --project tsconfig.json
+packages/validation typecheck: Done
+apps/api typecheck$ tsc --project tsconfig.json
+apps/web typecheck: Done
+apps/api typecheck: Done
+exit=0

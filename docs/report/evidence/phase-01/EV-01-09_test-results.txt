@@ -1,0 +1,139 @@
+# EV-01-09: unit, integration and security test results (pnpm test, verbose)
+# Captured: 2026-10-02T11:21Z | node v24.19.0 | base commit 5945d70 plus uncommitted Phase 1 changes
+
+$ pnpm test -- --reporter=verbose
+ RUN  v5.0.2 D:/ciphermesh
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "password" 5ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "passphrase" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "vaultPassphrase" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "authorization" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "cookie" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "set-cookie" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "session" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "sessionToken" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "accessToken" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "refreshToken" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "privateKey" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "roomKey" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "fileEncryptionKey" 1ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "FEK" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "secret" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "totpSecret" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "recoveryCode" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "presignedUrl" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "session_token" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "Session-Token" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "clientSecret" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "adminPassword" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "x-api-key" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts the field "safetyCode" 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts at any depth and inside arrays 1ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts whole sensitive objects, not only strings 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > redacts sensitive values under harmless keys 1ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > never logs raw bytes, which may be key material 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > keeps harmless fields unchanged 0ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > handles circular structures and deep nesting without throwing 1ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > serialises errors and redacts sensitive values in their messages 5ms
+ ✓ |unit| apps/api/src/logging/redact.test.ts > redact > supports additional sensitive fields 0ms
+ ✓ |unit| packages/crypto/src/boundary.test.ts > @ciphermesh/crypto boundary > exports no cryptographic functions before Phase 4 4ms
+ ✓ |unit| apps/api/src/logging/logger.test.ts > logger > writes one JSON object per line with time, level and message 7ms
+ ✓ |unit| apps/api/src/logging/logger.test.ts > logger > drops records below the configured level 1ms
+ ✓ |unit| apps/api/src/logging/logger.test.ts > logger > redacts sensitive fields, including those inherited by child loggers 1ms
+ ✓ |unit| apps/api/src/logging/logger.test.ts > logger > redacts sensitive values that appear in the message itself 1ms
+ ✓ |unit| apps/api/src/logging/logger.test.ts > logger > does not let fields overwrite the reserved keys 2ms
+ ✓ |unit| apps/web/scripts/csp-lib.test.ts > extractInlineScripts > returns executable inline scripts and skips external, JSON and empty scripts 4ms
+ ✓ |unit| apps/web/scripts/csp-lib.test.ts > findInlineStyles > counts style elements and style attributes outside scripts 1ms
+ ✓ |unit| apps/web/scripts/csp-lib.test.ts > sha256Source > produces the CSP hash source for the exact script text 1ms
+ ✓ |unit| apps/web/scripts/csp-lib.test.ts > buildCsp > never allows unsafe-inline or unsafe-eval 1ms
+ ✓ |unit| apps/web/scripts/csp-lib.test.ts > buildCsp > lists each script hash once, sorted, after self 1ms
+ ✓ |unit| apps/web/scripts/csp-lib.test.ts > buildCsp > denies by default and forbids framing, plugins and base changes 0ms
+ ✓ |unit| packages/shared/src/shared.test.ts > isUuidV4 > accepts a canonical version 4 UUID 2ms
+ ✓ |unit| packages/shared/src/shared.test.ts > isUuidV4 > rejects uppercase 0ms
+ ✓ |unit| packages/shared/src/shared.test.ts > isUuidV4 > rejects version 1 0ms
+ ✓ |unit| packages/shared/src/shared.test.ts > isUuidV4 > rejects wrong variant 0ms
+ ✓ |unit| packages/shared/src/shared.test.ts > isUuidV4 > rejects surrounding text 0ms
+ ✓ |unit| packages/shared/src/shared.test.ts > isUuidV4 > rejects not a string 0ms
+ ✓ |unit| packages/shared/src/shared.test.ts > isErrorCode > accepts every declared code and nothing else 1ms
+ ✓ |unit| packages/validation/src/validation.test.ts > strict schemas > reject unknown keys, including __proto__ created by JSON.parse 7ms
+ ✓ |unit| packages/validation/src/validation.test.ts > strict schemas > accept exactly the declared shape 1ms
+ ✓ |unit| packages/validation/src/validation.test.ts > validation issues > contain only paths and codes, never the rejected value 4ms
+ ✓ |unit| packages/validation/src/validation.test.ts > validation issues > label root-level problems 1ms
+ ✓ |unit| packages/validation/src/validation.test.ts > shared boundary schemas > validate the API error body shape 2ms
+ ✓ |unit| packages/validation/src/validation.test.ts > shared boundary schemas > accept only version 4 UUIDs 1ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > applies safe defaults: loopback host, fixed body limit 7ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > refuses to start without NODE_ENV or APP_ORIGIN 2ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > rejects a port out of range 2ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > rejects a non-numeric port 1ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > rejects an unknown log level 1ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > rejects an unknown environment 0ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > rejects an origin with a path 1ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > rejects an origin with another scheme 1ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > requires an https origin in production 1ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > treats empty values as missing 0ms
+ ✓ |unit| apps/api/src/config/env.test.ts > loadConfig > never echoes configuration values in its error 1ms
+ ✓ |unit| apps/api/src/routes/registry.test.ts > route registry > registers the system routes as the only public routes 5ms
+ ✓ |unit| apps/api/src/routes/registry.test.ts > route registry > refuses authenticated routes before authentication exists 2ms
+ ✓ |unit| apps/api/src/routes/registry.test.ts > route registry > refuses public routes missing from the allowlist 0ms
+ ✓ |unit| apps/api/src/routes/registry.test.ts > route registry > refuses public routes without a justification 0ms
+ ✓ |unit| apps/api/src/routes/registry.test.ts > route registry > refuses routes without a valid action ID 0ms
+ ✓ |unit| apps/api/src/routes/registry.test.ts > route registry > refuses POST routes without a body schema 0ms
+ ✓ |unit| apps/api/src/routes/registry.test.ts > route registry > refuses GET routes with a body schema 0ms
+ ✓ |unit| apps/api/src/routes/registry.test.ts > route registry > refuses duplicate registrations 0ms
+ ✓ |security| tests/security/route-inventory.test.ts > route inventory > registers only allowlisted public routes, each with an action ID 8ms
+ ✓ |security| tests/security/route-inventory.test.ts > route inventory > mounts no route outside the registry 1ms
+ ✓ |security| tests/security/route-inventory.test.ts > route inventory > refuses test routes in production, so the public surface cannot be widened 1ms
+ ✓ |security| tests/security/route-inventory.test.ts > route inventory > allowlists only the health and readiness probes in Phase 1 0ms
+ ✓ |security| tests/security/http-baseline.test.ts > security headers > are present on success and error responses alike 39ms
+ ✓ |security| tests/security/http-baseline.test.ts > security headers > do not disclose the framework or server version 10ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > health and readiness > GET /api/health returns only a status word 32ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > health and readiness > GET /api/ready reflects the lifecycle state 15ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > health and readiness > rejects unexpected query parameters instead of ignoring them 19ms
+ ✓ |security| tests/security/malformed-requests.test.ts > malformed requests > /api/%E0%A4%A gets a generic 404 20ms
+ ✓ |security| tests/security/malformed-requests.test.ts > malformed requests > /api/health%00 gets a generic 404 3ms
+ ✓ |security| tests/security/malformed-requests.test.ts > malformed requests > /api/../../etc/passwd gets a generic 404 2ms
+ ✓ |security| tests/security/malformed-requests.test.ts > malformed requests > rejects oversized URLs before routing 2ms
+ ✓ |security| tests/security/malformed-requests.test.ts > malformed requests > refuses compressed request bodies instead of decompressing them 5ms
+ ✓ |security| tests/security/malformed-requests.test.ts > malformed requests > never logs an unhandled error for these requests 0ms
+ ✓ |security| tests/security/http-baseline.test.ts > security headers > use a fresh server-generated request ID and ignore client-supplied ones 15ms
+ ✓ |security| tests/security/http-baseline.test.ts > CORS > never grants cross-origin access, including to preflight requests 16ms
+ ✓ |security| tests/security/http-baseline.test.ts > same-origin gate for state-changing requests (INV-19) > accepts a same-origin request with the CipherMesh header 41ms
+ ✓ |security| tests/security/http-baseline.test.ts > same-origin gate for state-changing requests (INV-19) > accepts an exact Origin match when Fetch Metadata is absent 4ms
+ ✓ |security| tests/security/http-baseline.test.ts > same-origin gate for state-changing requests (INV-19) > rejects cross-site Fetch Metadata with 403 before the body is parsed 17ms
+ ✓ |security| tests/security/http-baseline.test.ts > same-origin gate for state-changing requests (INV-19) > rejects same-site but cross-origin with 403 before the body is parsed 5ms
+ ✓ |security| tests/security/http-baseline.test.ts > same-origin gate for state-changing requests (INV-19) > rejects a foreign Origin with 403 before the body is parsed 8ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > unknown routes > /api/unknown returns the generic 404 body 12ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > unknown routes > /api/health/extra returns the generic 404 body 4ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > unknown routes > / returns the generic 404 body 10ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > unknown routes > /.env returns the generic 404 body 9ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > unknown routes > answers an unregistered method on a known path with 404 19ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > request bodies > accepts a valid JSON body and validates it 19ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > request bodies > rejects malformed JSON with 400 INVALID_JSON 17ms
+ ✓ |security| tests/security/http-baseline.test.ts > same-origin gate for state-changing requests (INV-19) > rejects Origin null (form post under no-referrer) with 403 before the body is parsed 16ms
+ ✓ |security| tests/security/http-baseline.test.ts > same-origin gate for state-changing requests (INV-19) > rejects neither Fetch Metadata nor Origin with 403 before the body is parsed 4ms
+ ✓ |security| tests/security/http-baseline.test.ts > same-origin gate for state-changing requests (INV-19) > rejects a missing CipherMesh header with 403 before the body is parsed 12ms
+ ✓ |security| tests/security/http-baseline.test.ts > logging > keeps secrets in headers, query strings and bodies out of the log 14ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > request bodies > rejects JSON scalars at the top level (strict parsing) 14ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > request bodies > rejects bodies over the limit with 413 before validation 9ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > request bodies > rejects text/plain with 415 8ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > request bodies > rejects application/x-www-form-urlencoded with 415 4ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > request bodies > rejects multipart/form-data; boundary=x with 415 9ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > request bodies > rejects a non-UTF-8 charset with 415 16ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > request bodies > rejects unknown fields and reports paths and codes only 18ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > fail-closed responses > never sends fields outside the response schema 22ms
+ ✓ |integration| tests/integration/api-foundation.test.ts > fail-closed responses > hides internal error details: no message, stack or path 3ms
+ ✓ |security| tests/security/startup-config.test.ts > API startup with invalid configuration > exits with code 1 and names the variable without its value 975ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > rejects eval in API code 2525ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > rejects new Function in API code 30ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > rejects Math.random in API code 20ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > rejects unsafe raw SQL in API code 29ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > rejects scattered process.env in API code 31ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > rejects WebCrypto outside packages/crypto in API code 25ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > rejects child processes in API code 40ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > rejects dangerouslySetInnerHTML in the web client 1660ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > rejects Node built-ins and server imports in browser code 141ms
+ ✓ |security| tests/security/lint-guards.test.ts > ESLint security guards > keeps shared packages browser-compatible 157ms
+ Test Files  14 passed (14)
+      Tests  129 passed (129)
+   Start at  15:21:04
+   Duration  5.39s (tests 56%, import 31%, transform 12%, worker 1%)
+exit=0

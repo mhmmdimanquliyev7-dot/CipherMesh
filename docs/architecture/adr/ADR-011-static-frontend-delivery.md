@@ -1,6 +1,6 @@
 # ADR-011: Static Next.js export served by Nginx
 
-- Status: **Proposed** (validate in Phase 1)
+- Status: **Accepted** for the static export and strict CSP (verified in Phase 1, 2026-10-02). The routing pattern for identifiers is confirmed with the first identifier route in Phase 5
 - Date: 2026-09-28
 - Related: [deployment-architecture.md](../../cloud/deployment-architecture.md), [trust-boundaries.md](../trust-boundaries.md) TB-03, T-12, T-19, T-24, L-02
 
@@ -30,4 +30,9 @@ Next.js is the preferred frontend framework. In CipherMesh all security-relevant
 - Code-delivery trust (TB-03) remains: a compromised VM can still serve modified files (T-24, L-02). Published release hashes allow detection after the fact.
 
 ## Status
-Proposed. Becomes Accepted when Phase 1 demonstrates the static export with the routing pattern and a strict CSP without `'unsafe-inline'` scripts.
+Accepted for the static export and its strict CSP. Confirming evidence from Phase 1:
+- `next build` with `output: 'export'` (Next.js 16.3.6) produces a static site. The App Router emits a few inline scripts and no inline styles.
+- `apps/web/scripts/generate-csp.mjs` hashes the inline scripts. The resulting policy has no `'unsafe-inline'` and no `'unsafe-eval'`, and the build fails if inline styles appear.
+- Playwright loads the export under that policy in Chromium, Firefox and WebKit with zero CSP violations (`tests/e2e/web-shell.spec.ts`). A negative control with the hashes removed makes the test fail.
+
+Still open: the identifier routing pattern for deep links and reloads is confirmed when the first identifier route is built (Phase 5). If it fails, this ADR is revised.

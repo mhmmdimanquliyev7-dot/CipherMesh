@@ -32,6 +32,10 @@ All scanning and testing targets only CipherMesh infrastructure, following the c
 | `authz-matrix` | Every action, role and profile combination returns the expected result, generated from the shared matrix | T-04, T-05 |
 | `bola` | Identifiers from another room or user always give 404 with no side effects, for every endpoint | T-06 |
 | `route-inventory` | Every route declares an action and has tests; public routes match the allowlist | T-05, T-06 |
+| `http-baseline` | Security headers on every response, no framework disclosure, server-generated request IDs, no CORS grants, the same-origin gate, and no secrets from headers, query strings or bodies in the log (implemented in Phase 1) | T-12, T-13, T-15 |
+| `malformed-requests` | Malformed and dot-segment paths, oversized URLs and compressed bodies get generic errors without crashes or decompression (implemented in Phase 1) | T-14, T-15, T-26 |
+| `startup-config` | The real server process refuses invalid configuration and never echoes values (implemented in Phase 1) | Principle 10 |
+| `lint-guards` | The ESLint guards for CLAUDE.md section 8 fire on forbidden code (implemented in Phase 1) | T-14, T-27 |
 | `policy-matrix` | PC-01 to PC-16: one allowed and one denied case per control and profile | T-04, T-21 |
 | `session` | Cookie attributes, fixation, every rotation and invalidation event, idle and absolute expiry, logout, session limit ([session-and-csrf.md](session-and-csrf.md)) | T-08 |
 | `csrf` | `Sec-Fetch-Site` and `Origin` checks, the custom request header, content types, login CSRF, side-effect-free GETs, `Origin` behaviour under `no-referrer` in three engines | T-13 |
