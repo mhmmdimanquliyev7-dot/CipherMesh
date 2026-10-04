@@ -42,4 +42,4 @@ The full rules, tables and tests are in [session-and-csrf.md](../../security/ses
 
 ## Status
 
-Accepted.
+Accepted. Implemented in Phase 3 as designed ([../../security/authentication-security.md](../../security/authentication-security.md)). The pre-authentication state is stored in its own table, `auth_challenges` (data-model 4.3.1); the session design section 11 records the implementation notes.

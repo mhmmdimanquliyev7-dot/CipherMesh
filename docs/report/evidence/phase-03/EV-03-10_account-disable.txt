@@ -1,0 +1,16 @@
+EV-03-10: Account disabled by a platform administrator
+Captured: 2026-10-04T11:51:44Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Redaction: no passwords, tokens, cookie values, TOTP secrets or codes appear below.
+
+$ pnpm exec vitest run tests/auth/admin.test.ts --reporter=verbose
+ ✓ |auth| tests/auth/admin.test.ts > platform administrator bootstrap (CLI only) > cannot be granted to an account without MFA
+ ✓ |auth| tests/auth/admin.test.ts > platform administrator bootstrap (CLI only) > revokes all sessions of the account when the role changes
+ ✓ |auth| tests/auth/admin.test.ts > platform administrator bootstrap (CLI only) > is not grantable through the API: there is no such route and registration refuses the field
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > is invisible to non-administrators (404)
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > requires a step-up even for an administrator
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > disables the account, ends its sessions immediately and blocks login; enabling restores login
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > refuses to disable oneself and answers 404 for unknown accounts
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > administrators cannot switch off their own MFA
+ ✓ |auth| tests/auth/admin.test.ts > last administrator protection > the CLI refuses to remove the role from the last active administrator
+ Test Files  1 passed (1)
+      Tests  9 passed (9)

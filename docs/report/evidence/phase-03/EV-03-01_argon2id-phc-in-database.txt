@@ -1,0 +1,14 @@
+EV-03-01: Argon2id PHC hash in the users table (password hashing, not encryption)
+Captured: 2026-10-04T09:04:27.038Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Environment: real API (Argon2id m=65536,t=3,p=4) on loopback, throwaway PostgreSQL database as cm_api.
+Redaction: passwords, tokens, cookie values, TOTP secrets, codes and hash bytes are replaced by <redacted>.
+Accounts are synthetic (example.test) and the database was dropped after capture.
+
+POST /api/auth/register -> 201 {"status":"registered"}
+
+SELECT '<email redacted>' AS email, password_hash FROM users WHERE email = <synthetic>;
+  password_hash = $argon2id$v=19$m=65536,t=3,p=4$<salt redacted>$<hash redacted>
+  length of the stored string: 97 characters; the salt is 16 bytes and the hash 32 bytes (lengths verified by tests)
+
+The column accepts only strings starting with $argon2id$v=19$ (CHECK users_password_hash_argon2id_check).
+The password itself is never stored, encrypted, returned or logged.

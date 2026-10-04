@@ -37,3 +37,22 @@ Captured on the stacked branch `feature/CM-T013-database-prisma` against the loc
 | EV-02-04 | [phase-02/EV-02-04_migrations-and-drift.txt](phase-02/EV-02-04_migrations-and-drift.txt) | 2026-10-04 | CM-T013 | Migrations from an empty database, idempotent re-run, drift check passing and failing on an out-of-band change |
 | EV-02-05 | [phase-02/EV-02-05_database-tests-and-seed.txt](phase-02/EV-02-05_database-tests-and-seed.txt) | 2026-10-04 | CM-T011, CM-T013, CM-T014 | All 103 database tests pass; synthetic seed output |
 | EV-02-06 | [phase-02/EV-02-06_database-url-rules.txt](phase-02/EV-02-06_database-url-rules.txt) | 2026-10-04 | CM-T013 | Database URL rules (role, TLS), redaction, and the built API with fail-closed and working readiness |
+
+## Phase 3
+
+Captured on the stacked branch `feature/CM-T015-authentication` against the real API, throwaway test databases and the local HTTPS E2E server. Synthetic accounts only; every password, token, cookie value, TOTP secret, code and hash byte is redacted. The CI-run versions and the Jira issue history need the GitHub remote and Jira.
+
+| ID | File | Date | Jira | Caption |
+|---|---|---|---|---|
+| EV-03-01 | [phase-03/EV-03-01_argon2id-phc-in-database.txt](phase-03/EV-03-01_argon2id-phc-in-database.txt) | 2026-10-04 | CM-T015 | Argon2id PHC string (parameters visible, salt and hash redacted) |
+| EV-03-02 | [phase-03/EV-03-02_argon2-benchmark.txt](phase-03/EV-03-02_argon2-benchmark.txt) | 2026-10-04 | CM-T015, CM-T018 | Argon2id benchmark on a 2-CPU container and the laptop; RFC 9106 vector |
+| EV-03-03 | [phase-03/EV-03-03_session-cookie-attributes.txt](phase-03/EV-03-03_session-cookie-attributes.txt) | 2026-10-04 | CM-T016 | `__Host-cm_session` with HttpOnly, Secure, SameSite=Strict, Path=/ |
+| EV-03-04 | [phase-03/EV-03-04_rate-limit-and-backoff.txt](phase-03/EV-03-04_rate-limit-and-backoff.txt) | 2026-10-04 | CM-T018 | 429 after five failures (even for the right password) and after 20 attempts from one address |
+| EV-03-05 | [phase-03/EV-03-05_mfa-enrollment.txt](phase-03/EV-03-05_mfa-enrollment.txt) | 2026-10-04 | CM-T019 | Enrollment needs step-up and a valid code; encrypted secret; pre-auth cookie opens nothing |
+| EV-03-06 | [phase-03/EV-03-06_login-attempts-privacy.txt](phase-03/EV-03-06_login-attempts-privacy.txt) | 2026-10-04 | CM-T016, CM-T018 | Login attempts with user ID or 32-byte HMAC only |
+| EV-03-07 | [phase-03/EV-03-07_csrf-rejections.txt](phase-03/EV-03-07_csrf-rejections.txt) | 2026-10-04 | CM-T020 | Cross-site login attempts rejected with ORIGIN_REJECTED or 415, no cookie |
+| EV-03-08 | [phase-03/EV-03-08_password-change-revokes-sessions.txt](phase-03/EV-03-08_password-change-revokes-sessions.txt) | 2026-10-04 | CM-T017 | Session list before and after a password change |
+| EV-03-09 | [phase-03/EV-03-09_auth-security-suites.txt](phase-03/EV-03-09_auth-security-suites.txt) | 2026-10-04 | CM-T015 to CM-T022 | All 186 authentication security tests pass |
+| EV-03-10 | [phase-03/EV-03-10_account-disable.txt](phase-03/EV-03-10_account-disable.txt) | 2026-10-04 | CM-T022 | Administrator bootstrap and account disabling tests |
+| EV-03-11 | [phase-03/EV-03-11_negative-controls.txt](phase-03/EV-03-11_negative-controls.txt) | 2026-10-04 | CM-T016 to CM-T021 | Ten deliberate defects, each caught |
+| EV-03-12 | [phase-03/EV-03-12_browser-checks.txt](phase-03/EV-03-12_browser-checks.txt) | 2026-10-04 | CM-T016, CM-T019, CM-T020 | 18 Playwright tests in Chromium, Firefox and WebKit |

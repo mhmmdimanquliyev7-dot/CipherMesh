@@ -1,0 +1,18 @@
+EV-03-06: Login attempt records without passwords or raw identifiers
+Captured: 2026-10-04T09:04:31.781Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Environment: real API (Argon2id m=65536,t=3,p=4) on loopback, throwaway PostgreSQL database as cm_api.
+Redaction: passwords, tokens, cookie values, TOTP secrets, codes and hash bytes are replaced by <redacted>.
+Accounts are synthetic (example.test) and the database was dropped after capture.
+
+The last login used a password typed into the email field. login_attempts (latest three rows for known accounts, then for unknown identifiers):
+  user_id | identifier_hmac | ip_address | user_agent | outcome
+  <user uuid> | NULL | 2001:db8::e7 | CipherMesh evidence browser | BAD_CREDENTIALS
+  <user uuid> | NULL | 2001:db8::e6 | CipherMesh evidence browser | BAD_CREDENTIALS
+  <user uuid> | NULL | 2001:db8::e5 | CipherMesh evidence browser | BAD_CREDENTIALS
+  NULL | 32 bytes | 2001:db8::eb | CipherMesh evidence browser | BAD_CREDENTIALS
+  NULL | 32 bytes | 2001:db8::ea | CipherMesh evidence browser | BAD_CREDENTIALS
+  NULL | 32 bytes | 2001:db8::ea | CipherMesh evidence browser | BAD_CREDENTIALS
+
+Known accounts: user ID only. Unknown identifiers: a 32-byte HMAC-SHA-256 under a key outside the database (CP-12).
+No row contains the typed value, the email address or any password (asserted in tests/auth/login.test.ts).
+IP addresses are documentation addresses (RFC 3849) set by the test client; retention is 90 days.

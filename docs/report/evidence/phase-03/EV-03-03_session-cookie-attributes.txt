@@ -1,0 +1,12 @@
+EV-03-03: Session cookie attributes (value redacted)
+Captured: 2026-10-04T09:04:27.040Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Environment: real API (Argon2id m=65536,t=3,p=4) on loopback, throwaway PostgreSQL database as cm_api.
+Redaction: passwords, tokens, cookie values, TOTP secrets, codes and hash bytes are replaced by <redacted>.
+Accounts are synthetic (example.test) and the database was dropped after capture.
+
+POST /api/auth/login -> 200 {"status":"authenticated"}
+  Set-Cookie: __Host-cm_session=<redacted>; Max-Age=43200; Path=/; Secure; HttpOnly; SameSite=Strict
+  Set-Cookie: __Host-cm_preauth=; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Strict
+
+Browser view (Playwright, three engines): see EV-03-12. Every engine reports httpOnly and secure;
+Chromium and Firefox report sameSite Strict; the Set-Cookie header above is checked in all three.

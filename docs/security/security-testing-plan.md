@@ -16,7 +16,8 @@ Status: Phase 0.5 baseline. Related: [../threat-model/threat-model.md](../threat
 | Unit | Crypto wrappers, canonical contexts, authorization decision function, policy engine, audit hashing | Vitest | Every PR |
 | Integration | API with a real PostgreSQL in Docker: auth, sessions, authorization, policy, audit chain, burn atomicity | Vitest with an HTTP test client | Every PR |
 | Security regression | `tests/security`: the suites in section 3 | Vitest, Playwright | Every PR |
-| Database | `tests/database`: migrations from zero, drift, constraints, append-only audit, role privileges, deletion behaviour, database client, seed (section 3.1, implemented in Phase 2) | Vitest against a throwaway PostgreSQL database per run | Every PR |
+| Database | `tests/database`: migrations from zero, drift, constraints, append-only audit, role privileges, deletion behaviour, database client, seed, retention (section 3.1, implemented in Phase 2) | Vitest against a throwaway PostgreSQL database per run | Every PR |
+| Authentication | `tests/auth`: the `session`, `csrf` and `auth-abuse` suites of section 3 and the MFA, recovery, step-up, administrator and logging suites (section 3.2, implemented in Phase 3) | Vitest against the real API and a throwaway PostgreSQL database; Playwright for browser checks | Every PR |
 | End-to-end | Browser flows in Chromium, Firefox and WebKit | Playwright | Every PR (smoke), nightly (full) |
 | Static analysis | TypeScript strict, ESLint with security rules, forbidden-API lint rules | tsc, ESLint | Every PR |
 | Supply chain | Vulnerable dependencies, secrets, SBOM, container images | OSV-Scanner or `pnpm audit`, gitleaks, CycloneDX, Trivy | Every PR and weekly |
@@ -56,6 +57,23 @@ All scanning and testing targets only CipherMesh infrastructure, following the c
 | `upload` | HTML and SVG never render inline; size and quota limits; storage keys independent of filenames | T-11 |
 | `browser-storage` | No key material or plaintext in localStorage, sessionStorage, IndexedDB or cookies after use | T-23 |
 | `identity` | Lookup responses label identifiers as unverified; fingerprint confirmation enforced in RESTRICTED invitations; key changes are audited | T-25, T-35 |
+
+### 3.2 Authentication suites (`tests/auth`, Phase 3)
+
+The real API runs on a loopback port against a throwaway database as `cm_api`, with production Argon2id parameters. Only the clock is controllable (a test seam that the application refuses in production), so expiry windows, backoff and TOTP steps can be tested exactly. Each scenario uses its own client address through one trusted forwarding hop. Details: [authentication-security.md](authentication-security.md) section 15.
+
+| Suite | What it proves | Threats |
+|---|---|---|
+| `registration` | Argon2id PHC storage, mass-assignment refusal, normalization, one winner among concurrent duplicates, password policy, rate limit | T-03, T-04 |
+| `login` | Cookie attributes, digest-only storage, identical failures and timing, fixation, disabled accounts, rehash, privacy of login attempts | T-08, T-09, T-15 |
+| `session` | Identity only from the session, expiry, logout, revocation, eviction, password change, disabled accounts | T-08 |
+| `abuse` | Backoff without lockout, unknown identifiers, per-address limits without writes, Argon2id burst | T-09, T-10, T-26 |
+| `csrf` | Nine attack shapes on eleven routes, login CSRF, side effects, preflight | T-13 |
+| `mfa`, `recovery` | Enrollment confirmation, encrypted secret, bypass attempts, attempt limits, expiry, drift window, replay, single use under concurrency | T-10, T-30 |
+| `step-up`, `admin`, `logging` | Server-side gates, forged claims, re-verification limits, CLI-only administrator role, disabling, secret-free logs and events | T-08, T-16, T-30 |
+| `tests/e2e/auth.spec.ts` | Cookie attributes in the browser, no secrets in browser storage, real `Origin` under `no-referrer`, MFA flows in three engines | T-08, T-13, T-23 |
+
+`pnpm security:negative-controls` writes ten deliberate defects into the code one at a time (CSRF gate removed, reusable recovery codes, MFA step removed, TOTP replay, password not redacted, route outside the registry, cookie without HttpOnly, step-up gate disabled, disabled accounts kept, no dummy verification) and requires the suites to fail for each, then pass on the unmodified code. It restores every file and is run before phase sign-off.
 
 ### 3.1 Database suite (`tests/database`, Phase 2)
 

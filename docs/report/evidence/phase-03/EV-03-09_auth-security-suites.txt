@@ -1,0 +1,96 @@
+EV-03-09: Authentication security suites (step-up, recovery-code single use, MFA bypass attempts, sessions, CSRF, abuse)
+Captured: 2026-10-04T11:51:44Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Redaction: no passwords, tokens, cookie values, TOTP secrets or codes appear below.
+
+$ pnpm test:auth --reporter=verbose
+ ✓ |auth| tests/auth/registration.test.ts > registration > creates the account with an Argon2id PHC hash and returns nothing else; no session yet
+ ✓ |auth| tests/auth/registration.test.ts > registration > rejects the privileged or unknown field platformRole (mass assignment) and creates nothing
+ ✓ |auth| tests/auth/registration.test.ts > registration > rejects the privileged or unknown field isAdmin (mass assignment) and creates nothing
+ ✓ |auth| tests/auth/registration.test.ts > registration > rejects the privileged or unknown field status (mass assignment) and creates nothing
+ ✓ |auth| tests/auth/registration.test.ts > registration > rejects the privileged or unknown field mfaEnabled (mass assignment) and creates nothing
+ ✓ |auth| tests/auth/registration.test.ts > registration > rejects the privileged or unknown field passwordHash (mass assignment) and creates nothing
+ ✓ |auth| tests/auth/registration.test.ts > registration > rejects the privileged or unknown field id (mass assignment) and creates nothing
+ ✓ |auth| tests/auth/registration.test.ts > registration > rejects the privileged or unknown field __proto__ (mass assignment) and creates nothing
+ ✓ |auth| tests/auth/admin.test.ts > platform administrator bootstrap (CLI only) > cannot be granted to an account without MFA
+ ✓ |auth| tests/auth/login.test.ts > login > issues a __Host- session cookie with HttpOnly, Secure, SameSite=Strict, Path=/ and no Domain
+ ✓ |auth| tests/auth/session.test.ts > session resolution > returns the caller from the session only; no hash, digest or token in the response
+ ✓ |auth| tests/auth/mfa.test.ts > TOTP enrollment > requires a recent step-up before a secret is issued
+ ✓ |auth| tests/auth/registration.test.ts > registration > normalizes the email once, so case and whitespace variants are the same account
+ ✓ |auth| tests/auth/step-up.test.ts > step-up > a gated action fails with STEP_UP_REQUIRED, succeeds after a step-up, and fails again after 15 minutes
+ ✓ |auth| tests/auth/login.test.ts > login > stores only the SHA-256 digest of the session token, never the token itself
+ ✓ |auth| tests/auth/admin.test.ts > platform administrator bootstrap (CLI only) > revokes all sessions of the account when the role changes
+ ✓ |auth| tests/auth/registration.test.ts > registration > lets exactly one of several concurrent registrations for the same email win
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > a cross-site logout attempt has no side effect: the session stays valid
+ ✓ |auth| tests/auth/admin.test.ts > platform administrator bootstrap (CLI only) > is not grantable through the API: there is no such route and registration refuses the field
+ ✓ |auth| tests/auth/registration.test.ts > registration > refuses a password that is too short with a helpful, value-free issue code
+ ✓ |auth| tests/auth/registration.test.ts > registration > refuses a password that is too long with a helpful, value-free issue code
+ ✓ |auth| tests/auth/registration.test.ts > registration > refuses a password that is a breached password with a helpful, value-free issue code
+ ✓ |auth| tests/auth/registration.test.ts > registration > refuses a password that is the email local part with a helpful, value-free issue code
+ ✓ |auth| tests/auth/recovery.test.ts > recovery codes > work exactly once, report the remaining count and revoke the other sessions
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > prevents login CSRF: a cross-site login sets no cookie for the attacker account
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > safe methods change nothing: GET on a state-changing path is not routed
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > answers a CORS preflight without granting anything
+ ✓ |auth| tests/auth/step-up.test.ts > step-up > rotates the session token, so the pre-step-up token stops working (fixation)
+ ✓ |auth| tests/auth/session.test.ts > session resolution > ignores identity claims in headers and query strings (INV-05)
+ ✓ |auth| tests/auth/mfa.test.ts > TOTP enrollment > is not active until a valid code confirms it; a wrong code changes nothing
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > accepts the real same-origin request shape
+ ✓ |auth| tests/auth/session.test.ts > session resolution > rejects missing, random, malformed and duplicated session cookies, clearing a dead one
+ ✓ |auth| tests/auth/registration.test.ts > registration > accepts a 128-character password and a Unicode passphrase without truncating them
+ ✓ |auth| tests/auth/login.test.ts > login > answers a wrong password, an unknown account and a malformed identifier identically
+ ✓ |auth| tests/auth/registration.test.ts > registration > rejects control characters in the display name
+ ✓ |auth| tests/auth/abuse.test.ts > per-account backoff (no permanent lockout) > blocks after five failures with Retry-After, then lets the right password in once the delay passes
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > is invisible to non-administrators (404)
+ ✓ |auth| tests/auth/step-up.test.ts > step-up > a wrong password fails, is recorded, and does not unlock the gate
+ ✓ |auth| tests/auth/registration.test.ts > registration > limits registrations per client address (10 per hour)
+ ✓ |auth| tests/auth/session.test.ts > expiry (CP-08) > expires after 30 minutes without activity, even if the browser keeps the cookie
+ ✓ |auth| tests/auth/step-up.test.ts > step-up > cannot be claimed by the client: fields and headers that look like a step-up are refused or ignored
+ ✓ |auth| tests/auth/mfa.test.ts > TOTP enrollment > confirmation enables MFA, returns ten recovery codes once, rotates this session and revokes others
+ ✓ |auth| tests/auth/recovery.test.ts > recovery codes > accept lower case and missing separators, and reject invalid codes
+ ✓ |auth| tests/auth/logging.test.ts > authentication logging > ran the flows that produce security events
+ ✓ |auth| tests/auth/logging.test.ts > authentication logging > writes no secret into the application log
+ ✓ |auth| tests/auth/logging.test.ts > authentication logging > puts only allowlisted, non-secret facts into security events
+ ✓ |auth| tests/auth/session.test.ts > expiry (CP-08) > extends the idle timer with activity, but never beyond 12 hours from the password login
+ ✓ |auth| tests/auth/mfa.test.ts > TOTP enrollment > stores the TOTP secret only encrypted under the server key, bound to the user (CP-11)
+ ✓ |auth| tests/auth/abuse.test.ts > per-account backoff (no permanent lockout) > doubles the delay with further failures, capped at 15 minutes
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > requires a step-up even for an administrator
+ ✓ |auth| tests/auth/recovery.test.ts > recovery codes > are stored only as SHA-256 digests
+ ✓ |auth| tests/auth/login.test.ts > login > spends comparable Argon2id time for unknown accounts and wrong passwords (no timing shortcut)
+ ✓ |auth| tests/auth/session.test.ts > logout and revocation > logout revokes the session on the server and clears the cookie
+ ✓ |auth| tests/auth/mfa.test.ts > TOTP enrollment > refuses a second enrollment while MFA is enabled
+ ✓ |auth| tests/auth/login.test.ts > login > never promotes a planted session token (session fixation, T-08)
+ ✓ |auth| tests/auth/abuse.test.ts > per-account backoff (no permanent lockout) > behaves identically for an unknown identifier, so throttling does not reveal accounts
+ ✓ |auth| tests/auth/recovery.test.ts > recovery codes > are consumed by exactly one of two concurrent logins
+ ✓ |auth| tests/auth/session.test.ts > logout and revocation > lists the caller own sessions and revokes one or all others
+ ✓ |auth| tests/auth/step-up.test.ts > step-up > limits password re-verification per user (10 per 15 minutes)
+ ✓ |auth| tests/auth/step-up.test.ts > step-up > requires authentication: there is no anonymous step-up
+ ✓ |auth| tests/auth/login.test.ts > login > refuses a disabled account with the same generic error, even with the right password
+ ✓ |auth| tests/auth/mfa.test.ts > MFA login step > issues only a short-lived pre-authentication cookie after the password, never a session
+ ✓ |auth| tests/auth/login.test.ts > login > fails closed on a malformed stored hash instead of erroring or accepting
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > disables the account, ends its sessions immediately and blocks login; enabling restores login
+ ✓ |auth| tests/auth/session.test.ts > logout and revocation > cannot revoke another user's session: the ID behaves as unknown
+ ✓ |auth| tests/auth/login.test.ts > login > rehashes a password stored with older parameters at the next successful login (CP-05)
+ ✓ |auth| tests/auth/mfa.test.ts > MFA login step > cannot be bypassed: the pre-authentication token opens no authenticated endpoint
+ ✓ |auth| tests/auth/recovery.test.ts > recovery codes > regeneration needs a step-up and invalidates every previous code
+ ✓ |auth| tests/auth/login.test.ts > login > records login attempts without passwords or raw identifiers of unknown accounts (CP-12, EV-03-06)
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > refuses to disable oneself and answers 404 for unknown accounts
+ ✓ |auth| tests/auth/abuse.test.ts > bounded writes under backoff > requests refused by the account or identifier backoff write no login_attempts rows
+ ✓ |auth| tests/auth/login.test.ts > login > never writes the password into the log
+ ✓ |auth| tests/auth/mfa.test.ts > MFA login step > completes with a valid code, replaces the pre-authentication state and is single use
+ ✓ |auth| tests/auth/admin.test.ts > account disabling (PA-03) > administrators cannot switch off their own MFA
+ ✓ |auth| tests/auth/session.test.ts > logout and revocation > an 11th login evicts the least recently used session (CP-08) and records an event
+ ✓ |auth| tests/auth/mfa.test.ts > MFA login step > allows at most five code attempts per pre-authentication state
+ ✓ |auth| tests/auth/admin.test.ts > last administrator protection > the CLI refuses to remove the role from the last active administrator
+ ✓ |auth| tests/auth/mfa.test.ts > MFA login step > expires the pre-authentication state after five minutes
+ ✓ |auth| tests/auth/session.test.ts > password change (section 7, EV-03-08) > requires the current password, rotates this session and revokes all others
+ ✓ |auth| tests/auth/session.test.ts > password change (section 7, EV-03-08) > applies the password policy to the new password
+ ✓ |auth| tests/auth/abuse.test.ts > per-address limits > limits one address to 20 login attempts in 10 minutes across all accounts
+ ✓ |auth| tests/auth/session.test.ts > disabled accounts > lose access on the next request, even before any revocation
+ ✓ |auth| tests/auth/mfa.test.ts > MFA login step > accepts one step of clock drift either way, nothing wider, and never the same step twice
+ ✓ |auth| tests/auth/mfa.test.ts > MFA login step > lets exactly one of two concurrent completions of the same state win
+ ✓ |auth| tests/auth/mfa.test.ts > disabling MFA > requires a step-up that includes a current TOTP code, then revokes other sessions
+ ✓ |auth| tests/auth/abuse.test.ts > per-address limits > rejects limited requests before any database write, so a flood cannot grow login_attempts
+ ✓ |auth| tests/auth/abuse.test.ts > Argon2id resource limit > a burst of concurrent logins gets 401 or 503 (busy) and never crashes the API
+ Test Files  10 passed (10)
+      Tests  186 passed (186)
+
+(The 99 per-route CSRF attack cases are summarized: all passed, see Tests total.)

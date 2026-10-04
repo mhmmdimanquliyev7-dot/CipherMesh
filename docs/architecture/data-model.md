@@ -96,6 +96,21 @@ Ownership: the user; the user and PLATFORM_ADMIN can revoke. At most 10 active s
 | rotatedAt | timestamptz, nullable | META | Last token rotation |
 | revokedAt, revokeReason | timestamptz, enum | META | |
 
+#### 4.3.1 AuthChallenge (Phase 3)
+The pre-authentication state between a verified password and the MFA step ([../security/session-and-csrf.md](../security/session-and-csrf.md) section 3). It is not a session and grants no access to authenticated routes.
+
+| Field | Type | Class | Notes |
+|---|---|---|---|
+| id, userId | uuid | ID | |
+| tokenDigest | bytea(32), unique | DIG | SHA-256 of a 256-bit token held only in the `__Host-cm_preauth` cookie |
+| purpose | enum LOGIN_MFA | META | |
+| createdAt | timestamptz | META | Time of the successful password verification; becomes the session's `authenticatedAt` |
+| expiresAt | timestamptz | META | At most 5 minutes after creation (CHECK) |
+| attempts | int | META | 0 to 5 (CHECK), incremented atomically per code attempt |
+| consumedAt | timestamptz, nullable | META | Single use |
+
+Retention: deleted by the worker one day after expiry.
+
 ### 4.4 LoginAttempt (security events, not hash-chained)
 | Field | Type | Class | Notes |
 |---|---|---|---|
@@ -360,6 +375,7 @@ Schema v1 implements sections 4.1 to 4.13 and 4.15 as 15 tables. Every stored fi
 | `room_key_versions.wrap_count` | CHECK 0 to 2^20 | CP-16 |
 | Room key state | CHECK that ACTIVE has no reasons and REKEY_REQUIRED or REKEYING has at least one | ADR-013: manual rotation keeps the room ACTIVE, so REKEYING always follows REKEY_REQUIRED |
 | SecurityPolicy (4.16), Organization (4.17) | Not tables, as designed | The checker fails on a SecurityPolicy model |
+| AuthChallenge (4.3.1) | **Added in Phase 3** (migration `20261004000000_auth_challenges`) | The session design specifies a pre-authentication state with its own cookie, lifetime and attempt limit but not its storage. A separate table keeps it from ever being confused with a session |
 
 ### 7.2 Not decided by the schema
 

@@ -74,6 +74,10 @@ Subject tags: **CRY** Cryptography Fundamentals, **CLD** Cloud Security, **ISMS*
 | EV-03-06 | Login attempt records without raw identifiers | Query output | Privacy-aware security logging | ISMS |
 | EV-03-07 | Cross-site requests rejected with `ORIGIN_REJECTED`, including login | Test output | CSRF defence beyond SameSite | APP |
 | EV-03-08 | Other sessions revoked after a password change | Session list before and after | Session invalidation policy | APP |
+| EV-03-09 | Step-up gate, recovery-code single use and MFA bypass attempts | Test output | Server-side enforcement of authentication state | APP |
+| EV-03-10 | Account disabled by a platform administrator: sessions end, login refused | Test output | Identity lifecycle (control 5.16) | ISMS, APP |
+| EV-03-11 | Negative controls: ten deliberate defects caught by the security suites | `pnpm security:negative-controls` output | The tests can fail | ISMS |
+| EV-03-12 | Browser checks: cookie attributes, empty browser storage, real Origin in three engines | Playwright output | Session and CSRF design in real browsers | APP |
 
 ### Phase 4: Vault
 | ID | Evidence | How to capture | Demonstrates | Tags |

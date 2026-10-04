@@ -1,0 +1,13 @@
+EV-03-07: Cross-site requests rejected with ORIGIN_REJECTED, including login (login CSRF)
+Captured: 2026-10-04T09:04:31.857Z on branch feature/CM-T015-authentication (stacked on 92418c3)
+Environment: real API (Argon2id m=65536,t=3,p=4) on loopback, throwaway PostgreSQL database as cm_api.
+Redaction: passwords, tokens, cookie values, TOTP secrets, codes and hash bytes are replaced by <redacted>.
+Accounts are synthetic (example.test) and the database was dropped after capture.
+
+cross-site form post (urlencoded) -> 403 {"error":{"code":"ORIGIN_REJECTED","message":"Request origin rejected","requestId":"de3615d6-fefa-4e5d-96d3-5342548fd358"}} | Set-Cookie: none
+foreign-origin fetch with JSON and custom header -> 403 {"error":{"code":"ORIGIN_REJECTED","message":"Request origin rejected","requestId":"9738e3aa-6653-4ee7-b5e6-d9ca9ec8d48d"}} | Set-Cookie: none
+Origin: null -> 403 {"error":{"code":"ORIGIN_REJECTED","message":"Request origin rejected","requestId":"b42ccabd-f1af-46e4-854c-812a33328170"}} | Set-Cookie: none
+same origin without X-CipherMesh-Request -> 403 {"error":{"code":"ORIGIN_REJECTED","message":"Request origin rejected","requestId":"497ff41f-fe27-4f4e-9354-72060fcbec5b"}} | Set-Cookie: none
+same origin with text/plain body -> 415 {"error":{"code":"UNSUPPORTED_MEDIA_TYPE","message":"Request body must be application/json","requestId":"a231cf8c-2968-4164-a7d9-929f75e9c66a"}} | Set-Cookie: none
+
+Full suite: tests/auth/csrf.test.ts, 104 cases over eleven routes (see EV-03-09 run output).

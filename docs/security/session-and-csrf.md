@@ -1,6 +1,6 @@
 # Session and CSRF Security
 
-Status: Phase 0.5 design. Normative. Implementation: Phase 3 (CM-T016, CM-T017, CM-T020, CM-T021). Related: [ADR-008](../architecture/adr/ADR-008-server-side-sessions.md), [trust-boundaries.md](../architecture/trust-boundaries.md) TB-02, [threat-model.md](../threat-model/threat-model.md) T-08 and T-13, parameter register CP-08.
+Status: Phase 0.5 design, normative; **implemented in Phase 3** (CM-T016, CM-T017, CM-T020, CM-T021). Implementation notes are in section 11 and in [authentication-security.md](authentication-security.md). Related: [ADR-008](../architecture/adr/ADR-008-server-side-sessions.md), [trust-boundaries.md](../architecture/trust-boundaries.md) TB-02, [threat-model.md](../threat-model/threat-model.md) T-08 and T-13, parameter register CP-08.
 
 ## 1. Summary
 
@@ -121,3 +121,13 @@ Failed checks return 403 `ORIGIN_REJECTED` (or 415 for the content type) before 
 |---|---|
 | `session` | Cookie attributes and prefix; token length; only the digest is stored; each rotation and invalidation event in section 4; idle and absolute expiry; logout clears the cookie and revokes the row; a planted cookie is not promoted at login; the 11th session evicts the least recently used; pre-authentication cookie scope, expiry and attempt limit |
 | `csrf` | Cross-site form posts (url-encoded, multipart, `text/plain`) rejected; foreign-origin `fetch()` rejected; missing custom header rejected; `Sec-Fetch-Site: cross-site` and `same-site` rejected; `Origin: null` rejected; neither header present rejected; registration, login, MFA and logout covered; GET handlers have no side effects; `fetch()` sends the real `Origin` under `no-referrer` in all three engines |
+
+## 11. Implementation notes (Phase 3)
+
+- **Pre-authentication state storage.** Section 3 fixes its behaviour; the implementation stores it in its own table, `auth_challenges` (data-model 4.3.1): a SHA-256 token digest, the user, creation and expiry times (CHECK: at most 5 minutes), an attempt counter (CHECK: 0 to 5) and a consumption time. It is never a row in `sessions`, so it can never be mistaken for a session.
+- **Idle expiry.** An idle-expired session is refused because `idle_expires_at` has passed; the row is not additionally updated to revoked. The effect is the same as revocation (the token can never work again), without a write triggered by a stale cookie. The worker deletes the row 30 days later.
+- **Revocation reasons** use `SessionRevokeReason` (data-model section 7.1). "Sign out other sessions" and per-session revocation record `REVOKED_BY_USER`; the session limit records `SESSION_LIMIT`.
+- **Vault lock on logout** (section 5, step 3) applies from Phase 4, when the vault exists.
+- **Local HTTPS.** E2E tests run behind `tests/e2e/static-server.mjs`, which serves the export and proxies `/api` over HTTPS with a throwaway self-signed certificate, so the `__Host-` cookie works unchanged. The local Nginx of section 2 arrives in Phase 17.
+- **Account disabling** is enforced twice: all sessions are revoked in the same transaction, and every request checks that the account is ACTIVE.
+

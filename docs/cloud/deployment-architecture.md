@@ -100,7 +100,7 @@ The exact CSP is validated in Phase 1 against the Next.js static export (ADR-011
 | Database credentials (per role) | api, worker | Secret file, mode 0400, owned by the container user |
 | Object-storage credentials (scoped) | api, worker | Secret file |
 | Anchor-bucket write-only credential | worker | Secret file |
-| TOTP_ENCRYPTION_KEY, IDENTIFIER_HMAC_KEY | api | Secret file |
+| TOTP_ENCRYPTION_KEY (with TOTP_ENCRYPTION_KEY_ID), IDENTIFIER_HMAC_KEY | api | Secret file. 32 random bytes each, base64url; the API refuses to start if either is missing, malformed or if both are equal (Phase 3) |
 | Audit signing key, Level 1 (Ed25519 private key) | worker only | Secret file mounted only into the worker container, with an offline backup on the operator workstation. Level 2 option: provider key service with no key file on the VM (OCD-13) |
 | Database migration and owner credentials | operator, during deployments | Never stored on the VM. Used from the operator workstation |
 | TLS private key | nginx | File readable only by the Nginx user |

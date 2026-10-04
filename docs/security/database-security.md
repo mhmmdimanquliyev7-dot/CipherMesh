@@ -41,6 +41,7 @@ S = SELECT, I = INSERT, U = UPDATE, D = DELETE. Source of truth: `prisma/migrati
 | users | S I U | | | Tombstones only |
 | recovery_codes | S I U D | | | Regeneration replaces the set |
 | sessions | S I U | S D | | Worker deletes 30 days after expiry |
+| auth_challenges (Phase 3) | S I U | S D | | Worker deletes one day after expiry |
 | login_attempts | S I | S D | | 90-day retention |
 | user_key_pairs | S I U | | | Tombstones (private key set to NULL) |
 | rooms | S I U | S U | | Tombstones |
@@ -166,7 +167,7 @@ No index exists on any ciphertext or wrapped-key column. Indexes on plaintext-de
 | users, rooms | `deleted_at` | Tombstones | API |
 | user_key_pairs | `superseded_at`, `revoked_at` | Private key set to NULL | API; CHECK constraint |
 
-No retention job runs in Phase 2; the fields, indexes and grants are in place for the worker.
+Phase 3 added the first retention job, `pnpm worker:retention` (`apps/api/src/db/retention.ts`), which runs as `cm_worker` and deletes sessions 30 days after they ended, pre-authentication states one day after expiry and login attempts after 90 days (`tests/database/retention.test.ts`, which also shows that the API role cannot run it). Scheduling arrives with the worker container.
 
 ## 9. Tests
 
@@ -188,3 +189,8 @@ No retention job runs in Phase 2; the fields, indexes and grants are in place fo
 - **Partial-index predicates and drift.** PostgreSQL rewrites `IN (...)` predicates to `= ANY (ARRAY[...])`, which Prisma 7.10 reports as drift. The schema uses `OR` predicates instead.
 - **Telemetry.** The Prisma CLI contacts Prisma's checkpoint service by default. The wrapper sets `CHECKPOINT_DISABLE=1`.
 - **Schema engine download.** With install scripts blocked, the CLI downloads its schema engine on first use from `binaries.prisma.sh` with checksum verification. Recorded in the engineering baseline as a supply-chain dependency (T-27).
+
+## 11. Correction recorded in Phase 3
+
+The Phase 2 record stated that `apps/api/src/logging/redact.test.ts` tested the redaction of URLs carrying credentials. The redaction rule existed, but the test had not been written: the scripted edit that should have added it did not match its anchor and changed nothing, and the gap was not noticed because the other tests passed. The test was added in Phase 3 (`redacts URLs that carry credentials`), and later scripted edits check that their anchor exists.
+
