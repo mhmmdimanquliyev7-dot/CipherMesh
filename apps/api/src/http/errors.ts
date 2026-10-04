@@ -1,5 +1,6 @@
 import { ErrorCode, type ApiErrorBody, type ValidationIssue } from '@ciphermesh/shared';
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
+import { describeDatabaseError, isDatabaseError } from '../db/errors';
 import type { Logger } from '../logging/logger';
 import { getRequestId } from './context';
 
@@ -68,7 +69,10 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
       sendError(res, status, code, message);
       return;
     }
-    logger.error('unhandled error', { requestId, method: req.method, path: req.path, err });
+    // Database errors are logged by class and code only: Prisma validation errors can quote the
+    // query arguments, and driver errors can quote row values (INV-10).
+    const detail = isDatabaseError(err) ? describeDatabaseError(err) : { err };
+    logger.error('unhandled error', { requestId, method: req.method, path: req.path, ...detail });
     if (res.headersSent) {
       res.end();
       return;

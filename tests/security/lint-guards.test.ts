@@ -16,7 +16,8 @@ async function ruleIdsFor(code: string, filePath: string): Promise<string[]> {
   return (result?.messages ?? []).map((message) => `${message.ruleId ?? 'parse'}: ${message.message}`);
 }
 
-describe('ESLint security guards', () => {
+// Type-aware linting loads the generated Prisma client, which is slow on a busy machine.
+describe('ESLint security guards', { timeout: 30_000 }, () => {
   it.each([
     ['eval', 'export const run = (s: string): unknown => eval(s);', 'eval is forbidden'],
     ['new Function', "export const f = new Function('return 1');", 'new Function is forbidden'],
@@ -29,6 +30,17 @@ describe('ESLint security guards', () => {
     ['scattered process.env', "export const p = process.env['API_PORT'];", 'validated config module'],
     ['WebCrypto outside packages/crypto', 'export const s = globalThis.crypto.subtle;', 'packages/crypto'],
     ['child processes', "import { exec } from 'node:child_process';\nexport { exec };", 'Spawning processes'],
+    [
+      'Prisma.raw (unparameterized SQL)',
+      "declare const Prisma: { raw(q: string): unknown };\nexport const q = Prisma.raw('x');",
+      'Prisma.raw builds unparameterized SQL',
+    ],
+    [
+      'the Prisma client outside apps/api/src/db',
+      "import { PrismaClient } from './generated/prisma/client';\nexport { PrismaClient };",
+      'apps/api/src/db only',
+    ],
+    ['the pg driver outside apps/api/src/db', "import pg from 'pg';\nexport { pg };", 'apps/api/src/db only'],
   ])('rejects %s in API code', async (_label, code, expected) => {
     const messages = await ruleIdsFor(code, 'apps/api/src/app.ts');
     expect(messages.join('\n')).toContain(expected);

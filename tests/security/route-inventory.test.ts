@@ -8,18 +8,25 @@ import { PUBLIC_ROUTE_ALLOWLIST } from '../../apps/api/src/routes/system';
 // Route inventory (security testing plan, `route-inventory` suite): the production
 // application exposes exactly the allowlisted public routes and nothing else.
 const logger = createLogger({ level: 'fatal', sink: { write: () => undefined } });
+const PRODUCTION_ENV = {
+  NODE_ENV: 'production',
+  APP_ORIGIN: 'https://ciphermesh.example',
+  // Never connected to: route registration needs no database.
+  DATABASE_URL: 'postgresql://cm_api:unused-test-value@db.ciphermesh.example/ciphermesh?sslmode=verify-full',
+};
+const database = { ping: () => Promise.resolve(true) };
 
 describe('route inventory', () => {
   it('registers only allowlisted public routes, each with an action ID', () => {
-    const config = loadConfig({ NODE_ENV: 'production', APP_ORIGIN: 'https://ciphermesh.example' });
-    const { routes } = createApp({ config, logger, lifecycle: createLifecycle() });
+    const config = loadConfig(PRODUCTION_ENV);
+    const { routes } = createApp({ config, logger, lifecycle: createLifecycle(), database });
     expect(routes.map(({ method, path }) => ({ method, path }))).toEqual([...PUBLIC_ROUTE_ALLOWLIST]);
     expect(routes.every((route) => route.access === 'public' && /^[A-Z]/.test(route.action))).toBe(true);
   });
 
   it('mounts no route outside the registry', () => {
-    const config = loadConfig({ NODE_ENV: 'production', APP_ORIGIN: 'https://ciphermesh.example' });
-    const { app } = createApp({ config, logger, lifecycle: createLifecycle() });
+    const config = loadConfig(PRODUCTION_ENV);
+    const { app } = createApp({ config, logger, lifecycle: createLifecycle(), database });
     // Express keeps app-level layers on app.router.stack; a layer with `route` is a handler
     // mounted directly (app.get, app.post, ...), which would bypass the registry's checks.
     const stack = (app as unknown as { router: { stack: { route?: unknown }[] } }).router.stack;
@@ -28,9 +35,15 @@ describe('route inventory', () => {
   });
 
   it('refuses test routes in production, so the public surface cannot be widened', () => {
-    const config = loadConfig({ NODE_ENV: 'production', APP_ORIGIN: 'https://ciphermesh.example' });
+    const config = loadConfig(PRODUCTION_ENV);
     expect(() =>
-      createApp({ config, logger, lifecycle: createLifecycle(), testing: { routes: [], publicAllowlist: [] } }),
+      createApp({
+        config,
+        logger,
+        lifecycle: createLifecycle(),
+        database,
+        testing: { routes: [], publicAllowlist: [] },
+      }),
     ).toThrow(/production/);
   });
 

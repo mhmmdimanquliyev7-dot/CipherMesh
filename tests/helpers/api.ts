@@ -20,15 +20,36 @@ export interface TestApiOptions {
   readonly env?: Readonly<Record<string, string>>;
   readonly testing?: AppDependencies['testing'];
   readonly ready?: boolean;
+  /**
+   * Readiness of the database dependency for HTTP-level tests that run without PostgreSQL.
+   * Only the readiness probe uses it; tests/database exercises the real database client.
+   */
+  readonly databaseReachable?: boolean;
 }
+
+/** A syntactically valid API-role URL for tests that never connect. Not a credential. */
+export const UNUSED_DATABASE_URL = 'postgresql://cm_api:unused-test-value@127.0.0.1:1/unused';
 
 /** Boots the real application on an ephemeral loopback port with a captured log. */
 export async function startTestApi(options: TestApiOptions = {}): Promise<TestApi> {
-  const config = loadConfig({ NODE_ENV: 'test', APP_ORIGIN: TEST_ORIGIN, LOG_LEVEL: 'debug', ...options.env });
+  const config = loadConfig({
+    NODE_ENV: 'test',
+    APP_ORIGIN: TEST_ORIGIN,
+    LOG_LEVEL: 'debug',
+    DATABASE_URL: UNUSED_DATABASE_URL,
+    ...options.env,
+  });
   const lines: string[] = [];
   const logger = createLogger({ level: config.logLevel, sink: { write: (line) => lines.push(line) } });
   const lifecycle = createLifecycle();
-  const { app } = createApp({ config, logger, lifecycle, ...(options.testing ? { testing: options.testing } : {}) });
+  const database = { ping: () => Promise.resolve(options.databaseReachable ?? true) };
+  const { app } = createApp({
+    config,
+    logger,
+    lifecycle,
+    database,
+    ...(options.testing ? { testing: options.testing } : {}),
+  });
   const server: Server = createServer(app);
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');

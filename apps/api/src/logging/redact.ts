@@ -41,6 +41,9 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'presignedUrl',
   'safetyCode',
   'credentials',
+  'databaseUrl',
+  'connectionString',
+  'dsn',
 ];
 
 /** Any key ending with one of these is sensitive, e.g. `clientSecret`, `adminPassword`. */
@@ -52,6 +55,8 @@ export const SENSITIVE_KEY_SUFFIXES: readonly string[] = [
   'privatekey',
   'apikey',
   'cookie',
+  'databaseurl',
+  'connectionstring',
 ];
 
 /** Values that are sensitive regardless of the key they appear under. */
@@ -60,6 +65,8 @@ const SENSITIVE_VALUE_PATTERNS: readonly RegExp[] = [
   /\bBearer\s+\S+/i, // bearer tokens anywhere, including inside error messages
   /^\s*Basic\s+\S+/i, // basic authorization header values
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/, // PEM private keys
+  // Any URL with a password in its user info, e.g. postgresql://role:password@host/db (CM-T013)
+  /\b[a-z][a-z0-9+.-]*:\/\/[^\s/?#@:]*:[^\s/?#@]*@/i,
 ];
 
 const MAX_DEPTH = 8;

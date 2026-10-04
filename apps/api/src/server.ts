@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { createApp } from './app';
 import { ConfigError, loadConfigFromProcessEnv, type AppConfig } from './config/env';
+import { createDatabase, describeDatabaseError } from './db/client';
 import { createLifecycle } from './lifecycle';
 import { createLogger } from './logging/logger';
 
@@ -20,7 +21,9 @@ function loadConfigOrExit(): AppConfig {
 const config = loadConfigOrExit();
 const logger = createLogger({ level: config.logLevel, base: { service: 'api' } });
 const lifecycle = createLifecycle();
-const { app, routes } = createApp({ config, logger, lifecycle });
+// Lazy: no connection is opened until the first query (readiness probe or request).
+const database = createDatabase({ url: config.database.url, logger });
+const { app, routes } = createApp({ config, logger, lifecycle, database });
 
 const server = createServer(app);
 // Slow-client limits (T-26). Nginx applies its own limits in front of these.
@@ -44,8 +47,17 @@ function shutdown(signal: string): void {
   lifecycle.markShuttingDown();
   logger.info('shutdown started', { signal });
   server.close(() => {
-    logger.info('shutdown complete');
-    process.exit(0);
+    // Release pooled connections only after in-flight requests have finished.
+    database.close().then(
+      () => {
+        logger.info('shutdown complete');
+        process.exit(0);
+      },
+      (error: unknown) => {
+        logger.error('database close failed', describeDatabaseError(error));
+        process.exit(1);
+      },
+    );
   });
   server.closeIdleConnections();
   setTimeout(() => {

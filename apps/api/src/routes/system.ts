@@ -1,4 +1,5 @@
 import { emptyQuerySchema, healthResponseSchema, readinessResponseSchema } from '@ciphermesh/validation';
+import type { DatabaseHealth } from '../db/client';
 import type { Lifecycle } from '../lifecycle';
 import { defineRoute, type AnyRoute, type PublicRouteEntry } from './registry';
 
@@ -16,7 +17,7 @@ export const PUBLIC_ROUTE_ALLOWLIST: readonly PublicRouteEntry[] = Object.freeze
  * Liveness and readiness. They reveal a status word only: no versions, hostnames,
  * dependency details, uptime or configuration.
  */
-export function systemRoutes(lifecycle: Lifecycle): readonly AnyRoute[] {
+export function systemRoutes(lifecycle: Lifecycle, database: DatabaseHealth): readonly AnyRoute[] {
   return [
     defineRoute({
       method: 'GET',
@@ -32,12 +33,16 @@ export function systemRoutes(lifecycle: Lifecycle): readonly AnyRoute[] {
       method: 'GET',
       path: '/ready',
       action: 'SYS-READY',
-      access: { kind: 'public', justification: 'Readiness probe: false before listening and during shutdown' },
+      access: {
+        kind: 'public',
+        justification: 'Readiness probe: false before listening, during shutdown and while PostgreSQL is unreachable',
+      },
       query: emptyQuerySchema,
       body: undefined,
       response: readinessResponseSchema,
-      handler: () =>
-        lifecycle.isReady()
+      // The answer is a status word only; why the database is unreachable goes to the log.
+      handler: async () =>
+        lifecycle.isReady() && (await database.ping())
           ? { status: 200, body: { status: 'ready' as const } }
           : { status: 503, body: { status: 'not-ready' as const } },
     }),

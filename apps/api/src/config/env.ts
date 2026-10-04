@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SecretValue } from './secret';
 
 /**
  * The only module allowed to read process.env (ESLint enforces this).
@@ -17,9 +18,15 @@ export interface AppConfig {
   readonly appOrigin: string;
   /** Maximum JSON body size. Files never pass through the API (CP-19, CP-25). */
   readonly bodyLimitBytes: number;
+  /** Connection to PostgreSQL as the least-privilege API role (CM-T014, TB-05). */
+  readonly database: { readonly url: SecretValue };
 }
 
 const BODY_LIMIT_BYTES = 128 * 1024;
+
+/** The API connects only as its runtime role; grants are written for this name (CM-T014). */
+export const API_DATABASE_ROLE = 'cm_api';
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']),
@@ -27,17 +34,51 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().int().min(1).max(65535).default(4100),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   APP_ORIGIN: z.string().refine(isOrigin, { message: 'must be an origin such as https://example.org' }),
+  DATABASE_URL: z.string(),
 });
 
 /**
- * Cross-field rule, checked on the raw values so it is reported together with any field
+ * Cross-field rules, checked on the raw values so they are reported together with any field
  * errors (zod skips object-level refinements once a field has failed).
  */
 function productionRules(env: Readonly<Record<string, string>>): { variable: string; problem: string }[] {
   const origin = env['APP_ORIGIN'];
-  return env['NODE_ENV'] === 'production' && origin !== undefined && !origin.startsWith('https://')
-    ? [{ variable: 'APP_ORIGIN', problem: 'must use https in production' }]
-    : [];
+  const problems =
+    env['NODE_ENV'] === 'production' && origin !== undefined && !origin.startsWith('https://')
+      ? [{ variable: 'APP_ORIGIN', problem: 'must use https in production' }]
+      : [];
+  const databaseUrl = env['DATABASE_URL'];
+  const databaseProblem =
+    databaseUrl === undefined ? undefined : checkDatabaseUrl(databaseUrl, env['NODE_ENV'] === 'production');
+  return databaseProblem === undefined
+    ? problems
+    : [...problems, { variable: 'DATABASE_URL', problem: databaseProblem }];
+}
+
+/**
+ * Database connection rules (TB-05, CP-21). Problems are described without the value, which
+ * contains a password.
+ * - Only the API role may be used: never the migration role or an administrator.
+ * - Production requires TLS with certificate and host name verification (sslmode=verify-full).
+ *   Weaker modes would allow an attacker on the network path to read or alter traffic.
+ * - Outside production, a connection without verify-full is accepted only to a loopback host
+ *   (the local development container).
+ */
+function checkDatabaseUrl(value: string, isProduction: boolean): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return 'must be a postgresql:// URL';
+  }
+  if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') return 'must be a postgresql:// URL';
+  if (url.hostname === '' || url.pathname.length < 2) return 'must name a host and a database';
+  if (decodeURIComponent(url.username) !== API_DATABASE_ROLE) return `must connect as the ${API_DATABASE_ROLE} role`;
+  if (url.password === '') return 'must include the role password';
+  const verifyFull = url.searchParams.get('sslmode') === 'verify-full';
+  if (isProduction && !verifyFull) return 'must use sslmode=verify-full in production';
+  if (!verifyFull && !LOOPBACK_HOSTS.has(url.hostname)) return 'must use sslmode=verify-full for a non-local host';
+  return undefined;
 }
 
 function isOrigin(value: string): boolean {
@@ -85,6 +126,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     logLevel: e.LOG_LEVEL,
     appOrigin: e.APP_ORIGIN,
     bodyLimitBytes: BODY_LIMIT_BYTES,
+    database: Object.freeze({ url: new SecretValue(e.DATABASE_URL) }),
   });
 }
 
