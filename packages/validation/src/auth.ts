@@ -1,6 +1,6 @@
 import { DISPLAY_NAME_MAX_LENGTH, EMAIL_MAX_LENGTH, TOTP_CODE_PATTERN } from '@ciphermesh/shared';
-import { z } from 'zod';
 import { uuidV4Schema } from './schemas';
+import { z } from './zod';
 
 /**
  * Authentication request and response schemas (Phase 3). Every object is strict, so fields such

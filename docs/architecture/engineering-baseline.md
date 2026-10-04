@@ -120,6 +120,8 @@ The file sits next to the export and is not served. The E2E server applies it to
 
 `next dev` uses eval-based hot reloading. CSP is therefore applied to the production export only, never to the development server.
 
+zod 4 compiles object parsers with `new Function`, and when the first object schema is constructed it probes whether that is allowed. Under this CSP the probe is reported as a `script-src eval` violation even though zod catches it. `packages/validation/src/zod.ts` therefore sets `z.config({ jitless: true })`, and every shared schema takes `z` from that module, which the package declares as its only side-effect module. `tests/e2e/web-shell.spec.ts` loads every page that bundles the schemas and fails on any violation.
+
 ## 7. Verification commands
 
 | Command | What it does |
