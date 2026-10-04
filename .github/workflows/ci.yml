@@ -69,6 +69,16 @@ jobs:
             echo "::add-mask::${password}"
             echo "${pair%%:*}=postgresql://${pair##*:}:${password}@127.0.0.1:55432/ciphermesh" >> "$GITHUB_ENV"
           done
+      # The seed loads the full API configuration, which requires the authentication keys from
+      # Phase 3 (CP-11, CP-12). Random per run, masked, never stored: there is no .env in CI.
+      - name: Authentication keys for this run (random, masked)
+        run: |
+          for name in TOTP_ENCRYPTION_KEY IDENTIFIER_HMAC_KEY; do
+            key="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))")"
+            echo "::add-mask::${key}"
+            echo "${name}=${key}" >> "$GITHUB_ENV"
+          done
+          echo "TOTP_ENCRYPTION_KEY_ID=ci-ephemeral" >> "$GITHUB_ENV"
       - name: Database roles, migrations from zero, drift check, synthetic seed
         run: |
           pnpm db:bootstrap
