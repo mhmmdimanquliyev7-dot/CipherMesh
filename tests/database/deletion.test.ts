@@ -143,17 +143,22 @@ describe('retention deletes by the worker', () => {
 
   it('the worker may delete expired sessions and old login attempts; the API role may not', async () => {
     const user = await insertUser(api);
-    const past = new Date(Date.now() - 86_400_000 * 40);
+    // The session is expired but ended less than 30 days ago, so the retention suite, which runs in
+    // parallel on the same database, never deletes it first. (With a 40-day-old session this test
+    // failed intermittently: the retention run removed the row before the worker's DELETE.) The
+    // login attempt stays 40 days old, well inside its 90-day retention.
+    const expired = new Date(Date.now() - 86_400_000 * 2);
+    const old = new Date(Date.now() - 86_400_000 * 40);
     await insert(api, 'sessions', {
       user_id: user,
       token_digest: DUMMY.digest().fill(randomUUID().charCodeAt(0)),
-      created_at: past,
-      last_seen_at: past,
-      idle_expires_at: new Date(past.getTime() + 1_800_000),
-      absolute_expires_at: new Date(past.getTime() + 43_200_000),
-      authenticated_at: past,
+      created_at: expired,
+      last_seen_at: expired,
+      idle_expires_at: new Date(expired.getTime() + 1_800_000),
+      absolute_expires_at: new Date(expired.getTime() + 43_200_000),
+      authenticated_at: expired,
     });
-    await insert(api, 'login_attempts', { user_id: user, outcome: 'SUCCESS', occurred_at: past });
+    await insert(api, 'login_attempts', { user_id: user, outcome: 'SUCCESS', occurred_at: old });
     expect(await sqlState(api.query('DELETE FROM sessions WHERE user_id = $1', [user]))).toBe(
       SQLSTATE.insufficientPrivilege,
     );
