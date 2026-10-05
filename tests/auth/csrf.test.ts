@@ -24,6 +24,11 @@ const STATE_CHANGING = [
   '/mfa/totp/enroll',
   '/mfa/totp/disable',
   '/admin/users/disable',
+  // Vault and directory (Phase 4): the same gate, before any handler (INV-19).
+  '/vault',
+  '/vault/rewrap',
+  '/vault/reset',
+  '/directory/lookup',
 ];
 
 interface Attack {

@@ -71,6 +71,20 @@ describe('route inventory', () => {
   it('no GET route is an authentication action that changes state', () => {
     const { routes } = productionApp();
     const gets = routes.filter((r) => r.method === 'GET').map((r) => r.path);
-    expect(gets).toEqual(['/health', '/ready', '/auth/session', '/auth/sessions']);
+    expect(gets).toEqual(['/health', '/ready', '/auth/session', '/auth/sessions', '/vault']);
+  });
+
+  it('the vault and directory routes exist only as reviewed, all authenticated (Phase 4)', () => {
+    const { routes } = productionApp();
+    const vault = routes
+      .filter((r) => r.path.startsWith('/vault') || r.path.startsWith('/directory'))
+      .map((r) => `${r.method} ${r.path} ${r.action} ${r.access}`);
+    expect(vault).toEqual([
+      'GET /vault SS-02-VAULT-READ authenticated',
+      'POST /vault SS-02-VAULT-CREATE authenticated',
+      'POST /vault/rewrap SS-02-VAULT-REWRAP authenticated',
+      'POST /vault/reset SS-02-VAULT-RESET authenticated',
+      'POST /directory/lookup SS-05-DIRECTORY-LOOKUP authenticated',
+    ]);
   });
 });

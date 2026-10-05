@@ -1,7 +1,7 @@
 import type { Logger } from '../logging/logger';
 
 /**
- * Authentication security events (Phase 3).
+ * Authentication and vault security events (Phase 3, extended in Phase 4).
  *
  * Every security-relevant authentication action goes through this single module with a name from
  * a fixed catalogue and allowlisted detail fields. In Phase 3 the sink is the structured
@@ -34,6 +34,13 @@ export const SECURITY_EVENTS = [
   'ACCOUNT_DISABLED',
   'ACCOUNT_ENABLED',
   'PLATFORM_ROLE_CHANGED',
+  // Vault and public-key directory (Phase 4). Unlock attempts are local and never reported: the
+  // server learns nothing about Vault Passphrase guesses (DF-04).
+  'VAULT_CREATED',
+  'VAULT_REWRAPPED',
+  'VAULT_RESET',
+  'VAULT_REJECTED',
+  'DIRECTORY_LOOKUP_THROTTLED',
 ] as const;
 export type SecurityEventName = (typeof SECURITY_EVENTS)[number];
 
