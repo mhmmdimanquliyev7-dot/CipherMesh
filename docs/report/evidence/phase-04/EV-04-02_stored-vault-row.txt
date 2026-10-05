@@ -24,7 +24,6 @@ User ID: 86de666f-7a5e-497a-a273-f7e4a94bb66b
     "encryption_iv_bytes": 12,
     "wrapped_signing_key_bytes": 154,
     "signing_iv_bytes": 12,
-    "wrapped_encryption_key_first_12_bytes": "8ef57c370a8231adfe4076bb",
     "rsa_oid_position": 0,
     "ec_oid_position": 0
   }

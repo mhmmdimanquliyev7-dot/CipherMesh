@@ -5,25 +5,25 @@ import { CryptoErrorCode, isCryptoError } from './errors';
 const ROOM = '1d6b4f0e-2c3a-4b5d-8e9f-0a1b2c3d4e5f';
 const FILE = '7a8b9c0d-1e2f-4a3b-9c4d-5e6f7a8b9c0d';
 const USER = '4b0c0b7e-6a5c-4d0e-9f3a-2b1c8d7e6f5a';
-const KEY = '8f14e45f-ceea-467a-a5ad-6c1f0d9a2b3c';
+const KEY_ID = '8f14e45f-ceea-467a-a5ad-6c1f0d9a2b3c';
 const B64 = (bytes: number): string => Buffer.alloc(bytes, 7).toString('base64url');
 
 // One valid field set per context, so every context in the table is exercised.
 const SAMPLES: { readonly [N in ContextName]: ContextFields<N> } = {
-  'cm.vault.pk-wrap': { userId: USER, keyId: KEY, purpose: 'encryption' },
+  'cm.vault.pk-wrap': { userId: USER, keyId: KEY_ID, purpose: 'encryption' },
   'cm.vault.private-key': {
     userId: USER,
-    keyId: KEY,
+    keyId: KEY_ID,
     purpose: 'signing',
     fingerprint: 'a'.repeat(64),
     suite: 'CM1',
     vaultVersion: 1,
   },
-  'cm.vault.pair-check': { userId: USER, keyId: KEY, suite: 'CM1' },
-  'cm.vault.signing-check': { userId: USER, keyId: KEY, challenge: B64(32) },
+  'cm.vault.pair-check': { userId: USER, keyId: KEY_ID, suite: 'CM1' },
+  'cm.vault.signing-check': { userId: USER, keyId: KEY_ID, challenge: B64(32) },
   'cm.vault.rewrap': {
     userId: USER,
-    keyId: KEY,
+    keyId: KEY_ID,
     suite: 'CM1',
     vaultVersion: 1,
     previousKdfSalt: B64(16),
@@ -39,13 +39,13 @@ const SAMPLES: { readonly [N in ContextName]: ContextFields<N> } = {
   },
   'cm.identity.binding': {
     userId: USER,
-    keyId: KEY,
+    keyId: KEY_ID,
     suite: 'CM1',
     encryptionKeySpki: B64(422),
     signingKeySpki: B64(91),
   },
   'cm.identity.fingerprint': { suite: 'CM1', encryptionKeySpki: B64(422), signingKeySpki: B64(91) },
-  'cm.room.envelope': { roomId: ROOM, keyVersion: 1, recipientUserId: USER, recipientKeyId: KEY, suite: 'CM1' },
+  'cm.room.envelope': { roomId: ROOM, keyVersion: 1, recipientUserId: USER, recipientKeyId: KEY_ID, suite: 'CM1' },
   'cm.room.dek-wrap-key': { roomId: ROOM, keyVersion: 1 },
   'cm.room.commitment': { roomId: ROOM, keyVersion: 1 },
   'cm.room.safety-code': { roomId: ROOM, keyVersion: 1 },
@@ -53,7 +53,7 @@ const SAMPLES: { readonly [N in ContextName]: ContextFields<N> } = {
   'cm.file.content': { roomId: ROOM, fileId: FILE },
   'cm.file.manifest': { roomId: ROOM, fileId: FILE },
   'cm.note.content': { roomId: ROOM, noteId: FILE, revision: 3 },
-  'cm.secret.sek-wrap': { roomId: ROOM, secretId: FILE, recipientUserId: USER, recipientKeyId: KEY, suite: 'CM1' },
+  'cm.secret.sek-wrap': { roomId: ROOM, secretId: FILE, recipientUserId: USER, recipientKeyId: KEY_ID, suite: 'CM1' },
   'cm.secret.payload': { roomId: ROOM, secretId: FILE },
   'cm.srv.totp': { userId: USER, keyId: 'server-key-1' },
 };
@@ -114,7 +114,7 @@ describe('canonical contexts (CP-15, cryptographic-architecture section 8)', () 
     invalid(() => contextBytes('cm.file.content', { roomId: 'not-a-uuid', fileId: FILE }));
     invalid(() => contextBytes('cm.room.commitment', { roomId: ROOM, keyVersion: 0 }));
     invalid(() => contextBytes('cm.room.commitment', { roomId: ROOM, keyVersion: 1.5 }));
-    invalid(() => contextBytes('cm.vault.pk-wrap', { userId: USER, keyId: KEY, purpose: 'other' as never }));
+    invalid(() => contextBytes('cm.vault.pk-wrap', { userId: USER, keyId: KEY_ID, purpose: 'other' as never }));
     invalid(() =>
       contextBytes('cm.vault.private-key', { ...SAMPLES['cm.vault.private-key'], fingerprint: 'A'.repeat(64) }),
     );
@@ -125,8 +125,8 @@ describe('canonical contexts (CP-15, cryptographic-architecture section 8)', () 
     invalid(() => contextBytes('cm.unknown' as ContextName, {} as never));
     invalid(() => contextBytes('cm.file.content', { roomId: ROOM, fileId: undefined } as never));
     invalid(() => contextBytes('cm.file.content', { roomId: 42, fileId: FILE } as never));
-    invalid(() => contextBytes('cm.vault.signing-check', { userId: USER, keyId: KEY, challenge: 42 } as never));
-    invalid(() => contextBytes('cm.vault.signing-check', { userId: USER, keyId: KEY, challenge: 'A' }));
+    invalid(() => contextBytes('cm.vault.signing-check', { userId: USER, keyId: KEY_ID, challenge: 42 } as never));
+    invalid(() => contextBytes('cm.vault.signing-check', { userId: USER, keyId: KEY_ID, challenge: 'A' }));
     invalid(() =>
       contextBytes('cm.dek.wrap', {
         roomId: ROOM,
