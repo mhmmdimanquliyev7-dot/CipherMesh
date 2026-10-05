@@ -66,6 +66,11 @@ export function sha256Source(text) {
  * part of a same-origin script bundle. The Argon2id Web Worker is a same-origin script, so
  * script-src 'self' covers it (worker-src falls back to script-src). The object-storage origin is
  * added to connect-src in Phase 7.
+ *
+ * form-action 'none' (Phase 4, security finding SF-04-01): the client never submits an HTML form
+ * natively; every form is handled by JavaScript and sent with fetch(). A native submission, which
+ * is possible before hydration or when the bundle fails to load, would be a GET that carries the
+ * typed values, such as the account password, in the URL. The browser now refuses it.
  * @param {readonly string[]} scriptHashes
  * @returns {string}
  */
@@ -79,7 +84,7 @@ export function buildCsp(scriptHashes) {
     "font-src 'self'",
     "connect-src 'self'",
     "manifest-src 'self'",
-    "form-action 'self'",
+    "form-action 'none'",
     "frame-ancestors 'none'",
     "base-uri 'none'",
     "object-src 'none'",

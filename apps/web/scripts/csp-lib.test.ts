@@ -43,8 +43,15 @@ describe('buildCsp', () => {
     expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval' 'sha256-a' 'sha256-b';");
   });
 
-  it('denies by default and forbids framing, plugins and base changes', () => {
-    for (const directive of ["default-src 'none'", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'none'"]) {
+  it('denies by default and forbids framing, plugins, base changes and native form submission', () => {
+    for (const directive of [
+      "default-src 'none'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'none'",
+      // SF-04-01: forms are only ever sent by JavaScript; a native submission would put values in the URL.
+      "form-action 'none'",
+    ]) {
       expect(csp).toContain(directive);
     }
   });
