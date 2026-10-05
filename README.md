@@ -4,7 +4,7 @@
 
 CipherMesh lets authorized members of a *Secure Room* exchange sensitive files, notes and one-time secrets. Content is encrypted in the member's browser before it is uploaded. The server stores ciphertext, wrapped keys and the metadata it needs to enforce access control, security policy and auditing.
 
-> **Status: Phase 4 (cryptographic identity and vault) implemented, awaiting approval.** On top of the authentication of Phase 3 (opaque sessions, TOTP MFA, step-up, CSRF defences, abuse controls) and the least-privilege PostgreSQL schema, every user can now create a client-side encrypted vault: an RSA-OAEP-3072 encryption key and an ECDSA P-256 signing key generated in the browser, wrapped under keys derived from a separate Vault Passphrase with Argon2id in a Web Worker, unlocked only in memory, with auto-lock, a signed passphrase change, a reset, a public-key directory and fingerprints. Rooms and all content encryption are not implemented yet.
+> **Status: Phase 4 (cryptographic identity and vault) implemented, approved and merged into `main` through pull request #10.** On top of the authentication of Phase 3 (opaque sessions, TOTP MFA, step-up, CSRF defences, abuse controls) and the least-privilege PostgreSQL schema, every user can now create a client-side encrypted vault: an RSA-OAEP-3072 encryption key and an ECDSA P-256 signing key generated in the browser, wrapped under keys derived from a separate Vault Passphrase with Argon2id in a Web Worker, unlocked only in memory, with auto-lock, a signed passphrase change, a reset, a public-key directory and fingerprints. Rooms and all content encryption are not implemented yet.
 
 ## Why this project exists
 
