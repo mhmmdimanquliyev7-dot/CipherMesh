@@ -16,5 +16,10 @@ apps/web/next-env.d.ts
 apps/api/src/generated/
 # Prisma schema and SQL migrations keep their reviewed formatting.
 prisma/migrations/
-# Generated password blocklist (scripts/auth/build-password-blocklist.mjs).
+# Generated password and passphrase blocklists (scripts/auth/build-password-blocklist.mjs).
 apps/api/src/auth/data/
+packages/crypto/src/passphrase-blocklist.ts
+# Generated from the pinned argon2id package (scripts/crypto/embed-argon2id-wasm.mjs).
+packages/crypto/src/kdf/argon2id-wasm.ts
+# Published test vectors (Project Wycheproof and OpenSSL), kept byte-for-byte as generated.
+packages/crypto/vectors/

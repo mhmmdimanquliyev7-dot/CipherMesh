@@ -1,4 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Sources and tests (lint and Vitest). Tests run in Node.js and cross-check against OpenSSL.
+    // tsconfig.browser.json additionally proves that the sources compile without Node.js types.
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"]
+  },
   "include": ["src"]
 }
