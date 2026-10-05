@@ -1,16 +1,16 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-05, end of Prompt 06 (Phase 4). The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-05, end of Prompt 06 (Phase 4); repository state updated after pull request #10 merged Phase 4 into `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
 | Item | State |
 |---|---|
-| Completed | Prompt 06 / Phase 4, Cryptographic Identity and Vault (CM-T086, CM-T023 to CM-T028): implemented, awaiting project owner approval. Traceability: [phase-04-traceability.md](phase-04-traceability.md) |
-| Next | Prompt 07 / Phase 5, Secure Rooms and RBAC (CM-T029 to CM-T032). Do not start without explicit approval |
-| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 3 (`f86a2ce`, after pull requests #1, #7, #8 and #9) |
-| Phase 4 branch | `feature/CM-T023-cryptographic-vault`, created from `f86a2ce`. Pull request #10: CI passed every job (run 37347479619); GitGuardian waits for a false-positive mark. Merge only after the project owner approves Phase 4, with a normal merge commit |
-| Prompt 07 branch | Create it from `main` after the Phase 4 pull request is merged (`git checkout main && git pull --ff-only`) |
+| Completed | Prompt 06 / Phase 4, Cryptographic Identity and Vault (CM-T086, CM-T023 to CM-T028): implemented, approved by the project owner and merged into `main` through pull request #10. Traceability: [phase-04-traceability.md](phase-04-traceability.md) |
+| Next | Prompt 07 / Phase 5, Secure Rooms and RBAC (CM-T029 to CM-T032), starting with Prompt 07A. Do not start without explicit approval |
+| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 4: merge commit `9e13259` of pull request #10, after pull requests #1, #7, #8 and #9. It is the baseline for Prompt 07 |
+| Phase 4 branch | `feature/CM-T023-cryptographic-vault` (head `99bd3c3`), created from `f86a2ce` and merged through pull request #10 with a normal merge commit (`9e13259`). CI passed every job on the pull request (run 37348289891) and on `main` after the merge (run 37359366784). The branch takes no further commits |
+| Prompt 07A branch | Create it from the updated `main` (`git checkout main && git pull --ff-only`), never from a phase branch |
 
 ## 2. Architecture implemented so far
 
@@ -97,12 +97,12 @@ The auth, vault, database, E2E and smoke runs need the local database. CI provid
 
 ## 11. Outstanding work outside the repository
 
-- GitHub: the Phase 4 pull request awaits review, CI and the project owner's approval; merge only with a normal merge commit.
+- GitHub: done. Phase 4 was merged through pull request #10 with a normal merge commit.
 - Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including the coverage step) as required checks. Then capture EV-01-01 (CI run), EV-01-02 and EV-01-03.
-- GitGuardian: mark incident 37892113 on pull request #10 as a false positive in the dashboard (the first 12 bytes of a test ciphertext in an evidence file; classification posted on the pull request). The Wycheproof vectors contain public test keys by design (`packages/crypto/vectors/README.md`); they were not flagged.
+- GitGuardian: done. The project owner marked incident 37892113 on pull request #10 as a false positive (the first 12 bytes of a test ciphertext in an evidence file; classification posted on the pull request). The check result recorded on the pull request head could not be re-run from the API and still shows the original failure. The Wycheproof vectors contain public test keys by design (`packages/crypto/vectors/README.md`); they were not flagged.
 - Dependabot pull requests #2 to #6 remain open (see the Phase 3 handoff notes: #2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24).
 - Jira: import the backlog (the CSV now matches ADR-015); move CM-T006 to CM-T028 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING. Create the security finding SF-04-01 (label `security-finding`, fixed in the Phase 4 pull request). Nothing is DONE yet.
-- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 4, EV-04-13 (CI run).
+- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 4. EV-04-13 (the CI run of pull request #10) is captured.
 
 ## 12. Scope of Prompt 07 (Phase 5, CM-T029 to CM-T032)
 
