@@ -13,6 +13,7 @@
     "worker:retention": "node --env-file-if-exists=../../.env --import tsx src/worker/retention.ts"
   },
   "dependencies": {
+    "@ciphermesh/crypto": "workspace:*",
     "@ciphermesh/shared": "workspace:*",
     "@ciphermesh/validation": "workspace:*",
     "@prisma/adapter-pg": "catalog:",

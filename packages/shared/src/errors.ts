@@ -24,6 +24,15 @@ export const ErrorCode = {
   EMAIL_UNAVAILABLE: 'EMAIL_UNAVAILABLE',
   PASSWORD_REJECTED: 'PASSWORD_REJECTED',
   MFA_STATE_CONFLICT: 'MFA_STATE_CONFLICT',
+  // Vault and public-key directory (Phase 4). Unlock failures never reach the API: unlocking is
+  // local, so there is no server-side code for a wrong Vault Passphrase.
+  VAULT_NOT_FOUND: 'VAULT_NOT_FOUND',
+  VAULT_ALREADY_EXISTS: 'VAULT_ALREADY_EXISTS',
+  VAULT_SETUP_REQUIRED: 'VAULT_SETUP_REQUIRED',
+  VAULT_CONFLICT: 'VAULT_CONFLICT',
+  INVALID_VAULT_FORMAT: 'INVALID_VAULT_FORMAT',
+  IDENTITY_REJECTED: 'IDENTITY_REJECTED',
+  VAULT_SIGNATURE_INVALID: 'VAULT_SIGNATURE_INVALID',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

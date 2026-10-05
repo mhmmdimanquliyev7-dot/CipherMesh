@@ -1,6 +1,6 @@
-# Engineering Baseline (Phases 1 to 3)
+# Engineering Baseline (Phases 1 to 4)
 
-Status: Phase 1, 2026-10-02; database layer added in Phase 2 and authentication in Phase 3 (2026-10-04). Records the tool and version decisions, the request pipeline and the local development setup established by CM-T006 to CM-T022. Related: [ADR-001](adr/ADR-001-monorepo-architecture.md), [ADR-011](adr/ADR-011-static-frontend-delivery.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
+Status: Phase 1, 2026-10-02; database layer added in Phase 2, authentication in Phase 3 (2026-10-04), and the cryptography package and vault in Phase 4 (2026-10-05). Records the tool and version decisions, the request pipeline and the local development setup established by CM-T006 to CM-T028. Related: [ADR-001](adr/ADR-001-monorepo-architecture.md), [ADR-011](adr/ADR-011-static-frontend-delivery.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
 
 ## 1. Versions
 
@@ -25,6 +25,8 @@ Versions were checked against the npm registry and peer-dependency ranges on 202
 | pg (node-postgres) | 8.23.0 | Driver used by the Prisma adapter and by the database tooling and tests |
 | Argon2id (server) | Node.js built-in `crypto.argon2` | LIB-04: no dependency, OpenSSL implementation, RFC 9106 vector verified. Parameters CP-05 |
 | otpauth | 9.5.2 | LIB-06, TOTP (RFC 6238). One dependency: `@noble/hashes` 2.4.0 |
+| argon2id | 1.0.1 | LIB-03, browser Argon2id (Phase 4). MIT, no dependencies, no install scripts; its two WebAssembly builds are embedded by `scripts/crypto/embed-argon2id-wasm.mjs` and compared with the package by a unit test |
+| @vitest/coverage-v8 | 5.0.2 | Development only (Phase 4): measures and enforces the coverage target of CLAUDE.md section 10 for `packages/crypto`. MIT, no install scripts, same release as Vitest |
 | uqr | 0.1.3 | Web client only: QR code matrix for TOTP enrollment, rendered as SVG elements. No dependencies; replaces an image request or HTML injection |
 | SeaweedFS (development) | 4.47, image pinned by digest | See section 5 |
 | gitleaks | 8.30.1, image pinned by digest | Secret scanning locally and in CI |
@@ -34,9 +36,11 @@ Versions were checked against the npm registry and peer-dependency ranges on 202
 | Workspace | Runtime dependencies | Why |
 |---|---|---|
 | apps/api | express, zod, @prisma/client, @prisma/adapter-pg, pg, otpauth, @ciphermesh/shared, @ciphermesh/validation | HTTP server; configuration and input validation; database access (Phase 2); TOTP (Phase 3) |
-| apps/web | next, react, react-dom, uqr, @ciphermesh/shared, @ciphermesh/validation | Approved frontend stack; QR codes and response validation (Phase 3) |
-| packages/validation | zod, @ciphermesh/shared | Boundary schemas |
-| packages/shared, packages/crypto | none | |
+| apps/web | next, react, react-dom, uqr, @ciphermesh/shared, @ciphermesh/validation, @ciphermesh/crypto | Approved frontend stack; QR codes and response validation (Phase 3); client-side cryptography and the vault (Phase 4) |
+| apps/api | adds @ciphermesh/crypto in Phase 4 | Identity verification and signature checks with the same code the browsers run, through the `./identity` and `./contexts` subpaths only |
+| packages/validation | zod, @ciphermesh/shared, @ciphermesh/crypto | Boundary schemas; vault size limits come from `@ciphermesh/crypto/params` |
+| packages/crypto | argon2id | Browser Argon2id (LIB-03). Everything else is WebCrypto |
+| packages/shared | none | |
 
 Deliberately not added:
 - **Logging libraries.** The API uses a small in-repo JSON logger with a tested deep redactor (`apps/api/src/logging`). A library such as pino would add about ten transitive packages, and its path-based redaction cannot cover arbitrary nesting.
@@ -116,7 +120,15 @@ The static export contains a few inline scripts emitted by Next.js. After `next 
 2. fails the build if any inline style or style attribute would require `'unsafe-inline'`;
 3. writes `apps/web/out-meta/security-headers.json` with the CSP and the other headers.
 
-The file sits next to the export and is not served. The E2E server applies it today, and Nginx will use it in Phase 17. The policy has no `'unsafe-inline'` or `'unsafe-eval'`. `'wasm-unsafe-eval'` is added in Phase 4 with the Argon2id module, and the storage origin is added to `connect-src` in Phase 7.
+The file sits next to the export and is not served. The E2E server applies it today, and Nginx will use it in Phase 17. The policy has no `'unsafe-inline'` or `'unsafe-eval'`. Since Phase 4 `script-src` contains `'wasm-unsafe-eval'` for the Argon2id module (ADR-010), and `form-action` is `'none'` (security finding SF-04-01: the client sends every form with `fetch()`, so the browser refuses any native submission, which before hydration would have put the typed values into the URL); the storage origin is added to `connect-src` in Phase 7. `tests/e2e/web-shell.spec.ts` fails if `'unsafe-inline'` or `'unsafe-eval'` ever appears.
+
+### 6.1 The Argon2id worker in the export (Phase 4)
+
+`packages/crypto/src/kdf/runner.ts` starts the worker with `new Worker(new URL('./argon2id.worker.ts', import.meta.url), { type: 'module' })`. Turbopack compiles this into a bootstrap script, `_next/static/chunks/turbopack-worker-*.js`, which it starts as a classic worker with the list of its chunks in the worker URL; the chunks contain the worker code and the embedded WebAssembly. Everything is same-origin, so `script-src 'self'` covers it (`worker-src` falls back to `script-src`), and the E2E tests run the worker in all three engines under the production CSP without violations.
+
+Turbopack also copies the raw worker source to `_next/static/media/argon2id.worker.*.ts` for the `new URL()` reference. Nothing loads that file: it holds only the 47-line source of the worker, no secrets, and `X-Content-Type-Options: nosniff` prevents it from being run as a script with a non-script type. It is accepted as a build artefact and reviewed again at the next Next.js upgrade.
+
+Workspace packages are compiled by Next.js through `transpilePackages`, which now includes `@ciphermesh/crypto`. ESLint forbids browser code from importing `@ciphermesh/crypto/src/**`, so the web client uses only the package's public entry point.
 
 `next dev` uses eval-based hot reloading. CSP is therefore applied to the production export only, never to the development server.
 
@@ -135,8 +147,12 @@ zod 4 compiles object parsers with `new Function`, and when the first object sch
 | `pnpm smoke:api` | Starts the built API twice: in production mode with an unreachable TLS-only database (readiness must fail closed) and against the real database (readiness must succeed). Checks graceful shutdown on Linux and that no database password reaches the log |
 | `pnpm test:e2e` | Playwright against the built export and the built API over HTTPS on one origin (`tests/e2e/static-server.mjs`: throwaway self-signed certificate from OpenSSL, generated headers, `/api` reverse proxy with one forwarding hop). Needs `DATABASE_URL` |
 | `pnpm test:auth` | Authentication security suites against the real API and a throwaway database |
-| `pnpm security:negative-controls` | Ten deliberate defects, each of which must make the security suites fail |
+| `pnpm test:vault` | Vault and directory suites against the real API, real Argon2id and a throwaway database (Phase 4) |
+| `pnpm test:coverage:crypto` | Coverage of `packages/crypto`; fails below 90% statements, branches, functions or lines (Phase 4, run in CI) |
+| `pnpm security:negative-controls` | 27 deliberate defects (ten from Phase 3, seventeen from Phase 4), each of which must make the security suites fail; the five browser controls rebuild the web client and run Playwright. `--vitest-only` skips those. Every touched file is compared with its original by SHA-256 afterwards |
 | `pnpm bench:argon2` | Argon2id benchmark and RFC 9106 check (CP-05) |
+| `pnpm bench:vault` | Browser benchmark of the vault in Chromium, Firefox and WebKit: the real crypto code under the production CSP (CP-04, crypto-decisions section 8) |
+| `node scripts/crypto/embed-argon2id-wasm.mjs` | Regenerates the embedded Argon2id WebAssembly after an update of the pinned `argon2id` package |
 | `pnpm admin:platform-role grant\|revoke <email>` | Server-side PLATFORM_ADMIN management (CM-T022) |
 | `pnpm worker:retention` | Deletes expired sessions, pre-authentication states and old login attempts, as `cm_worker` |
 | `pnpm audit:deps`, `pnpm scan:secrets`, `pnpm sbom:generate` | Dependency advisories, gitleaks over the git history, CycloneDX SBOM |

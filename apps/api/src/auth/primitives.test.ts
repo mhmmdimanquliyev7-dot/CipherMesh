@@ -7,7 +7,7 @@ import { backoffSeconds, FixedWindowLimiter } from './limits';
 import { canonicalRecoveryCode, generateRecoveryCodes, recoveryCodeDigest } from './recovery-codes';
 import { requireRecentAuthentication, requireStepUp, SESSION_POLICY, type Actor } from './sessions';
 import { digestToken, isWellFormedToken, issueToken } from './tokens';
-import { canonicalServerContext, TotpSecretBox } from './totp-secret-box';
+import { TotpSecretBox } from './totp-secret-box';
 
 describe('session tokens (ADR-008, CP-08)', () => {
   it('are 256-bit random values, base64url encoded, stored only as SHA-256 digests', () => {
@@ -119,11 +119,22 @@ describe('TOTP secret encryption at rest (CP-11)', () => {
     expect(() => other.open(userId, 'k1', sealed)).toThrow();
   });
 
-  it('builds the AAD as the canonical context with sorted keys (CP-15)', () => {
-    expect(canonicalServerContext({ v: 1, userId: 'u', keyId: 'k', ctx: 'cm.srv.totp' }).toString()).toBe(
-      '{"ctx":"cm.srv.totp","keyId":"k","userId":"u","v":1}',
+  it('opens a secret sealed by the Phase 3 code: the CD-22 context migration kept the AAD bytes', () => {
+    // Fixture produced on 2026-10-05 by the Phase 3 implementation (local canonicalServerContext)
+    // before it was replaced: a synthetic key of 32 bytes 0x42, key ID fixture-key-1, and the
+    // RFC 6238 seed "12345678901234567890" as the TOTP secret. Not a secret of any system.
+    const PHASE3_SEALED = 'sAnTz0PqGGu1bbVavk_Hcz2h7YEHEVuNccRvYT6E1O0rbVqiyNoRuV_6yvmUog3z';
+    const phase3Box = new TotpSecretBox(Buffer.alloc(32, 0x42).toString('base64url'), 'fixture-key-1');
+    const opened = phase3Box.open(
+      '6f1c2b8e-3d4a-4f5b-9c6d-7e8f9a0b1c2d',
+      'fixture-key-1',
+      Buffer.from(PHASE3_SEALED, 'base64url'),
     );
-    expect(() => canonicalServerContext({ v: 2 ** 60 })).toThrow();
+    expect(opened.toString('ascii')).toBe('12345678901234567890');
+  });
+
+  it('refuses a user ID that is not a UUIDv4 instead of building an ambiguous context', () => {
+    expect(() => box.seal('not-a-uuid', secret)).toThrow();
   });
 });
 

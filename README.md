@@ -4,7 +4,7 @@
 
 CipherMesh lets authorized members of a *Secure Room* exchange sensitive files, notes and one-time secrets. Content is encrypted in the member's browser before it is uploaded. The server stores ciphertext, wrapped keys and the metadata it needs to enforce access control, security policy and auditing.
 
-> **Status: Phase 3 (authentication) implemented, awaiting approval.** Registration, login with opaque server-side sessions, TOTP MFA with recovery codes, step-up, CSRF defences, login abuse controls and account administration work end to end, on top of the PostgreSQL schema with least-privilege roles. Rooms, the vault and all content cryptography are not implemented yet.
+> **Status: Phase 4 (cryptographic identity and vault) implemented, awaiting approval.** On top of the authentication of Phase 3 (opaque sessions, TOTP MFA, step-up, CSRF defences, abuse controls) and the least-privilege PostgreSQL schema, every user can now create a client-side encrypted vault: an RSA-OAEP-3072 encryption key and an ECDSA P-256 signing key generated in the browser, wrapped under keys derived from a separate Vault Passphrase with Argon2id in a Web Worker, unlocked only in memory, with auto-lock, a signed passphrase change, a reset, a public-key directory and fingerprints. Rooms and all content encryption are not implemented yet.
 
 ## Why this project exists
 
@@ -54,11 +54,11 @@ The full list, with the reasoning behind each item, is in [docs/security/limitat
 |---|---|
 | Rules for contributors and Claude Code | [CLAUDE.md](CLAUDE.md) |
 | Architecture | [System overview](docs/architecture/system-overview.md), [Data flow](docs/architecture/data-flow.md), [Trust boundaries](docs/architecture/trust-boundaries.md), [Data model](docs/architecture/data-model.md), [Crypto Inspector](docs/architecture/crypto-inspector.md), [Security Dashboard](docs/architecture/security-dashboard.md), [Security UI](docs/architecture/security-ui.md), [ADRs](docs/architecture/adr/README.md) |
-| Cryptography | [Cryptographic architecture](docs/crypto/cryptographic-architecture.md), [Key hierarchy](docs/crypto/key-hierarchy.md), [Key lifecycle](docs/crypto/key-lifecycle.md), [Crypto decisions and parameters](docs/crypto/crypto-decisions.md) |
+| Cryptography | [Cryptographic architecture](docs/crypto/cryptographic-architecture.md), [Vault specification](docs/crypto/vault.md), [Key hierarchy](docs/crypto/key-hierarchy.md), [Key lifecycle](docs/crypto/key-lifecycle.md), [Crypto decisions and parameters](docs/crypto/crypto-decisions.md) |
 | Threat model | [Threat model and risk register](docs/threat-model/threat-model.md) |
 | Security | [Principles](docs/security/security-principles.md), [Authorization model](docs/security/authorization-model.md), [Policy profiles](docs/security/security-policy-profiles.md), [Testing plan](docs/security/security-testing-plan.md), [Sessions and CSRF](docs/security/session-and-csrf.md), [Limitations](docs/security/limitations.md), [Authentication security](docs/security/authentication-security.md), [Database security](docs/security/database-security.md), [ISMS control mapping](docs/security/isms-control-mapping.md), [Phase 0 review](docs/security/architecture-review.md), [Phase 0.5 gate](docs/security/architecture-gate-phase-0-5.md) |
 | Cloud | [Service models](docs/cloud/service-models.md), [Shared responsibility](docs/cloud/shared-responsibility.md), [Deployment architecture](docs/cloud/deployment-architecture.md) |
-| Project management | [Jira workflow](docs/management/jira-workflow.md), [Jira backlog](docs/management/jira-backlog.md), [Jira import guide](docs/management/jira-import-guide.md), [Jira CSV](docs/management/jira-backlog.csv), [Roadmap](docs/management/project-roadmap.md), [Phase 1 traceability](docs/management/phase-01-traceability.md), [Phase 2 traceability](docs/management/phase-02-traceability.md), [Phase 3 traceability](docs/management/phase-03-traceability.md) |
+| Project management | [Jira workflow](docs/management/jira-workflow.md), [Jira backlog](docs/management/jira-backlog.md), [Jira import guide](docs/management/jira-import-guide.md), [Jira CSV](docs/management/jira-backlog.csv), [Roadmap](docs/management/project-roadmap.md), [Phase 1 traceability](docs/management/phase-01-traceability.md), [Phase 2 traceability](docs/management/phase-02-traceability.md), [Phase 3 traceability](docs/management/phase-03-traceability.md), [Phase 4 traceability](docs/management/phase-04-traceability.md) |
 | Report | [Evidence plan](docs/report/evidence-plan.md) |
 
 ## Repository layout

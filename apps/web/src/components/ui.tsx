@@ -1,6 +1,23 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import { useSyncExternalStore, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react';
 
 /** Small presentational building blocks. Text only: no HTML rendering of server data. */
+
+const noSubscription = () => () => undefined;
+
+/**
+ * False in the prerendered HTML and during hydration, true once React runs in the browser.
+ * Buttons stay disabled until then: before hydration no handler exists, and a native submission
+ * of a prerendered form would be a GET that puts the typed values, such as the account password,
+ * into the URL (security finding SF-04-01). The CSP's form-action 'none' refuses such a
+ * submission as well; this keeps the user from reaching it.
+ */
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
+}
 
 export function Field({
   label,
@@ -21,11 +38,14 @@ export function Field({
 
 export function Button({
   children,
+  disabled,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { readonly children: ReactNode }) {
+  const hydrated = useHydrated();
   return (
     <button
       {...props}
+      disabled={disabled === true || !hydrated}
       className="rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
     >
       {children}
@@ -35,11 +55,14 @@ export function Button({
 
 export function SecondaryButton({
   children,
+  disabled,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { readonly children: ReactNode }) {
+  const hydrated = useHydrated();
   return (
     <button
       {...props}
+      disabled={disabled === true || !hydrated}
       className="rounded border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:border-slate-400 disabled:opacity-50"
     >
       {children}

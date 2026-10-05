@@ -1,0 +1,12 @@
+# Reviewed gitleaks false positives (pnpm scan:secrets). Each entry names one finding by
+# commit:file:rule:line. Add an entry only after inspecting the finding; never for a real secret.
+#
+# Phase 4, reviewed 2026-10-05 (rule generic-api-key, matched on the word "key"):
+# - a UUIDv4 test constant named KEY (renamed to KEY_ID in a later commit);
+a8aeb3c8250b2c978eddb940128ee459eeb60145:packages/crypto/src/contexts.test.ts:generic-api-key:8
+# - the list of field names the logger must redact, not values;
+e7f1fbd88e05fa3e1e8e54a51d648719ca1ff7d4:apps/api/src/logging/redact.test.ts:generic-api-key:60
+# - the first bytes of a vault ciphertext in an evidence file (removed in a later commit);
+b0f59885999552c7f52303fffe3d1da1769d2722:docs/report/evidence/phase-04/EV-04-02_stored-vault-row.txt:generic-api-key:27
+# - a public identity fingerprint in an evidence file (reworded in a later commit).
+b0f59885999552c7f52303fffe3d1da1769d2722:docs/report/evidence/phase-04/EV-04-05_fingerprint.txt:generic-api-key:10

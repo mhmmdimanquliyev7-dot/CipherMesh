@@ -54,6 +54,25 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'otpauthUri',
   'challenge',
   'preAuth',
+  // Vault (Phase 4). The server never receives these values; the names are redacted anyway, so a
+  // mistake in a client or a test can never put them into a log (INV-01, INV-10).
+  'vaultPassword',
+  'vaultKey',
+  'vaultRootKey',
+  'vrk',
+  'kek',
+  'keyEncryptionKey',
+  'pkwk',
+  'privateKeyPkcs8',
+  'pkcs8',
+  'decryptedPrivateKey',
+  'vaultPlaintext',
+  'vaultCiphertext',
+  'vaultBlob',
+  'wrappedEncryptionKey',
+  'wrappedSigningKey',
+  'encryptedPrivateKey',
+  'encryptedSigningPrivateKey',
 ];
 
 /** Any key ending with one of these is sensitive, e.g. `clientSecret`, `adminPassword`. */
@@ -67,6 +86,7 @@ export const SENSITIVE_KEY_SUFFIXES: readonly string[] = [
   'cookie',
   'databaseurl',
   'connectionstring',
+  'pkcs8',
 ];
 
 /** Values that are sensitive regardless of the key they appear under. */

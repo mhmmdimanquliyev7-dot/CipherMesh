@@ -1,0 +1,35 @@
+EV-04-02: The stored vault row in user_key_pairs (queried as cm_api)
+Captured: 2026-10-05T17:10:30.148Z on branch feature/CM-T023-cryptographic-vault (Phase 4, uncommitted working tree)
+Environment: built static export and built API behind tests/e2e/static-server.mjs (HTTPS, generated CSP),
+local PostgreSQL 17, Chromium from Playwright 1.63. Synthetic account (example.test).
+Redaction: the Vault Passphrase and the account password are random and replaced by <redacted>;
+ciphertexts and public keys are shortened. Nothing below is secret.
+
+User ID: 86de666f-7a5e-497a-a273-f7e4a94bb66b
+[
+  {
+    "status": "ACTIVE",
+    "algorithm_suite": "CM1",
+    "vault_version": 1,
+    "kdf_algorithm": "argon2id",
+    "kdf_memory_kib": 65536,
+    "kdf_iterations": 3,
+    "kdf_parallelism": 1,
+    "salt_bytes": 16,
+    "encryption_spki_bytes": 422,
+    "signing_spki_bytes": 91,
+    "binding_signature_bytes": 64,
+    "public_key_fingerprint": "4113040befc90fdfc2b52f70cafc8ef208336367fac5bbfb348ca71825aca4f2",
+    "wrapped_encryption_key_bytes": 1809,
+    "encryption_iv_bytes": 12,
+    "wrapped_signing_key_bytes": 154,
+    "signing_iv_bytes": 12,
+    "rsa_oid_position": 0,
+    "ec_oid_position": 0
+  }
+]
+
+Reading: the row holds public keys, a signature, a fingerprint, KDF parameters and a salt, and the two
+private keys only as AES-256-GCM ciphertext (wrapped in the browser). A position of 0 means the PKCS#8
+algorithm identifier does not occur in the stored bytes, so no private key is stored in plaintext.
+There is no column for the Vault Passphrase, any hash or verifier of it, or any key derived from it.

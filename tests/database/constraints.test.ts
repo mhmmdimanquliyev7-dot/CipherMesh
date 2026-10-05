@@ -92,7 +92,12 @@ describe('partial unique indexes (data-model 4.5 to 4.9.1)', () => {
     expect(
       await attempt(
         'user_key_pairs',
-        await keyPairRow(user, { status: 'SUPERSEDED', encrypted_private_key: null, superseded_at: new Date() }),
+        await keyPairRow(user, {
+          status: 'SUPERSEDED',
+          encrypted_private_key: null,
+          encrypted_signing_private_key: null,
+          superseded_at: new Date(),
+        }),
       ),
     ).toBe('none');
   });
@@ -233,6 +238,16 @@ describe('CHECK constraints: what the database refuses to store', () => {
     expect(await attempt('user_key_pairs', await keyPairRow(user, { encrypted_private_key: null }))).toBe(
       SQLSTATE.checkViolation,
     );
+    // The same rule for the signing key of the identity bundle (ADR-015).
+    expect(await attempt('user_key_pairs', await keyPairRow(user, { encrypted_signing_private_key: null }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+    expect(
+      await attempt(
+        'user_key_pairs',
+        await keyPairRow(user, { status: 'SUPERSEDED', encrypted_private_key: null, superseded_at: new Date() }),
+      ),
+    ).toBe(SQLSTATE.checkViolation);
     expect(await attempt('user_key_pairs', await keyPairRow(user, { status: 'REVOKED', revoked_at: new Date() }))).toBe(
       SQLSTATE.checkViolation,
     );
@@ -249,6 +264,21 @@ describe('CHECK constraints: what the database refuses to store', () => {
     ['a 16-byte IV', { private_key_iv: DUMMY.ciphertext(16) }],
     ['a private key too short to be ciphertext of a PKCS#8 key', { encrypted_private_key: DUMMY.ciphertext(32) }],
     ['an unknown algorithm suite', { algorithm_suite: 'CM2' }],
+    // Identity signing key and vault format (ADR-015, migration 20261005000000)
+    ['a signing key that is not a 91-byte P-256 SPKI', { signing_public_key_spki: DUMMY.ciphertext(120) }],
+    ['a binding signature that is not 64 bytes', { identity_signature: DUMMY.ciphertext(72) }],
+    ['a 16-byte signing-key IV', { signing_private_key_iv: DUMMY.ciphertext(16) }],
+    [
+      'a signing-key ciphertext too short for a wrapped PKCS#8 key',
+      { encrypted_signing_private_key: DUMMY.ciphertext(32) },
+    ],
+    ['a signing-key ciphertext of content size', { encrypted_signing_private_key: DUMMY.ciphertext(300) }],
+    ['an encryption-key ciphertext of content size', { encrypted_private_key: DUMMY.ciphertext(4096) }],
+    ['an unknown vault format version', { vault_version: 2 }],
+    ['KDF memory above the ceiling (CP-04)', { kdf_memory_kib: 262145 }],
+    ['KDF passes above the ceiling', { kdf_iterations: 11 }],
+    ['KDF parallelism above the ceiling', { kdf_parallelism: 5 }],
+    ['a re-wrap time before creation', { created_at: new Date(), rewrapped_at: new Date(Date.now() - 60_000) }],
   ])('rejects a key pair with %s', async (_label, override) => {
     const user = await insertUser(api);
     expect(await attempt('user_key_pairs', await keyPairRow(user, override))).toBe(SQLSTATE.checkViolation);
@@ -433,10 +463,57 @@ describe('write-once identity columns', () => {
     ).toBe(SQLSTATE.integrityConstraintViolation);
     expect(
       await run(
-        `UPDATE user_key_pairs SET status = 'SUPERSEDED', encrypted_private_key = NULL, superseded_at = now() WHERE id = $1`,
+        `UPDATE user_key_pairs SET status = 'SUPERSEDED', encrypted_private_key = NULL,
+           encrypted_signing_private_key = NULL, superseded_at = now() WHERE id = $1`,
         [key],
       ),
     ).toBe('none');
+  });
+
+  it('never changes the signing key or the binding signature, but allows a re-wrap (ADR-015)', async () => {
+    const user = await insertUser(api);
+    const key = await insertKeyPair(api, user);
+    expect(
+      await run('UPDATE user_key_pairs SET signing_public_key_spki = $2 WHERE id = $1', [
+        key,
+        DUMMY.ciphertext(91).fill(2),
+      ]),
+    ).toBe(SQLSTATE.integrityConstraintViolation);
+    expect(
+      await run('UPDATE user_key_pairs SET identity_signature = $2 WHERE id = $1', [key, DUMMY.ciphertext(64).fill(3)]),
+    ).toBe(SQLSTATE.integrityConstraintViolation);
+    // A passphrase change replaces the salt, parameters, IVs and ciphertexts of the same identity.
+    expect(
+      await run(
+        `UPDATE user_key_pairs SET kdf_salt = $2, kdf_iterations = 4, private_key_iv = $3,
+           encrypted_private_key = $4, signing_private_key_iv = $3, encrypted_signing_private_key = $5,
+           rewrapped_at = now() WHERE id = $1`,
+        [
+          key,
+          DUMMY.ciphertext(16).fill(4),
+          DUMMY.ciphertext(12).fill(5),
+          DUMMY.ciphertext(1810).fill(6),
+          DUMMY.ciphertext(154).fill(7),
+        ],
+      ),
+    ).toBe('none');
+  });
+
+  it('a retired identity can never become ACTIVE again', async () => {
+    const user = await insertUser(api);
+    const key = await insertKeyPair(api, user);
+    await run(
+      `UPDATE user_key_pairs SET status = 'SUPERSEDED', encrypted_private_key = NULL,
+         encrypted_signing_private_key = NULL, superseded_at = now() WHERE id = $1`,
+      [key],
+    );
+    expect(
+      await run(
+        `UPDATE user_key_pairs SET status = 'ACTIVE', encrypted_private_key = $2, encrypted_signing_private_key = $3,
+           superseded_at = NULL WHERE id = $1`,
+        [key, DUMMY.encryptedPrivateKey(), DUMMY.encryptedSigningPrivateKey()],
+      ),
+    ).toBe(SQLSTATE.integrityConstraintViolation);
   });
 
   it('never changes the commitment of a key version', async () => {
@@ -470,9 +547,14 @@ async function keyPairRow(userId: string, overrides: Record<string, unknown> = {
     status: 'ACTIVE',
     algorithm_suite: 'CM1',
     public_key_spki: DUMMY.spki(),
+    signing_public_key_spki: DUMMY.signingSpki(),
     public_key_fingerprint: randomUUID().replaceAll('-', '').padEnd(64, 'f'),
+    identity_signature: DUMMY.signature(),
     encrypted_private_key: DUMMY.encryptedPrivateKey(),
     private_key_iv: DUMMY.iv(),
+    encrypted_signing_private_key: DUMMY.encryptedSigningPrivateKey(),
+    signing_private_key_iv: DUMMY.iv(),
+    vault_version: 1,
     kdf_algorithm: 'argon2id',
     kdf_memory_kib: 19456,
     kdf_iterations: 2,

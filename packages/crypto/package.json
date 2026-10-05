@@ -2,16 +2,23 @@
   "name": "@ciphermesh/crypto",
   "version": "0.0.0",
   "private": true,
-  "description": "Package boundary for CipherMesh client-side cryptography. No cryptography is implemented yet.",
+  "description": "CipherMesh client-side cryptography: WebCrypto wrappers, canonical contexts, the cryptographic identity, the Vault and browser Argon2id.",
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./contexts": "./src/contexts.ts",
+    "./identity": "./src/identity-server.ts",
+    "./params": "./src/params.ts"
   },
   "scripts": {
-    "typecheck": "tsc --project tsconfig.json"
+    "typecheck": "tsc --project tsconfig.json && tsc --project tsconfig.browser.json"
+  },
+  "dependencies": {
+    "argon2id": "1.0.1"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:"
   }
 }

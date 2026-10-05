@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { QrCode } from '../../components/qr-code';
 import { Alert, Button, Card, Field, SecondaryButton } from '../../components/ui';
 import { api, ApiError, describeError, formText } from '../../lib/api';
+import { vaultController } from '../../vault/controller';
 
 type SessionList = z.infer<typeof sessionListResponseSchema>['sessions'];
 
@@ -64,7 +65,8 @@ export default function AccountPage() {
         <SecondaryButton
           onClick={() =>
             void act(async () => {
-              await api('POST', '/auth/logout', statusOkResponseSchema);
+              // The vault is locked before the session ends (session-and-csrf.md section 5).
+              await vaultController.logout();
               router.replace('/login');
             })
           }
@@ -73,6 +75,16 @@ export default function AccountPage() {
         </SecondaryButton>
       </div>
       {message === undefined ? null : <Alert kind={message.kind}>{message.text}</Alert>}
+
+      <Card title="Vault">
+        <p className="text-sm text-slate-400">
+          Your Vault holds your cryptographic identity, protected by a Vault Passphrase that is separate from this
+          account password and never leaves your browser.{' '}
+          <Link className="text-sky-400 underline" href="/vault">
+            Open the vault
+          </Link>
+        </p>
+      </Card>
 
       <Card title="Signed in">
         <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">

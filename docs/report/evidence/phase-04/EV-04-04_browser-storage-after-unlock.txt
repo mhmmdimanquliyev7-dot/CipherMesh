@@ -1,0 +1,29 @@
+EV-04-04: Browser storage after setup, lock and unlock (CM-T026)
+Captured: 2026-10-05T17:10:30.148Z on branch feature/CM-T023-cryptographic-vault (Phase 4, uncommitted working tree)
+Environment: built static export and built API behind tests/e2e/static-server.mjs (HTTPS, generated CSP),
+local PostgreSQL 17, Chromium from Playwright 1.63. Synthetic account (example.test).
+Redaction: the Vault Passphrase and the account password are random and replaced by <redacted>;
+ciphertexts and public keys are shortened. Nothing below is secret.
+
+Readable by page scripts (what any script in the origin could see):
+{
+  "documentCookie": "",
+  "localStorageKeys": [],
+  "sessionStorageKeys": [],
+  "indexedDbDatabases": [],
+  "cacheStorageNames": []
+}
+
+Cookies held by the browser (values redacted; HttpOnly cookies are invisible to scripts):
+[
+  {
+    "name": "__Host-cm_session",
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "Strict",
+    "path": "/",
+    "value": "<redacted>"
+  }
+]
+
+The unlocked private keys exist only as non-extractable CryptoKey objects in the memory of this tab.

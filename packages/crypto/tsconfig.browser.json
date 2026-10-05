@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Production sources only, with browser types and no Node.js types: they cannot use Buffer,
+    // process or Node modules. The API runs the shared subset through WebCrypto, not Node APIs.
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

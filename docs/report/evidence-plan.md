@@ -82,11 +82,20 @@ Subject tags: **CRY** Cryptography Fundamentals, **CLD** Cloud Security, **ISMS*
 ### Phase 4: Vault
 | ID | Evidence | How to capture | Demonstrates | Tags |
 |---|---|---|---|---|
-| EV-04-01 | Vault setup request body | Devtools network panel | The passphrase and private key never leave the browser | CRY |
+| EV-04-01 | Vault setup request body | Network capture of the real setup flow in a browser (Playwright), ciphertext shortened | The passphrase and private keys never leave the browser | CRY |
 | EV-04-02 | Encrypted private key row | Query output | Private keys stored only encrypted | CRY |
-| EV-04-03 | Browser Argon2id benchmark | Table in the issue | KDF parameter choice | CRY |
-| EV-04-04 | Empty browser storage after unlock | Devtools Application panel | Keys held only in memory | CRY |
-| EV-04-05 | Key fingerprint display | Screenshot | Public-key verification support | CRY |
+| EV-04-03 | Browser Argon2id benchmark | `pnpm bench:vault` output and the library comparison | KDF parameter choice | CRY |
+| EV-04-04 | Empty browser storage after unlock | Playwright inspection of cookies, localStorage, sessionStorage, IndexedDB and the Cache API | Keys held only in memory | CRY |
+| EV-04-05 | Key fingerprint display | Screenshot on a throwaway account, plus an independent recomputation | Public-key verification support | CRY |
+| EV-04-06 | OCD-12 decision and identity authenticity tests | ADR-015 acceptance record; identity, signature and re-wrap test output | Design decided before implementation; signatures and fingerprints verified | CRY, ISMS |
+| EV-04-07 | Cryptographic known-answer, invariant and fail-closed tests with coverage | `pnpm test:coverage:crypto` output | Primitives match published vectors; the package fails closed; coverage target met | CRY |
+| EV-04-08 | Vault API security suites | `pnpm test:vault`, CSRF and route-inventory output | Step-up, strict schemas, signed re-wraps, reset, directory, BOLA, no secrets in logs | APP, CRY |
+| EV-04-09 | Negative controls | `pnpm security:negative-controls` output | The vault and crypto tests can fail | ISMS |
+| EV-04-14 | Security finding SF-04-01: regression test before and after the fix | Playwright output on the unfixed and the fixed build | Finding management: a test that fails before the fix and passes after it | ISMS, APP |
+| EV-04-10 | Cross-browser vault tests | `pnpm test:e2e` output | Tamper refusal, wrong-passphrase refusal, passphrase change, auto-lock and cross-engine unlock in real browsers | CRY, APP |
+| EV-04-11 | Server context migration (CD-22) | Unit test output | Phase 3 TOTP ciphertexts still open after the switch to the shared builder | CRY |
+| EV-04-12 | Dependency audit, secret scan and SBOM with the new dependency | `pnpm audit:deps`, `pnpm scan:secrets`, `pnpm sbom:generate` output | Supply-chain checks for LIB-03 | ISMS |
+| EV-04-13 | CI run of the Phase 4 pull request | GitHub Actions summary | All gates pass in CI, including the coverage gate | ISMS |
 
 ### Phase 5: Rooms and RBAC
 | ID | Evidence | How to capture | Demonstrates | Tags |

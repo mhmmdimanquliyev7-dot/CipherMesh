@@ -32,7 +32,7 @@ Reasons: it is native in every major browser, fully standardized, needs no compo
 ## Consequences
 - RSA key generation takes noticeable time on slow devices, once per vault; the UI shows progress.
 - Envelopes are 384 bytes each; storage cost is negligible.
-- RSA-OAEP gives no sender authentication. Anyone with a recipient's public key can create a valid envelope, including the server. Who created an envelope is known only from the authenticated API session (L-09). A server-side attacker can therefore inject key material of its own (T-36, L-23). OCD-12 decides how key versions are authenticated.
+- RSA-OAEP gives no sender authentication. Anyone with a recipient's public key can create a valid envelope, including the server. Who created an envelope is known only from the authenticated API session (L-09). Without further measures, a server-side attacker could inject key material of its own (T-36, L-23). [ADR-015](ADR-015-identity-signing-keys.md) adds a separate ECDSA signing key to every identity; key versions are signed by their creator, so RSA-OAEP itself still needs no sender authentication.
 - Phase 6 must run a cross-browser test (Chromium, Firefox, WebKit) of OAEP labels and of decrypting into HKDF keys.
 
 ## Security Implications
@@ -44,3 +44,5 @@ Reasons: it is native in every major browser, fully standardized, needs no compo
 
 ## Status
 Proposed. Becomes Accepted when the project owner approves Phase 0 and the Phase 6 cross-browser test passes. Superseded by a new ADR if HPKE or a post-quantum KEM is adopted.
+
+Phase 4 evidence (2026-10-05): the identity encryption key is RSA-OAEP-3072 with e = 65537 and SHA-256, generated in the browser; the single 32-byte wrapper in `packages/crypto` refuses any other size and requires a canonical label. It passes the 37 Wycheproof RSA-OAEP-3072 SHA-256 cases (8 of them with labels) and an OpenSSL interoperability vector, and the vault pair check (a wrap under the label `cm.vault.pair-check`) runs at every unlock in Chromium, Firefox and WebKit. What remains for acceptance is an envelope created in one engine and opened in another (Phase 6, OCD-01).

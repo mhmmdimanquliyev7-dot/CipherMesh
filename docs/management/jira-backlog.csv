@@ -572,16 +572,16 @@ CM-T017
 
 h3. Evidence required
 none"
-"1023","4","Task","CM-T023 packages/crypto foundation: WebCrypto wrappers, canonical contexts, known-answer tests","Backlog","Highest","P0","crypto","","","","M2 Identity and Access","4","High","","CM-EPIC-04","","CM-T023","CM-T006","1006","","","- Known-answer tests for AES-GCM, HKDF (RFC 5869), SHA-256, RSA-OAEP fixed vectors and RFC 8785 vectors.
+"1023","4","Task","CM-T023 packages/crypto foundation: WebCrypto wrappers, canonical contexts, known-answer tests","Backlog","Highest","P0","crypto","","","","M2 Identity and Access","4","High","","CM-EPIC-04","","CM-T023","CM-T006","1006","","","- Known-answer tests for AES-GCM, HKDF (RFC 5869), SHA-256, RSA-OAEP fixed vectors, ECDSA P-256 vectors and RFC 8785 vectors.
 - Tamper tests for every decrypt function; no production function accepts an IV.
 - Different contexts produce different bytes; decryption under a wrong context fails.
 - Runs in browsers and the Node.js test environment; coverage at least 90%.","INV-02, principle 9; the base for every later crypto feature.","*Placeholder ID:* CM-T023 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
 
 h3. Description
-Wrappers for AES-256-GCM (encrypt, decrypt, wrap, unwrap) with internally generated IVs, RSA-OAEP with labels, HKDF, SHA-256, base64url; RFC 8785 canonicalization (OCD-04); builders for every context in the cryptographic architecture; typed errors; a test-only IV seam excluded from production builds.
+Wrappers for AES-256-GCM (encrypt, decrypt, wrap, unwrap) with internally generated IVs, RSA-OAEP with labels, ECDSA P-256 signatures over canonical statements (CP-26, ADR-015), HKDF, SHA-256, base64url; RFC 8785 canonicalization (OCD-04); builders for every context in the cryptographic architecture; typed errors; a test-only IV seam excluded from production builds.
 
 h3. Acceptance criteria
-* Known-answer tests for AES-GCM, HKDF (RFC 5869), SHA-256, RSA-OAEP fixed vectors and RFC 8785 vectors.
+* Known-answer tests for AES-GCM, HKDF (RFC 5869), SHA-256, RSA-OAEP fixed vectors, ECDSA P-256 vectors and RFC 8785 vectors.
 * Tamper tests for every decrypt function; no production function accepts an IV.
 * Different contexts produce different bytes; decryption under a wrong context fails.
 * Runs in browsers and the Node.js test environment; coverage at least 90%.
@@ -615,14 +615,16 @@ CM-T023
 h3. Evidence required
 EV-04-03"
 "1025","4","Task","CM-T025 Vault setup: key-pair generation, private-key wrapping and upload","Backlog","High","P1","crypto","frontend","backend","","M2 Identity and Access","4","High","EV-04-01, EV-04-02","CM-EPIC-04","","CM-T025","CM-T024, CM-T016, CM-T086","1024","1016","1086","- A Playwright test inspects network traffic and finds neither the passphrase nor any PKCS#8 private key.
-- Parameters below the floor are rejected by the client and the API.","INV-01; T-22.","*Placeholder ID:* CM-T025 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
+- Parameters below the floor are rejected by the client and the API.
+- The API refuses an identity whose binding signature or fingerprint does not verify.","INV-01; T-22.","*Placeholder ID:* CM-T025 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
 
 h3. Description
-DF-03 end to end, with Vault Passphrase policy (CP-06) and strength feedback; API validation of key type and size, fingerprint, parameters at or above the floor, unique key ID and one ACTIVE key pair; audit {{VAULT_CREATED}}.
+DF-03 end to end, with Vault Passphrase policy (CP-06) and strength feedback. Per ADR-015 the identity is an RSA-OAEP-3072 encryption key pair and an ECDSA P-256 signing key pair under one key ID, with a binding signature and a fingerprint over both public keys; each private key is wrapped under its own HKDF-derived key (CP-27). API validation of key types and sizes, the binding signature, the fingerprint, parameters between the floor and the ceiling, unique key ID and one ACTIVE identity; audit {{VAULT_CREATED}}.
 
 h3. Acceptance criteria
 * A Playwright test inspects network traffic and finds neither the passphrase nor any PKCS#8 private key.
 * Parameters below the floor are rejected by the client and the API.
+* The API refuses an identity whose binding signature or fingerprint does not verify.
 
 h3. Security considerations
 INV-01; T-22.
@@ -633,15 +635,15 @@ CM-T024, CM-T016, CM-T086
 h3. Evidence required
 EV-04-01, EV-04-02"
 "1026","4","Task","CM-T026 Vault unlock, auto-lock and in-memory key handling","Backlog","High","P1","crypto","frontend","","","M2 Identity and Access","4","High","EV-04-04","CM-EPIC-04","","CM-T026","CM-T025","1025","","","- No key material or plaintext in localStorage, sessionStorage, IndexedDB or cookies (Playwright inspection).
-- The private key cannot be exported (test).
+- Neither private key can be exported (test).
 - Auto-lock clears keys and decrypted views.","T-23, L-15.","*Placeholder ID:* CM-T026 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
 
 h3. Description
-DF-04 including the key-pair consistency check; non-extractable private key; auto-lock after 15 minutes (CP-22), on logout, on tab close and when the session becomes invalid; generic error for a wrong passphrase.
+DF-04 including the consistency checks of both key pairs (RSA-OAEP round trip and ECDSA signature, ADR-015); non-extractable private keys; auto-lock after 15 minutes (CP-22), on logout, on tab close and when the session becomes invalid; generic error for a wrong passphrase.
 
 h3. Acceptance criteria
 * No key material or plaintext in localStorage, sessionStorage, IndexedDB or cookies (Playwright inspection).
-* The private key cannot be exported (test).
+* Neither private key can be exported (test).
 * Auto-lock clears keys and decrypted views.
 
 h3. Security considerations
@@ -656,7 +658,7 @@ EV-04-04"
 - Users can view their own fingerprint for out-of-band comparison.","T-25, T-15.","*Placeholder ID:* CM-T027 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* High
 
 h3. Description
-Exact-match, rate-limited user lookup returning ID, display name, account creation date, key ID, public key and fingerprint, with the email labelled unverified (SS-05, T-35); fingerprint display in 16 groups of 4 (CP-17); audit events and notices for key changes.
+Exact-match, rate-limited user lookup returning ID, display name, account creation date, key ID, both public keys, the binding signature and the fingerprint, with the email labelled unverified (SS-05, T-35); the browser verifies the binding signature and computes the fingerprint over both keys itself (CP-17 as revised by ADR-015); fingerprint display in 16 groups of 4; audit events and notices for key changes.
 
 h3. Acceptance criteria
 * Lookup returns no other fields and is rate-limited.
@@ -671,14 +673,16 @@ CM-T025
 h3. Evidence required
 EV-04-05"
 "1028","4","Task","CM-T028 Vault passphrase change","Backlog","Medium","P2","crypto","frontend","","","M2 Identity and Access","4","Medium","","CM-EPIC-04","","CM-T028","CM-T026","1026","","","- Same key pair after the change; the old record is replaced.
-- Old passphrase no longer unlocks the stored record.","Does not protect against an attacker who already has the old blob and old passphrase; that requires an identity reset (documented in the key lifecycle).","*Placeholder ID:* CM-T028 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* Medium
+- Old passphrase no longer unlocks the stored record.
+- An unsigned, wrongly signed, replayed or stale re-wrap is refused.","Does not protect against an attacker who already has the old blob and old passphrase; that requires an identity reset (documented in the key lifecycle).","*Placeholder ID:* CM-T028 | *Epic:* CM-EPIC-04 | *Phase:* 4 | *Release:* M2 Identity and Access | *Security impact:* Medium
 
 h3. Description
-Re-wrap the private key under a new salt and new PKWK; also re-wrap automatically when stored parameters are below the current target; audit {{VAULT_REWRAPPED}}.
+Re-wrap both private keys under a new salt and new wrapping keys. The change is signed by the identity's signing key and applied by compare-and-swap on the previous salt (ADR-015 section 3). When stored parameters are below the current target, offer the same re-wrap after unlock; it needs a step-up, so it is offered rather than automatic (ADR-010). Audit {{VAULT_REWRAPPED}}.
 
 h3. Acceptance criteria
 * Same key pair after the change; the old record is replaced.
 * Old passphrase no longer unlocks the stored record.
+* An unsigned, wrongly signed, replayed or stale re-wrap is refused.
 
 h3. Security considerations
 Does not protect against an attacker who already has the old blob and old passphrase; that requires an identity reset (documented in the key lifecycle).
@@ -764,15 +768,17 @@ h3. Evidence required
 EV-05-02, EV-05-03"
 "1033","6","Task","CM-T033 Initial room-key version with commitment and owner envelope","Backlog","High","P1","crypto","backend","frontend","","M3 Encrypted Collaboration","6","High","EV-06-01","CM-EPIC-06","","CM-T033","CM-T030, CM-T026","1030","1026","","- A room cannot be created without valid key data.
 - Request schemas contain no field that could carry raw key material.
-- E2E: create a room, lock and unlock the vault, reopen the room.","INV-04.","*Placeholder ID:* CM-T033 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+- E2E: create a room, lock and unlock the vault, reopen the room.
+- Unsigned or wrongly signed genesis and key-version statements are refused.","INV-04.","*Placeholder ID:* CM-T033 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
 
 h3. Description
-DF-05: room creation requires version 1 with commitment and the owner envelope; the API checks envelope length, that the recipient key is the caller's ACTIVE key, and commitment length; everything is stored in one transaction. The commitment is written once at activation and never changes.
+DF-05: room creation requires version 1 with commitment and the owner envelope; the API checks envelope length, that the recipient key is the caller's ACTIVE key, and commitment length; everything is stored in one transaction. The commitment is written once at activation and never changes. Per ADR-015 the creator also signs {{cm.room.genesis}} and the version-1 key-version statement (commitment and recipient list), and the API verifies both signatures under the creator's ACTIVE signing key before storing them.
 
 h3. Acceptance criteria
 * A room cannot be created without valid key data.
 * Request schemas contain no field that could carry raw key material.
 * E2E: create a room, lock and unlock the vault, reopen the room.
+* Unsigned or wrongly signed genesis and key-version statements are refused.
 
 h3. Security considerations
 INV-04.
@@ -787,7 +793,7 @@ EV-06-01"
 - Profile-specific tests for every rule; audit events.","T-25 (key substitution), T-05.","*Placeholder ID:* CM-T034 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
 
 h3. Description
-DF-06 on the inviter side: role ceiling (ADMINs invite only MEMBER or VIEWER), history rule (PC-07), fingerprint confirmation (PC-05), server-set validity (PC-06), PENDING envelopes, revocation (AZ-08), invalidation when the invitee's key changes. Invitations are rejected while the room is REKEY_REQUIRED or REKEYING.
+DF-06 on the inviter side: role ceiling (ADMINs invite only MEMBER or VIEWER), history rule (PC-07), fingerprint confirmation (PC-05), server-set validity (PC-06), PENDING envelopes, revocation (AZ-08), invalidation when the invitee's key changes. Every invitation carries a membership grant signed by the inviter, or by the OWNER for ADMIN grants ({{cm.room.membership-grant}}, ADR-015). Invitations are rejected while the room is REKEY_REQUIRED or REKEYING.
 
 h3. Acceptance criteria
 * Envelope sets are validated: the current version is required, older versions only where allowed.
@@ -825,19 +831,21 @@ EV-06-02"
 "1036","6","Task","CM-T036 Client-side room-key unwrap, commitment check and cross-browser checks","Backlog","High","P1","crypto","frontend","testing","","M3 Encrypted Collaboration","6","High","EV-06-03, EV-06-04","CM-EPIC-06","","CM-T036","CM-T033","1033","","","- A tampered envelope, or one whose key does not match the stored commitment, is rejected and reported.
 - A test documents the limit: a harness that serves a different commitment with a matching envelope passes this check; the Room Safety Code (CM-T085) covers that case.
 - The cross-browser suite passes in Chromium, Firefox and WebKit.
-- ADR-007 updated to Accepted or revised with the results.","The commitment detects inconsistent envelopes while the server is honest (T-29). Split views need the Room Safety Code. Tampering: T-07.","*Placeholder ID:* CM-T036 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
+- ADR-007 updated to Accepted or revised with the results.
+- The key-injection suite: unsigned, forged, wrongly attributed and unauthorized versions, a commitment mismatch and a missing recipient are refused; a negative control removes the verification.","The commitment detects inconsistent envelopes while the server is honest (T-29). Split views need the Room Safety Code. Tampering: T-07. Key versions created by the server are refused (T-36, ADR-015).","*Placeholder ID:* CM-T036 | *Epic:* CM-EPIC-06 | *Phase:* 6 | *Release:* M3 Encrypted Collaboration | *Security impact:* High
 
 h3. Description
-Envelope decryption, commitment check, reuse check against the previous version, RWK derivation and an in-memory cache cleared on lock; reporting of mismatches (AZ-29); Playwright cross-browser tests of OAEP labels and decryption into HKDF keys (OCD-01).
+Envelope decryption, commitment check, reuse check against the previous version, RWK derivation and an in-memory cache cleared on lock; the verification rule of ADR-015 section 4 (the creator's identity, the key-version signature, the creator's authority from the chain of signed grants back to the genesis statement, the decrypted key against the signed commitment, the client's own identity in the signed recipient list), with {{KEY_AUTHENTICATION_FAILED}} and a security alert on failure; reporting of mismatches (AZ-29); Playwright cross-browser tests of OAEP labels and decryption into HKDF keys (OCD-01).
 
 h3. Acceptance criteria
 * A tampered envelope, or one whose key does not match the stored commitment, is rejected and reported.
 * A test documents the limit: a harness that serves a different commitment with a matching envelope passes this check; the Room Safety Code (CM-T085) covers that case.
 * The cross-browser suite passes in Chromium, Firefox and WebKit.
 * ADR-007 updated to Accepted or revised with the results.
+* The {{key-injection}} suite: unsigned, forged, wrongly attributed and unauthorized versions, a commitment mismatch and a missing recipient are refused; a negative control removes the verification.
 
 h3. Security considerations
-The commitment detects inconsistent envelopes while the server is honest (T-29). Split views need the Room Safety Code. Tampering: T-07.
+The commitment detects inconsistent envelopes while the server is honest (T-29). Split views need the Room Safety Code. Tampering: T-07. Key versions created by the server are refused (T-36, ADR-015).
 
 h3. Dependencies
 CM-T033
@@ -1094,10 +1102,11 @@ EV-10-01"
 - Finalize rejects a wrong recipient set (422), a changed epoch or version, and closed or expired operations (409). A repeated identical finalize returns the original result.
 - A rekey that never finalizes is recoverable after the lease expires, and no partial key state exists.
 - After activation, writes naming the old version return KEY_VERSION_STALE, and old content stays readable.
-- Every transition emits an audit event.","T-21, T-37. Departed members never receive the new version.","*Placeholder ID:* CM-T050 | *Epic:* CM-EPIC-10 | *Phase:* 11 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
+- Every transition emits an audit event.
+- A finalize without a valid key-version signature by the starter is refused.","T-21, T-37. Departed members never receive the new version.","*Placeholder ID:* CM-T050 | *Epic:* CM-EPIC-10 | *Phase:* 11 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
 
 h3. Description
-Implement ADR-013 and key-lifecycle sections 1.2 to 1.5: room key states; rekey operations (start, finalize, cancel) with a 10-minute lease and one live operation per room; the membership-epoch snapshot and server-computed recipient set; atomic activation; idempotent finalize by payload digest; stale and closed operation handling; worker cleanup of abandoned operations; manual rotation without the write lock; the admin flow with recipient review.
+Implement ADR-013 and key-lifecycle sections 1.2 to 1.5: room key states; rekey operations (start, finalize, cancel) with a 10-minute lease and one live operation per room; the membership-epoch snapshot and server-computed recipient set; atomic activation; idempotent finalize by payload digest; stale and closed operation handling; worker cleanup of abandoned operations; manual rotation without the write lock; the admin flow with recipient review. The finalize payload carries the starter's signed key-version statement (ADR-015), which the API verifies and stores with the version.
 
 h3. Acceptance criteria
 * Only the starter can finalize; concurrent starts return {{REKEY_IN_PROGRESS}}; the OWNER can cancel.
@@ -1105,6 +1114,7 @@ h3. Acceptance criteria
 * A rekey that never finalizes is recoverable after the lease expires, and no partial key state exists.
 * After activation, writes naming the old version return {{KEY_VERSION_STALE}}, and old content stays readable.
 * Every transition emits an audit event.
+* A finalize without a valid key-version signature by the starter is refused.
 
 h3. Security considerations
 T-21, T-37. Departed members never receive the new version.
@@ -1158,7 +1168,7 @@ none"
 - The compromise path marks every affected room; runbook documented.","Key lifecycle sections 3 and 6.","*Placeholder ID:* CM-T053 | *Epic:* CM-EPIC-10 | *Phase:* 11 | *Release:* M4 Governance and Key Lifecycle | *Security impact:* High
 
 h3. Description
-Vault reset (old key SUPERSEDED, envelopes deleted), optional compromise flag that sets all of the user's rooms to REKEY_REQUIRED, re-share flow (AZ-14) with fingerprint rules, and an incident runbook.
+Vault reset (old identity with both key pairs SUPERSEDED, envelopes deleted; the Phase 4 reset already replaces the identity and revokes the other sessions), optional compromise flag that sets all of the user's rooms to REKEY_REQUIRED, re-share flow (AZ-14) with fingerprint rules, and an incident runbook.
 
 h3. Acceptance criteria
 * E2E: reset a vault, admins re-share, the user regains access as the history rule allows.

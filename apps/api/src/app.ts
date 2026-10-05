@@ -11,6 +11,7 @@ import { resolveSession } from './auth/sessions';
 import { TotpSecretBox } from './auth/totp-secret-box';
 import type { AppConfig } from './config/env';
 import { authDataAccess } from './db/auth-store';
+import { vaultDataAccess } from './db/vault-store';
 import type { Database } from './db/client';
 import { requireJsonBody } from './http/content-type';
 import { errorHandler, notFound } from './http/errors';
@@ -29,6 +30,8 @@ import {
   type RegisteredRoute,
 } from './routes/registry';
 import { createReadinessProbe, PUBLIC_ROUTE_ALLOWLIST, systemRoutes } from './routes/system';
+import { vaultRoutes } from './routes/vault';
+import { createVaultService, defaultVaultRateLimits, type VaultRateLimits, type VaultService } from './vault/service';
 
 export interface AppDependencies {
   readonly config: AppConfig;
@@ -45,6 +48,7 @@ export interface AppDependencies {
     readonly publicAllowlist?: readonly PublicRouteEntry[];
     readonly clock?: () => Date;
     readonly rateLimits?: AuthRateLimits;
+    readonly vaultRateLimits?: VaultRateLimits;
     readonly events?: SecurityEventSink;
   };
 }
@@ -54,6 +58,7 @@ export interface CipherMeshApp {
   readonly routes: readonly RegisteredRoute[];
   readonly auth: AuthService;
   readonly admin: AdminService;
+  readonly vault: VaultService;
 }
 
 /** Argon2id computations allowed at once: one per CPU, at most four (CP-05 benchmark). */
@@ -80,6 +85,14 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
     limits: testing?.rateLimits ?? defaultRateLimits(() => clock().getTime()),
   });
   const admin = createAdminService({ transaction: data.transaction, events, clock });
+  const vaultData = vaultDataAccess(database.prisma);
+  const vault = createVaultService({
+    store: vaultData.store,
+    transaction: vaultData.transaction,
+    events,
+    clock,
+    limits: testing?.vaultRateLimits ?? defaultVaultRateLimits(() => clock().getTime()),
+  });
   const authenticator: Authenticator = {
     authenticate: (token) => resolveSession(data.store, token, clock()),
     now: clock,
@@ -106,6 +119,7 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
     [
       ...systemRoutes(lifecycle, createReadinessProbe(database)),
       ...authRoutes(auth, admin),
+      ...vaultRoutes(vault),
       ...(testing?.routes ?? []),
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],
@@ -115,5 +129,5 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
 
   app.use(notFound);
   app.use(errorHandler(logger));
-  return { app, routes: registered, auth, admin };
+  return { app, routes: registered, auth, admin, vault };
 }

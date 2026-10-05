@@ -1,0 +1,141 @@
+EV-04-07: packages/crypto known-answer, invariant and fail-closed tests with coverage (CM-T023, CM-T024)
+Captured: 2026-10-05T17:11:45Z on branch feature/CM-T023-cryptographic-vault (Phase 4)
+Redaction: no passwords, passphrases, tokens or private keys appear below (test fixtures are synthetic or published vectors).
+
+$ pnpm test:coverage:crypto --reporter=verbose
+ ✓ |unit| packages/crypto/src/encoding.test.ts > base64url (RFC 4648 section 5, unpadded) > matches the RFC 4648 test vectors 4ms
+ ✓ |unit| packages/crypto/src/encoding.test.ts > base64url (RFC 4648 section 5, unpadded) > round-trips every length and agrees with Node.js 6ms
+ ✓ |unit| packages/crypto/src/encoding.test.ts > base64url (RFC 4648 section 5, unpadded) > refuses padding, other alphabets, impossible lengths and non-canonical trailing bits 1ms
+ ✓ |unit| packages/crypto/src/encoding.test.ts > base64url (RFC 4648 section 5, unpadded) > enforces an expected length 1ms
+ ✓ |unit| packages/crypto/src/encoding.test.ts > hex > encodes lower case and decodes only canonical lower case 2ms
+ ✓ |unit| packages/crypto/src/encoding.test.ts > UTF-8 > refuses lone surrogates instead of replacing them 1ms
+ ✓ |unit| packages/crypto/src/encoding.test.ts > bytesEqual > compares length and every byte 0ms
+ ✓ |unit| packages/crypto/src/canonical.test.ts > RFC 8785 section 3.2.3: sorting of object properties > orders members by UTF-16 code units, as the RFC lists 4ms
+ ✓ |unit| packages/crypto/src/canonical.test.ts > RFC 8785 sections 3.2.2 to 3.2.4: string serialization and UTF-8 bytes > reproduces the RFC bytes for the subset 1ms
+ ✓ |unit| packages/crypto/src/canonical.test.ts > RFC 8785 sections 3.2.2 to 3.2.4: string serialization and UTF-8 bytes > refuses the full sample, because it contains floating-point numbers 1ms
+ ✓ |unit| packages/crypto/src/canonical.test.ts > RFC 8785 Appendix B: numbers within the safe-integer subset > serializes zero, minus zero and the largest safe integers 0ms
+ ✓ |unit| packages/crypto/src/canonical.test.ts > RFC 8785 Appendix B: numbers within the safe-integer subset > refuses values outside the subset instead of rounding them 1ms
+ ✓ |unit| packages/crypto/src/canonical.test.ts > canonicalize: everything outside CP-15 is refused, nothing is dropped > refuses undefined members, lone surrogates, non-plain objects and cycles 1ms
+ ✓ |unit| packages/crypto/src/canonical.test.ts > canonicalize: everything outside CP-15 is refused, nothing is dropped > sorts nested objects and keeps array order 0ms
+ ✓ |unit| packages/crypto/src/canonical.test.ts > CD-22: the server TOTP context keeps its bytes > contextBytes reproduces the Phase 3 context exactly 1ms
+ ✓ |unit| packages/crypto/src/contexts.test.ts > canonical contexts (CP-15, cryptographic-architecture section 8) > matches the documented example byte for byte 3ms
+ ✓ |unit| packages/crypto/src/contexts.test.ts > canonical contexts (CP-15, cryptographic-architecture section 8) > builds every context in the table with ctx and v first in canonical order 4ms
+ ✓ |unit| packages/crypto/src/contexts.test.ts > canonical contexts (CP-15, cryptographic-architecture section 8) > gives every context distinct bytes, even for the same field values (domain separation) 2ms
+ ✓ |unit| packages/crypto/src/contexts.test.ts > canonical contexts (CP-15, cryptographic-architecture section 8) > changes when any single field changes 1ms
+ ✓ |unit| packages/crypto/src/contexts.test.ts > canonical contexts (CP-15, cryptographic-architecture section 8) > refuses missing, extra and malformed fields and unknown contexts 2ms
+ ✓ |unit| packages/crypto/src/contexts.test.ts > canonical contexts (CP-15, cryptographic-architecture section 8) > a UUID that is not version 4 is refused (identifiers in contexts are UUIDv4, CD-08) 0ms
+ ✓ |unit| packages/crypto/src/argon2id-no-simd.test.ts > non-SIMD WebAssembly build (LIB-03) > is used when SIMD is refused and reproduces the RFC 9106 Argon2id test vector 23ms
+ ✓ |unit| packages/crypto/src/passphrase.test.ts > Vault Passphrase policy (CP-06) > accepts long passphrases of words, spaces and any script 5ms
+ ✓ |unit| packages/crypto/src/passphrase.test.ts > Vault Passphrase policy (CP-06) > counts Unicode code points after NFKC and never truncates 1ms
+ ✓ |unit| packages/crypto/src/passphrase.test.ts > Vault Passphrase policy (CP-06) > refuses lone surrogates 0ms
+ ✓ |unit| packages/crypto/src/passphrase.test.ts > Vault Passphrase policy (CP-06) > refuses breached passwords of 16 or more characters, in any case 0ms
+ ✓ |unit| packages/crypto/src/passphrase.test.ts > Vault Passphrase policy (CP-06) > refuses passphrases built from the account identity or the product name 0ms
+ ✓ |unit| packages/crypto/src/passphrase.test.ts > Vault Passphrase policy (CP-06) > keeps whitespace exactly as typed 0ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > SHA-256 (FIPS 180-2 examples) > matches the published digests 6ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > HKDF-SHA-256 (RFC 5869 appendix A) > test case 1 3ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > HKDF-SHA-256 (RFC 5869 appendix A) > test case 2 (long inputs and output) 1ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > HKDF-SHA-256 (RFC 5869 appendix A) > test case 3: an empty salt equals the 32 zero bytes CipherMesh uses (CP-03) 1ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > HKDF-SHA-256 (RFC 5869 appendix A) > production derivation = HKDF(ikm, 32 zero bytes, canonical context), and contexts separate keys 6ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > HKDF-SHA-256 (RFC 5869 appendix A) > importKeyMaterial wipes the input buffer and accepts only 32 bytes 1ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM (GCM specification test cases 13 to 16) > TC13: encrypts and decrypts to the published values 10ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM (GCM specification test cases 13 to 16) > TC14: encrypts and decrypts to the published values 7ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM (GCM specification test cases 13 to 16) > TC15: encrypts and decrypts to the published values 4ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM (GCM specification test cases 13 to 16) > TC16: encrypts and decrypts to the published values 3ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM (GCM specification test cases 13 to 16) > TC16 tampering: each modified part fails authentication and returns no plaintext 6ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM wrapper: internal IVs, mandatory contexts, fail closed (INV-02) > accepts no IV parameter: encrypt takes exactly key, plaintext and context 0ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > identity fingerprint (CP-17 revised by ADR-015) > is SHA-256 of the canonical statement over both public keys (independent computation) 18ms
+ ✓ |unit| packages/crypto/src/boundary.test.ts > @ciphermesh/crypto export surface > exports exactly the reviewed browser API 5ms
+ ✓ |unit| packages/crypto/src/boundary.test.ts > @ciphermesh/crypto export surface > the server subset has no key generation, KDF or worker code 2ms
+ ✓ |unit| packages/crypto/src/boundary.test.ts > @ciphermesh/crypto export surface > contexts are reachable only through the builder 0ms
+ ✓ |unit| packages/crypto/src/boundary.test.ts > @ciphermesh/crypto export surface > never exports the known-answer-test seam 1ms
+ ✓ |unit| packages/crypto/src/boundary.test.ts > @ciphermesh/crypto export surface > only the reviewed modules use the low-level seam, and only with the reviewed functions 9ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > platform cryptography missing (secure context required) > WebCrypto without subtle, or without a CSPRNG, gives CRYPTO_UNAVAILABLE 9ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > platform cryptography missing (secure context required) > randomUUID missing gives CRYPTO_UNAVAILABLE, never a home-made UUID 1ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > platform cryptography missing (secure context required) > randomBytes refuses lengths outside 1 to 65,536 4ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > platform cryptography missing (secure context required) > guarded() replaces library errors by its fixed code but keeps CipherMesh errors 1ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > Argon2id WebAssembly unavailable > no WebAssembly gives CRYPTO_UNAVAILABLE 1ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > Argon2id WebAssembly unavailable > a CSP without 'wasm-unsafe-eval' (compilation refused) gives CRYPTO_UNAVAILABLE 5ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > Argon2id WebAssembly unavailable > the in-process runner wipes the password and keeps CRYPTO_UNAVAILABLE 2ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > Argon2id WebAssembly unavailable > the in-process runner reports any other library failure as KDF_FAILED 8ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > ECDSA known answers > Wycheproof: every valid signature verifies and every invalid one is rejected 63ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > ECDSA known answers > RFC 6979 A.2.5: the published P-256 / SHA-256 signatures verify 4ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > statement signatures > sign and verify round trip; 64-byte P1363 signatures 4ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > statement signatures > rejects a modified statement, a modified signature, another key and wrong lengths 4ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > statement signatures > never signs, and never accepts, an empty statement 1ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > statement signatures > interoperates with OpenSSL in both directions 8ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > importSigningPublicKey: only uncompressed P-256 in canonical DER > rejects other curves, compressed points, points off the curve, RSA keys and garbage 83ms
+ ✓ |unit| packages/crypto/src/kdf-worker.test.ts > Argon2id worker script > derives, transfers only the 32-byte result, wipes the passphrase bytes and closes 291ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > vault key derivation input checks > lengths are enforced by CipherMesh, because the library does not check them 132ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > vault key derivation input checks > refuses a salt that is not 16 bytes before any work 1ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > worker runner (page side of the KDF worker boundary) > starts a module worker, transfers the passphrase bytes and wipes its own copy 10ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > worker runner (page side of the KDF worker boundary) > a malformed or failed answer, a worker error and an undeliverable message give KDF_FAILED 4ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > worker runner (page side of the KDF worker boundary) > a derivation that never answers is stopped after 120 seconds 7ms
+ ✓ |unit| packages/crypto/src/fail-closed.test.ts > worker runner (page side of the KDF worker boundary) > a worker that cannot be created, or a page without WebAssembly, gives CRYPTO_UNAVAILABLE 1ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP known answers (Wycheproof rsa_oaep_3072_sha256_mgf1sha256) > decrypts every valid vector to its message and rejects every invalid one 172ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP known answers (Wycheproof rsa_oaep_3072_sha256_mgf1sha256) > unwrap32 recovers the OpenSSL-encrypted 32-byte value with the canonical pair-check label 9ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP wrapper (INV-17: 32-byte values only, label always a canonical context) > interoperates with OpenSSL in both directions 15ms
+ ✓ |unit| packages/crypto/src/kdf-worker.test.ts > Argon2id worker script > answers a malformed request with a bare failure flag and closes 13ms
+ ✓ |unit| packages/crypto/src/kdf-worker.test.ts > Argon2id worker script > accepts exactly one message and ignores any later one 2ms
+ ✓ |unit| packages/crypto/src/kdf-worker.test.ts > Argon2id worker script > reports a bare failure, not an error text, when Argon2id cannot run, and still wipes the passphrase 63ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP wrapper (INV-17: 32-byte values only, label always a canonical context) > refuses anything but exactly 32 bytes (no RSA encryption of content) 115ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > identity fingerprint (CP-17 revised by ADR-015) > changes when either key changes and is shown as 16 groups of 4 422ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP wrapper (INV-17: 32-byte values only, label always a canonical context) > rejects a wrong label, a modified ciphertext, a wrong size and a valid OAEP value of 31 bytes 108ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > fingerprint display > formats only well-formed fingerprints 1ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > importEncryptionPublicKey: only RSA-3072 with e = 65537 in canonical DER > accepts the vector key and generated keys 290ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > embedded WebAssembly (supply chain, LIB-03) > equals the files of the installed, lockfile-pinned argon2id package byte for byte 10ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > Argon2id known answers > reproduces the RFC 9106 section 5.3 Argon2id test vector 24ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > Argon2id known answers > matches OpenSSL (Node.js crypto.argon2) at the floor and at the production target 727ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > generateIdentity and verifyPublicIdentity > produces an identity that the same verification as the API accepts 352ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > importEncryptionPublicKey: only RSA-3072 with e = 65537 in canonical DER > rejects RSA-2048, a 3072-bit key with another exponent, garbage and an EC key 189ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > vault key derivation: limits, concurrency and fail-closed behaviour > refuses parameters below the floor or above the ceiling before doing any work 1ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > vault key derivation: limits, concurrency and fail-closed behaviour > runs one derivation at a time and refuses a second one while busy 3ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > vault key derivation: limits, concurrency and fail-closed behaviour > wipes the passphrase bytes it handed to the runner and rejects outputs of the wrong size 0ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > vault key derivation: limits, concurrency and fail-closed behaviour > the derived root key is a non-extractable HKDF key 66ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > vault key derivation: limits, concurrency and fail-closed behaviour > fails closed where Web Workers do not exist (no main-thread or weaker fallback) 1ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > worker message protocol (trust boundary inside the client) > accepts exactly one well-formed request shape 1ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > worker message protocol (trust boundary inside the client) > accepts only a 32-byte result 3ms
+ ✓ |unit| packages/crypto/src/argon2id.test.ts > parameter comparisons (upgrade offer and re-wrap downgrade check) > compare memory and passes separately 0ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > generateIdentity and verifyPublicIdentity > rejects any modified field 51ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault setup (DF-03, CM-T025) > uploads only public keys, ciphertext and non-secret KDF metadata 461ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > generateIdentity and verifyPublicIdentity > refuses another identity's keys under a different account (key copy, ADR-015 section 2) 61ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > generateIdentity and verifyPublicIdentity > refuses a substituted encryption key even with a matching recomputed fingerprint 251ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM wrapper: internal IVs, mandatory contexts, fail closed (INV-02) > generates a fresh 96-bit IV for every encryption (10,000 encryptions, no repeat) 1466ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM wrapper: internal IVs, mandatory contexts, fail closed (INV-02) > decrypts its own output only under the same context 2ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM wrapper: internal IVs, mandatory contexts, fail closed (INV-02) > a wrapped private key opens only with the same wrapping key and the same context (AAD binding) 12ms
+ ✓ |unit| packages/crypto/src/primitives.test.ts > AES-256-GCM wrapper: internal IVs, mandatory contexts, fail closed (INV-02) > refuses an empty context and malformed sealed values 1ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault setup (DF-03, CM-T025) > completes into non-extractable private keys with only their own usages 331ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault setup (DF-03, CM-T025) > completion refuses a record the server changed to another identity 316ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault setup (DF-03, CM-T025) > refuses a passphrase that fails the policy, before any derivation 0ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault setup (DF-03, CM-T025) > two vaults never share a salt, an IV, a key ID or a fingerprint 628ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault unlock (DF-04, CM-T026) > unlocks with the right passphrase, typed in any Unicode normalization form (CD-15) 1162ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault unlock (DF-04, CM-T026) > a wrong passphrase gives the generic VAULT_UNLOCK_FAILED 423ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault unlock (DF-04, CM-T026) > any modified byte of a wrapped key, its IV or its tag gives the same generic failure 2227ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault unlock (DF-04, CM-T026) > swapping the two wrapped keys fails: each key is bound to its purpose (AAD and HKDF info) 437ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault unlock (DF-04, CM-T026) > a changed salt or changed parameters derive another key and fail 1034ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault unlock (DF-04, CM-T026) > a server that substitutes another valid public identity cannot get the vault opened 1742ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault unlock (DF-04, CM-T026) > an invalid public identity or another user's record is refused before any derivation 8ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault unlock (DF-04, CM-T026) > refuses a second derivation while one is running 454ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault format (version 1): structural refusals before derivation > refuses unknown versions and suites (no downgrade) and foreign KDFs 3ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault format (version 1): structural refusals before derivation > refuses parameters below the floor or above the ceiling 2ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > vault format (version 1): structural refusals before derivation > refuses malformed sizes and encodings 4ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > passphrase change and signed re-wrap (CM-T028, ADR-015 section 3) > keeps the identity, replaces salt and ciphertext, and only the new passphrase opens the result 1773ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > passphrase change and signed re-wrap (CM-T028, ADR-015 section 3) > the signature covers every field, and the server can verify it with the stored public key 915ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > passphrase change and signed re-wrap (CM-T028, ADR-015 section 3) > a wrong current passphrase produces no request 472ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > passphrase change and signed re-wrap (CM-T028, ADR-015 section 3) > a new passphrase that fails the policy is refused before any derivation 1ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > parameter upgrade (ADR-010) > re-wraps a floor-parameter vault under the target with the same passphrase 2255ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > defence in depth inside unlock and re-wrap > the pair checks refuse private keys of another identity even when every AAD matches 3164ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > defence in depth inside unlock and re-wrap > an in-memory record with another format version or out-of-range parameters is refused without deriving 3ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > defence in depth inside unlock and re-wrap > environment failures pass through unchanged, so a broken browser is not reported as a wrong passphrase 10ms
+ ✓ |unit| packages/crypto/src/vault.test.ts > defence in depth inside unlock and re-wrap > completing a re-wrap refuses a stored record of another identity 1300ms
+ Test Files  14 passed (14)
+      Tests  124 passed (124)
+   Duration  20.44s (tests 86%, transform 8%, import 4%, worker 2%)
+ % Coverage report from v8
+Statements   : 99.51% ( 618/621 )
+Branches     : 91.76% ( 323/352 )
+Functions    : 100% ( 166/166 )
+Lines        : 99.62% ( 527/529 )
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+
+Files below 100% are listed in the table; fully covered files are omitted by the reporter. The uncovered branches are
+?? 0 defaults required by noUncheckedIndexedAccess on typed-array reads and checks on WebCrypto's own output.

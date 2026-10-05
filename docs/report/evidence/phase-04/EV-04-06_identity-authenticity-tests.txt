@@ -1,0 +1,31 @@
+EV-04-06: OCD-12 decision and identity authenticity tests (ADR-015, CM-T086)
+Captured: 2026-10-05T17:11:12Z on branch feature/CM-T023-cryptographic-vault (Phase 4)
+Redaction: no passwords, passphrases, tokens or private keys appear below (test fixtures are synthetic).
+
+Decision: docs/architecture/adr/ADR-015-identity-signing-keys.md, status Accepted (2026-10-05, by the project owner,
+before the Phase 4 identity code was written). The tests below confirm sections 1 to 3; section 4 is tested in Phases 6 and 11.
+
+$ vitest run packages/crypto/src/identity.test.ts packages/crypto/src/signing.test.ts tests/vault/rewrap.test.ts --reporter=verbose
+ ✓ |unit| packages/crypto/src/signing.test.ts > ECDSA known answers > Wycheproof: every valid signature verifies and every invalid one is rejected 28ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > ECDSA known answers > RFC 6979 A.2.5: the published P-256 / SHA-256 signatures verify 1ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > statement signatures > sign and verify round trip; 64-byte P1363 signatures 2ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > statement signatures > rejects a modified statement, a modified signature, another key and wrong lengths 2ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > statement signatures > never signs, and never accepts, an empty statement 1ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > statement signatures > interoperates with OpenSSL in both directions 4ms
+ ✓ |unit| packages/crypto/src/signing.test.ts > importSigningPublicKey: only uncompressed P-256 in canonical DER > rejects other curves, compressed points, points off the curve, RSA keys and garbage 44ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > identity fingerprint (CP-17 revised by ADR-015) > is SHA-256 of the canonical statement over both public keys (independent computation) 6ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > identity fingerprint (CP-17 revised by ADR-015) > changes when either key changes and is shown as 16 groups of 4 415ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > fingerprint display > formats only well-formed fingerprints 1ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > generateIdentity and verifyPublicIdentity > produces an identity that the same verification as the API accepts 202ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > generateIdentity and verifyPublicIdentity > rejects any modified field 286ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > generateIdentity and verifyPublicIdentity > refuses another identity's keys under a different account (key copy, ADR-015 section 2) 161ms
+ ✓ |unit| packages/crypto/src/identity.test.ts > generateIdentity and verifyPublicIdentity > refuses a substituted encryption key even with a matching recomputed fingerprint 155ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > keeps the identity, replaces salt and ciphertexts; only the new passphrase opens the vault 2575ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > requires a recent step-up 2766ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > refuses a request that was modified after signing, or signed by another identity 4236ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > a replayed or stale request is refused, so an old change can never be applied again 2070ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > refuses weaker parameters and a reused salt before checking the signature 2291ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > upgrades the parameters of a vault with the same passphrase (ADR-010) 2486ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > a user without a vault gets 404 2627ms
+ Test Files  3 passed (3)
+      Tests  21 passed (21)

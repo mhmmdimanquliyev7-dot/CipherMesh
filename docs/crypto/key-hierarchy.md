@@ -1,8 +1,8 @@
 # Key Hierarchy
 
-Status: Phase 0.5 baseline. Normative. Parameters: [crypto-decisions.md](crypto-decisions.md). Mechanisms: [cryptographic-architecture.md](cryptographic-architecture.md). Lifecycle: [key-lifecycle.md](key-lifecycle.md).
+Status: Phase 0.5 baseline, updated in Phase 4 (identity signing key, ADR-015; one wrapping key per private key, CP-27). Normative. Parameters: [crypto-decisions.md](crypto-decisions.md). Mechanisms: [cryptographic-architecture.md](cryptographic-architecture.md). Lifecycle: [key-lifecycle.md](key-lifecycle.md).
 
-In the diagrams, an arrow from A to B means "A protects or derives B".
+In the diagrams, a solid arrow from A to B means "A protects or derives B". A dotted arrow means "A authenticates B" (a signature); it adds no confidentiality.
 
 ## 1. Client-side hierarchy (room content)
 
@@ -10,17 +10,23 @@ In the diagrams, an arrow from A to B means "A protects or derives B".
 flowchart TD
   VP(["Vault Passphrase<br/>user memory only"])
   VRK["VRK<br/>Argon2id output<br/>ephemeral"]
-  PKWK["PKWK<br/>HKDF-derived AES-256-GCM<br/>ephemeral"]
-  KP["User key pair<br/>RSA-OAEP-3072<br/>private half stored only wrapped"]
-  VP -->|"Argon2id, per-vault salt"| VRK
-  VRK -->|"HKDF ctx vault.pk-wrap"| PKWK
-  PKWK -->|"AES-256-GCM wrap of private half"| KP
+  PKWKE["PKWK_encryption<br/>HKDF-derived AES-256-GCM<br/>ephemeral"]
+  PKWKS["PKWK_signing<br/>HKDF-derived AES-256-GCM<br/>ephemeral"]
+  KP["User encryption key pair<br/>RSA-OAEP-3072<br/>private half stored only wrapped"]
+  SK["User signing key pair<br/>ECDSA P-256 (ADR-015)<br/>private half stored only wrapped"]
+  VP -->|"Argon2id, per-write salt"| VRK
+  VRK -->|"HKDF ctx vault.pk-wrap<br/>purpose encryption"| PKWKE
+  VRK -->|"HKDF ctx vault.pk-wrap<br/>purpose signing"| PKWKS
+  PKWKE -->|"AES-256-GCM wrap of private half"| KP
+  PKWKS -->|"AES-256-GCM wrap of private half"| SK
+  SK -.->|"binding signature over both public keys"| KP
 
   RKM["RKM_v<br/>32 random bytes per room key version"]
   RWK["RWK_v<br/>HKDF-derived AES-256-GCM"]
   RKC["RKC_v<br/>HKDF-derived commitment<br/>public, stored once per version"]
   RSC["RSC_v Room Safety Code<br/>HKDF-derived, shown to members<br/>never sent or stored"]
   KP -->|"RSA-OAEP envelope per member key"| RKM
+  SK -.->|"key-version statement with RKC_v<br/>(signed by its creator, Phase 6)"| RKC
   RKM -->|"HKDF ctx room.dek-wrap-key"| RWK
   RKM -->|"HKDF ctx room.commitment"| RKC
   RKM -->|"HKDF ctx room.safety-code"| RSC
@@ -40,7 +46,7 @@ flowchart TD
   SEK -->|"AES-256-GCM"| SC
 ```
 
-Every content item follows the same envelope pattern: its own data key, AES-256-GCM, and then a key wrap chosen by the audience. RSA-OAEP only ever wraps 32-byte keys: room key material and SEKs (INV-17).
+Every content item follows the same envelope pattern: its own data key, AES-256-GCM, and then a key wrap chosen by the audience. RSA-OAEP only ever wraps 32-byte keys: room key material, SEKs and the vault pair-check value (INV-17). The signing key never encrypts or wraps anything; it only signs canonical statements (CP-26).
 
 ## 2. Server-side keys (separate domain)
 
@@ -60,9 +66,10 @@ flowchart LR
 |---|---|---|---|---|---|---|
 | Vault Passphrase | Secret string | User | User memory | Never | Until changed | Not applicable |
 | VRK | 256-bit Argon2id output | Browser Web Worker | Derived | Never | Seconds | Immediately after deriving PKWK |
-| PKWK | AES-256-GCM, non-extractable | Browser (HKDF) | Derived | Never | Duration of unlock or wrap | After use |
-| User private key | RSA-OAEP-3072 | Browser at vault setup | PKWK (AES-256-GCM) | PostgreSQL as ciphertext; memory while unlocked | Until identity reset | Ciphertext set to NULL on reset or account deletion |
-| User public key | RSA-OAEP-3072 SPKI | Browser | Public | PostgreSQL | Same as private key | Kept for audit |
+| PKWK_encryption, PKWK_signing | AES-256-GCM, non-extractable, one per private key | Browser (HKDF) | Derived | Never | Duration of unlock or wrap | After use |
+| User encryption private key | RSA-OAEP-3072 | Browser at vault setup | PKWK_encryption (AES-256-GCM) | PostgreSQL as ciphertext; memory while unlocked | Until identity reset | Ciphertext set to NULL on reset or account deletion |
+| User signing private key | ECDSA P-256 | Browser at vault setup, with the encryption key | PKWK_signing (AES-256-GCM) | PostgreSQL as ciphertext; memory while unlocked | Same as the encryption key | Same as the encryption key |
+| User public keys, binding signature, fingerprint | SPKIs (422 and 91 bytes), ECDSA signature, SHA-256 hex | Browser | Public; verified by every client and by the API | PostgreSQL | Same as the private keys | Kept, so earlier signatures stay verifiable |
 | RKM_v | 256 random bits | Browser of the room creator or the rekeying OWNER or ADMIN | Member key pairs (RSA-OAEP envelopes) | PostgreSQL as envelopes only | While version v is ACTIVE or RETIRED | Envelopes deleted when the version is destroyed, or per member when that member leaves the room |
 | RWK_v | AES-256-GCM, non-extractable | Each member's browser (HKDF) | Derived | Never | In memory while the vault is unlocked | On vault lock |
 | RKC_v | 256-bit commitment | Browser (HKDF) | Public value | PostgreSQL in clear, immutable | With version v | Kept |
@@ -81,12 +88,13 @@ flowchart LR
 
 The protection relation forms a directed acyclic graph:
 
-1. Vault Passphrase -> VRK -> PKWK -> user private key.
+1. Vault Passphrase -> VRK -> PKWK_encryption -> encryption private key, and VRK -> PKWK_signing -> signing private key.
 2. User key pair -> RKM_v (envelopes) and user key pair -> SEK (wrapped SEKs).
 3. RKM_v -> RWK_v, RKM_v -> RKC_v and RKM_v -> RSC_v. RKC_v and RSC_v are leaves: they protect nothing.
 4. RWK_v -> FEK and NEK.
 5. FEK, NEK and SEK -> content.
 6. Server keys protect only server-side secrets and have no edges into or out of the client hierarchy.
+7. Signatures (dotted arrows) authenticate statements and protect nothing, so they add no edge to this graph.
 
 No key protects one of its ancestors. Room keys never protect user keys, content keys never protect other keys, and no stored secret is needed to recover the key that protects it. Two practical consequences:
 
@@ -99,13 +107,14 @@ No key protects one of its ancestors. Room keys never protect user keys, content
 |---|---|---|---|
 | One DEK | Read that one item version, given its ciphertext | Read any other item | Delete the item |
 | RKM_v or RWK_v | Read every item wrapped under version v, given ciphertext access | Read other versions or other rooms | Rekey; consider re-encryption (OCD-07) |
-| A user private key | Unwrap every RKM version wrapped to that key and every SEK sent to it, given envelope access | Read rooms the user never joined | Identity reset, then a rekey of every room of the user |
+| A user's encryption private key | Unwrap every RKM version wrapped to that key and every SEK sent to it, given envelope access | Read rooms the user never joined | Identity reset, then a rekey of every room of the user |
+| A user's signing private key | Sign statements as that user: re-wraps of that user's vault and, from Phase 6, membership grants and key versions within that user's role | Decrypt anything | Identity reset (CM-T053, R5) |
 | The Vault Passphrase only | Nothing without the encrypted private key | | Change the passphrase |
 | The Vault Passphrase and the database | Everything a private-key compromise gives | | As for a private key |
 | A displayed Room Safety Code | Nothing: it is derived one-way and is designed to be read aloud | Recover or narrow down RKM_v | None needed |
-| The auth password | Log in unless MFA is enabled; see metadata and ciphertext; perform non-cryptographic actions | Decrypt anything, because the vault stays locked | Reset the password, revoke sessions |
-| A session token | Act as the user within that session for non-cryptographic actions | Decrypt, because unlocking needs the Vault Passphrase | Revoke the session |
+| The auth password | Log in unless MFA is enabled; see metadata and ciphertext; perform non-cryptographic actions. With a strict step-up it can reset the vault, which destroys the victim's identity (availability) and shows a new fingerprint | Decrypt anything, because the vault stays locked; replace the wrapped keys of the existing identity, because re-wraps must be signed by it | Reset the password, revoke sessions, reset the vault again and re-verify fingerprints |
+| A session token | Act as the user within that session for non-cryptographic actions; download the user's encrypted vault record and guess the passphrase offline (L-39) | Decrypt, because unlocking needs the Vault Passphrase; change or reset the vault without a fresh step-up | Revoke the session; change the passphrase if it may be weak |
 | TOTP_ENCRYPTION_KEY and the database | Recover TOTP secrets and bypass MFA where the password is also known | Decrypt content | Rotate the key, force MFA re-enrollment |
 | Audit signing key | Sign forged checkpoints | Change checkpoints already in the retention-locked bucket or the external witness copies | Revoke and rotate the key, publish the new public key, investigate (ADR-009 section 8) |
 | TLS private key plus a network position | Impersonate the server and deliver malicious JavaScript (L-02) | Decrypt stored content directly | Revoke and reissue the certificate |
-| Write access to the database or control of API responses | Distribute a room-key version it knows to every member (T-36) | Read content encrypted before that version | Open decision OCD-12; treat as a server compromise |
+| Write access to the database or control of API responses | Until Phase 6: nothing room-related, because no rooms exist. From Phase 6: substitute identities that users do not verify (T-25), withhold data (T-32) | From Phase 6: distribute a room-key version of its own, because clients require a valid signature by an authorized member (ADR-015, T-36); open any vault | Treat as a server compromise |

@@ -1,0 +1,12 @@
+EV-04-11: Server TOTP context migrated to the shared canonical builder (CD-22, CM-T023)
+Captured: 2026-10-05T17:13:04Z on branch feature/CM-T023-cryptographic-vault (Phase 4)
+The fixture is a ciphertext sealed by the Phase 3 code with a synthetic key (32 bytes of 0x42) and the RFC 6238
+test secret; opening it with the Phase 4 code proves that the AAD bytes are identical. No real secret is involved.
+
+$ vitest run apps/api/src/auth/primitives.test.ts --reporter=verbose (TOTP secret box cases)
+ ✓ |unit| apps/api/src/auth/primitives.test.ts > TOTP secret encryption at rest (CP-11) > round-trips and produces IV || ciphertext || tag (48 bytes for a 160-bit secret) 2ms
+ ✓ |unit| apps/api/src/auth/primitives.test.ts > TOTP secret encryption at rest (CP-11) > fails closed for another user, another key ID, a flipped bit or another key 1ms
+ ✓ |unit| apps/api/src/auth/primitives.test.ts > TOTP secret encryption at rest (CP-11) > opens a secret sealed by the Phase 3 code: the CD-22 context migration kept the AAD bytes 0ms
+ ✓ |unit| apps/api/src/auth/primitives.test.ts > TOTP secret encryption at rest (CP-11) > refuses a user ID that is not a UUIDv4 instead of building an ambiguous context 0ms
+ Test Files  1 passed (1)
+      Tests  15 passed (15)

@@ -1,8 +1,8 @@
 # Authentication Security (Phase 3)
 
-Status: implemented in Phase 3 (CM-T015 to CM-T022), awaiting project owner approval. This document describes what was built and how it is tested. The normative designs are [session-and-csrf.md](session-and-csrf.md), [ADR-008](../architecture/adr/ADR-008-server-side-sessions.md), [../architecture/data-flow.md](../architecture/data-flow.md) DF-01 and DF-02, and the parameter register CP-05 to CP-12 in [../crypto/crypto-decisions.md](../crypto/crypto-decisions.md).
+Status: implemented in Phase 3 (CM-T015 to CM-T022); section 16 records how Phase 4 builds on it. This document describes what was built and how it is tested. The normative designs are [session-and-csrf.md](session-and-csrf.md), [ADR-008](../architecture/adr/ADR-008-server-side-sessions.md), [../architecture/data-flow.md](../architecture/data-flow.md) DF-01 and DF-02, and the parameter register CP-05 to CP-12 in [../crypto/crypto-decisions.md](../crypto/crypto-decisions.md).
 
-**Scope boundary.** This is account authentication: the account password proves identity to the server. The Vault Passphrase, which protects the user's private key in the browser, is a different secret in a different trust domain (CD-01). Nothing in this phase derives keys from the account password, generates key pairs or touches the vault (Phase 4).
+**Scope boundary.** This is account authentication: the account password proves identity to the server. The Vault Passphrase, which protects the user's private key in the browser, is a different secret in a different trust domain (CD-01). Nothing in this phase derives keys from the account password, generates key pairs or touches the vault. Phase 4 built the vault on top of these controls without changing that separation (section 16).
 
 ## 1. Components
 
@@ -99,7 +99,7 @@ flowchart TD
 1. `POST /mfa/totp/enroll`: the server generates a 160-bit secret with the CSPRNG, encrypts it (CP-11) and stores it as pending (`mfa_enabled = false`). The response carries the otpauth URI and the base32 secret, shown once (QR code rendered as SVG elements, no image request, nothing stored by the client). Refused with 409 if MFA is already on.
 2. `POST /mfa/totp/confirm`: a valid code proves the authenticator holds the secret. Only then is MFA enabled; ten recovery codes are issued and returned once; the session rotates and records `mfaVerifiedAt`; other sessions are revoked.
 
-**Secret at rest (CP-11).** AES-256-GCM under `TOTP_ENCRYPTION_KEY` (32 bytes, outside the database), fresh 96-bit IV, AAD = canonical context `{"ctx":"cm.srv.totp","keyId":…,"userId":…,"v":1}`. Stored as IV, ciphertext and tag (48 bytes). A ciphertext moved to another user, a wrong key ID or any flipped bit fails closed (tested). This is a server-readable secret by design: the server must verify codes. It has nothing to do with the user's vault.
+**Secret at rest (CP-11).** AES-256-GCM under `TOTP_ENCRYPTION_KEY` (32 bytes, outside the database), fresh 96-bit IV, AAD = canonical context `{"ctx":"cm.srv.totp","keyId":…,"userId":…,"v":1}`. Since Phase 4 the context is built by the shared RFC 8785 builder in `@ciphermesh/crypto/contexts`; a unit test opens a ciphertext sealed by the Phase 3 code, so stored secrets stay readable (CD-22). Stored as IV, ciphertext and tag (48 bytes). A ciphertext moved to another user, a wrong key ID or any flipped bit fails closed (tested). This is a server-readable secret by design: the server must verify codes. It has nothing to do with the user's vault.
 
 **Verification (CP-09, LIB-06).** RFC 6238 with HMAC-SHA-1, 6 digits, 30-second steps, and a window of one step either way (about 90 seconds). The library compares codes in constant time. Each accepted time step is stored per account (`mfa_last_used_step`) with a conditional update, so a code is never accepted twice, even concurrently. The server clock must be NTP-synchronized.
 
@@ -188,3 +188,12 @@ The session and pre-authentication cookies are HttpOnly, so page scripts never s
 | `tests/auth/step-up`, `tests/auth/admin`, `tests/auth/logging` | Gates and rotation, forged claims, limits; administrator bootstrap and disabling; log and event secrecy |
 | `tests/e2e/auth.spec.ts` | Cookies, browser storage, real Origin, MFA enrollment and recovery login in three engines |
 | `pnpm security:negative-controls` | Ten deliberate defects, each caught by the suites above |
+
+## 16. Phase 4 additions
+
+- **Step-up use.** The vault routes use the step-up gates of section 8: the standard window for vault setup, passphrase change and parameter upgrade, the strict window (5 minutes) for a vault reset. The step-up proves the Account Password and the MFA code; it never asks for, receives or checks the Vault Passphrase.
+- **Sessions.** A vault reset revokes the user's other sessions (reason `VAULT_RESET`) and rotates the current one ([session-and-csrf.md](session-and-csrf.md) section 12).
+- **Security events.** The catalogue gained `VAULT_CREATED`, `VAULT_REWRAPPED`, `VAULT_RESET`, `VAULT_REJECTED` (reason codes FORMAT, IDENTITY and SIGNATURE) and `DIRECTORY_LOOKUP_THROTTLED`, with key IDs and counts only. They use the same sink, so L-33 applies to them as well.
+- **Redaction.** The redaction list gained the vault field names (`vaultPassword`, `vaultKey`, `vaultRootKey`, `vrk`, `kek`, `keyEncryptionKey`, `pkwk`, `privateKeyPkcs8`, `pkcs8` and any key ending in `pkcs8`, `decryptedPrivateKey`, `vaultPlaintext`, `vaultCiphertext`, `vaultBlob`, the wrapped-key fields). `tests/vault/leakage.test.ts` runs every vault flow and then searches the whole log and all events for every passphrase, ciphertext, IV and salt used.
+- **Security finding SF-04-01 (fixed).** The prerendered sign-in and registration forms could be submitted natively before the client bundle ran, which would have sent the account password in the URL of a GET request. The CSP now sets `form-action 'none'` and the buttons stay disabled until hydration; `tests/e2e/web-shell.spec.ts` proves it in three engines ([../management/phase-04-traceability.md](../management/phase-04-traceability.md) section 4). This completes the rule of section 9 that the client never submits HTML forms.
+- **The account password never touches the vault.** No key is derived from it, the vault-reset flow cannot recover the old identity, and a PLATFORM_ADMIN cannot open any vault (CD-01, [../crypto/vault.md](../crypto/vault.md)).

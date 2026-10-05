@@ -1,0 +1,41 @@
+EV-04-09: Negative controls (deliberate defects must make the security tests fail)
+Captured: 2026-10-05T17:00:29Z to 2026-10-05T17:07:47Z on branch feature/CM-T023-cryptographic-vault (Phase 4)
+Each control writes one defect into a source file, runs the tests that must catch it (browser controls rebuild the
+static export and run Playwright in Chromium), and restores the file. Afterwards the unmodified code must pass, the
+export is rebuilt from the unmodified sources, and every touched file is compared with its original by SHA-256.
+Redaction: no passwords, passphrases, tokens or keys appear below.
+
+$ pnpm security:negative-controls
+| ID | Deliberate defect | Detected by | Result |
+|---|---|---|---|
+| NC-03-01 | CSRF same-origin verification removed | tests/auth/csrf.test.ts | CAUGHT (tests failed) |
+| NC-03-02 | Recovery codes made reusable | tests/auth/recovery.test.ts | CAUGHT (tests failed) |
+| NC-03-03 | MFA step removed from login | tests/auth/mfa.test.ts | CAUGHT (tests failed) |
+| NC-03-04 | TOTP time-step replay allowed | tests/auth/mfa.test.ts | CAUGHT (tests failed) |
+| NC-03-05 | Password field no longer redacted in logs | apps/api/src/logging/redact.test.ts | CAUGHT (tests failed) |
+| NC-03-06 | Route mounted outside the route registry | tests/security/route-inventory.test.ts | CAUGHT (tests failed) |
+| NC-03-07 | Session cookie readable by page scripts (HttpOnly removed) | apps/api/src/auth/primitives.test.ts, tests/auth/login.test.ts | CAUGHT (tests failed) |
+| NC-03-08 | Step-up gate always satisfied | tests/auth/step-up.test.ts | CAUGHT (tests failed) |
+| NC-03-09 | Disabled accounts keep their sessions | tests/auth/session.test.ts | CAUGHT (tests failed) |
+| NC-03-10 | Unknown accounts skip the dummy Argon2id verification (timing enumeration) | tests/auth/login.test.ts | CAUGHT (tests failed) |
+| NC-04-01 | Vault private-key AAD removed (wrapped keys no longer bound to their context) | packages/crypto/src/primitives.test.ts | CAUGHT (tests failed) |
+| NC-04-02 | Fixed AES-GCM nonce (IV reuse under one key) | packages/crypto/src/primitives.test.ts, packages/crypto/src/vault.test.ts | CAUGHT (tests failed) |
+| NC-04-03 | Directory response exposes wrapped private-key data | tests/vault/reset-and-directory.test.ts | CAUGHT (tests failed) |
+| NC-04-04 | Vault ownership bypassed (any ACTIVE vault returned) | tests/vault/reset-and-directory.test.ts, tests/vault/setup.test.ts | CAUGHT (tests failed) |
+| NC-04-05 | Fingerprint computed over the encryption key only | packages/crypto/src/identity.test.ts | CAUGHT (tests failed) |
+| NC-04-06 | Unsupported vault format version accepted (downgrade) | packages/crypto/src/vault.test.ts | CAUGHT (tests failed) |
+| NC-04-07 | Server accepts a vault re-wrap without verifying its signature | tests/vault/rewrap.test.ts | CAUGHT (tests failed) |
+| NC-04-08 | Argon2id floor and ceiling not enforced | packages/crypto/src/argon2id.test.ts | CAUGHT (tests failed) |
+| NC-04-09 | Unlocked private keys left extractable | packages/crypto/src/vault.test.ts | CAUGHT (tests failed) |
+| NC-04-10 | Canonical JSON without member sorting (RFC 8785 broken) | packages/crypto/src/canonical.test.ts | CAUGHT (tests failed) |
+| NC-04-11 | RSA-OAEP wrapper accepts values of any size (INV-17) | packages/crypto/src/rsa-oaep.test.ts | CAUGHT (tests failed) |
+| NC-04-12 | Vault Passphrase persisted in localStorage at unlock | tests/e2e/vault.spec.ts "setup, lock, unlock and passphrase change" (Chromium) | CAUGHT (tests failed) |
+| NC-04-13 | Vault Passphrase sent to the API at setup | tests/e2e/vault.spec.ts "setup, lock, unlock and passphrase change" (Chromium) | CAUGHT (tests failed) |
+| NC-04-14 | Inactivity auto-lock disabled | tests/e2e/vault.spec.ts "the vault locks after 15 minutes" (Chromium) | CAUGHT (tests failed) |
+| NC-04-15 | CSP allows native form submission again (form-action 'self', SF-04-01) | apps/web/scripts/csp-lib.test.ts | CAUGHT (tests failed) |
+| NC-04-16 | Submit buttons enabled before hydration (SF-04-01) | tests/e2e/web-shell.spec.ts "a form submitted before the client runs" (Chromium) | CAUGHT (tests failed) |
+| NC-04-17 | A failed background refresh replaces the unlocked vault by an error view (R-04-01) | tests/e2e/vault.spec.ts "a failed background refresh keeps the vault under the auto-lock" (Chromium) | CAUGHT (tests failed) |
+
+Baseline on unmodified code (Vitest): PASS
+Baseline on unmodified code (rebuilt export, Playwright): PASS
+Sources restored byte for byte (SHA-256, 19 files): YES

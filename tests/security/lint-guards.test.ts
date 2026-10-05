@@ -7,16 +7,22 @@ import { beforeAll, describe, expect, it } from 'vitest';
 const root = fileURLToPath(new URL('../..', import.meta.url));
 let eslint: ESLint;
 
-beforeAll(() => {
-  eslint = new ESLint({ cwd: root });
-});
-
 async function ruleIdsFor(code: string, filePath: string): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath: `${root}${filePath}` });
   return (result?.messages ?? []).map((message) => `${message.ruleId ?? 'parse'}: ${message.message}`);
 }
 
-// Type-aware linting loads the generated Prisma client, which is slow on a busy machine.
+// Type-aware linting builds one TypeScript program per project on first use. That takes tens of
+// seconds on a busy machine (the generated Prisma client and, since Phase 4, the crypto package
+// are part of them), so the programs are built once here and each test's timeout covers only
+// its own lint call. The assertions are unchanged.
+beforeAll(async () => {
+  eslint = new ESLint({ cwd: root });
+  for (const file of ['apps/api/src/app.ts', 'apps/web/src/app/page.tsx', 'packages/shared/src/http.ts']) {
+    await ruleIdsFor('export const warmUp = 1;', file);
+  }
+}, 180_000);
+
 describe('ESLint security guards', { timeout: 30_000 }, () => {
   it.each([
     ['eval', 'export const run = (s: string): unknown => eval(s);', 'eval is forbidden'],

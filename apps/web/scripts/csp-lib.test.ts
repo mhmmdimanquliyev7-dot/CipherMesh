@@ -32,16 +32,26 @@ describe('sha256Source', () => {
 describe('buildCsp', () => {
   const csp = buildCsp(["'sha256-b'", "'sha256-a'", "'sha256-a'"]);
 
-  it('never allows unsafe-inline or unsafe-eval', () => {
-    expect(csp).not.toMatch(/unsafe-inline|unsafe-eval/);
+  it('never allows unsafe-inline or unsafe-eval; WebAssembly compilation is the only relaxation (ADR-010)', () => {
+    expect(csp).not.toMatch(/'unsafe-inline'|'unsafe-eval'/);
+    // 'wasm-unsafe-eval' appears exactly once, in script-src, and in no other directive.
+    expect(csp.match(/wasm-unsafe-eval/g)).toHaveLength(1);
+    expect(csp).toMatch(/script-src 'self' 'wasm-unsafe-eval' /);
   });
 
   it('lists each script hash once, sorted, after self', () => {
-    expect(csp).toContain("script-src 'self' 'sha256-a' 'sha256-b';");
+    expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval' 'sha256-a' 'sha256-b';");
   });
 
-  it('denies by default and forbids framing, plugins and base changes', () => {
-    for (const directive of ["default-src 'none'", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'none'"]) {
+  it('denies by default and forbids framing, plugins, base changes and native form submission', () => {
+    for (const directive of [
+      "default-src 'none'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'none'",
+      // SF-04-01: forms are only ever sent by JavaScript; a native submission would put values in the URL.
+      "form-action 'none'",
+    ]) {
       expect(csp).toContain(directive);
     }
   });

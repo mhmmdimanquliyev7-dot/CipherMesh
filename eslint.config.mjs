@@ -53,6 +53,9 @@ export default tseslint.config(
       'apps/api/src/generated/**',
       'tmp/**',
       'apps/api/src/auth/data/**',
+      // Generated data modules (blocklist and the embedded Argon2id WebAssembly).
+      'packages/crypto/src/passphrase-blocklist.ts',
+      'packages/crypto/src/kdf/argon2id-wasm.ts',
     ],
   },
   js.configs.recommended,
@@ -99,6 +102,10 @@ export default tseslint.config(
             {
               group: ['@ciphermesh/api', '**/apps/api/**', '**/api/src/**'],
               message: 'The web client must never import server code.',
+            },
+            {
+              group: ['@ciphermesh/crypto/src/**', '**/packages/crypto/src/**'],
+              message: 'Use the public entry points of @ciphermesh/crypto; its internals are not an API.',
             },
           ],
         },

@@ -20,8 +20,9 @@ It is one project that must show real depth in three subjects. Security depth ma
 - **Phase 0.5 (Architecture hardening and project-management bootstrap): complete and approved.** Review record: `docs/security/architecture-gate-phase-0-5.md`.
 - **Phase 1 (Repository and Application Foundation): implemented; the project owner continued to Phase 2.** Merged into `main` through pull request #1 with CI passing; its branch-protection evidence is still pending. Traceability: `docs/management/phase-01-traceability.md`.
 - **Phase 2 (Database and Prisma): implemented and merged into `main` through pull request #7; the project owner continued to Phase 3.** Traceability: `docs/management/phase-02-traceability.md`. Database controls: `docs/security/database-security.md`.
-- **Phase 3 (Authentication): implemented and merged into `main` through pull request #8, awaiting approval by the project owner.** Traceability: `docs/management/phase-03-traceability.md`. Controls: `docs/security/authentication-security.md`.
-- Next phase: **Phase 4 (Cryptographic Identity and Vault)**. Do not start it without explicit approval. Its branch starts from the updated `main`.
+- **Phase 3 (Authentication): implemented and merged into `main` through pull request #8; the project owner continued to Phase 4.** Traceability: `docs/management/phase-03-traceability.md`. Controls: `docs/security/authentication-security.md`.
+- **Phase 4 (Cryptographic Identity and Vault): implemented on branch `feature/CM-T023-cryptographic-vault`, awaiting approval by the project owner.** ADR-015 (OCD-12) was accepted before implementation. Traceability: `docs/management/phase-04-traceability.md`. Specification: `docs/crypto/vault.md`.
+- Next phase: **Phase 5 (Secure Rooms and RBAC)**. Do not start it without explicit approval. Its branch starts from `main` after the Phase 4 pull request is merged.
 - Work is phase-gated. Finish one phase, report, and wait for approval before starting the next.
 - Phase details: `docs/management/project-roadmap.md`. Backlog: `docs/management/jira-backlog.md`.
 
@@ -38,7 +39,8 @@ It is one project that must show real depth in three subjects. Security depth ma
 Key hierarchy (details: `docs/crypto/key-hierarchy.md`):
 
 ```
-Vault Passphrase -> Argon2id -> HKDF -> private-key wrapping key -> user RSA-OAEP private key
+Vault Passphrase -> Argon2id -> HKDF (one key per private key) -> wrapping keys -> user RSA-OAEP and ECDSA P-256 private keys
+user ECDSA signing key -> binding signature over both public keys; signed vault re-wraps; signed room statements (Phase 6, ADR-015)
 user RSA-OAEP public key -> envelope -> room key material (per version) -> HKDF -> room wrapping key -> per-item DEK -> content
 room key material -> HKDF -> commitment (public) and Room Safety Code (shown to members, never sent)
 recipient RSA-OAEP public key -> wrapped SEK (32 bytes) -> AES-256-GCM -> secret payload
@@ -53,7 +55,7 @@ recipient RSA-OAEP public key -> wrapped SEK (32 bytes) -> AES-256-GCM -> secret
 | Backend | Node.js (current Active LTS), Express, TypeScript |
 | Database | PostgreSQL 17 (managed in production), Prisma ORM 7 with the pg driver adapter |
 | Object storage | S3-compatible API (managed in production, local emulator in development) |
-| Client crypto | WebCrypto (SubtleCrypto); Argon2id through a vetted WASM library (selected in Phase 4, ADR-010) |
+| Client crypto | WebCrypto (SubtleCrypto); Argon2id through `argon2id` 1.0.1 in a Web Worker (LIB-03, selected in Phase 4, ADR-010) |
 | Server crypto | Node.js `crypto` and WebCrypto; Argon2id through Node.js `crypto.argon2` (LIB-04, selected in Phase 3); TOTP through `otpauth` (LIB-06) |
 | Validation | Schema validation at every trust boundary (planned: zod) |
 | Testing | Vitest (unit), HTTP-level API integration tests, Playwright (E2E), security regression suite |
@@ -112,7 +114,7 @@ Boundary rules: `apps/web` must not import `apps/api`. `packages/crypto` must no
 
 - **NEVER implement custom cryptography.** Use WebCrypto, Node.js `crypto`, and libraries approved in `docs/crypto/crypto-decisions.md`. Compose them only as specified in `docs/crypto/`.
 - Algorithms and parameters come only from the parameter register (CP-xx) in `docs/crypto/crypto-decisions.md`. Changing one requires an ADR update and tests.
-- ADR-007 (RSA-OAEP-3072 key distribution) and ADR-010 (browser Argon2id) are Proposed. Implement them as designed and record the confirming test or benchmark in the ADR before marking it Accepted. ADR-011 is Accepted for the static export and CSP; its identifier routing pattern is confirmed in Phase 5.
+- ADR-007 (RSA-OAEP-3072 key distribution) is Proposed: implement it as designed and record the confirming cross-browser envelope test in the ADR (Phase 6) before marking it Accepted. ADR-010 (browser Argon2id) was accepted in Phase 4 with its benchmark. ADR-015 (identity signing keys, OCD-12) is Accepted; its room-statement part is confirmed by the Phase 6 and Phase 11 tests. ADR-011 is Accepted for the static export and CSP; its identifier routing pattern is confirmed in Phase 5.
 - Encoding is not encryption. Base64 and hex are representations, not protection.
 - Use non-extractable `CryptoKey` objects wherever the API allows, and restrict key usages to the minimum needed.
 - Every encrypted record stores its algorithm suite identifier (`CM1` in the baseline) for crypto agility.
@@ -226,9 +228,9 @@ An item is done only when all of the following hold:
 ## 15. Key documents
 
 - Architecture: `docs/architecture/` (system-overview, data-flow, trust-boundaries, data-model, crypto-inspector, security-dashboard, security-ui, engineering-baseline, `adr/`)
-- Cryptography: `docs/crypto/` (cryptographic-architecture, key-hierarchy, key-lifecycle, crypto-decisions)
+- Cryptography: `docs/crypto/` (cryptographic-architecture, vault, key-hierarchy, key-lifecycle, crypto-decisions)
 - Threat model: `docs/threat-model/threat-model.md`
 - Security: `docs/security/` (security-principles, authorization-model, security-policy-profiles, security-testing-plan, session-and-csrf, authentication-security, database-security, limitations, isms-control-mapping, architecture-review, architecture-gate-phase-0-5)
 - Cloud: `docs/cloud/` (service-models, shared-responsibility, deployment-architecture)
-- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap, github-repository-settings, phase-01-traceability, phase-02-traceability, phase-03-traceability, current-state for session handoff)
+- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap, github-repository-settings, phase-01-traceability, phase-02-traceability, phase-03-traceability, phase-04-traceability, current-state for session handoff)
 - Report: `docs/report/evidence-plan.md`

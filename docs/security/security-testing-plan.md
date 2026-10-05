@@ -1,6 +1,6 @@
 # Security Testing Plan
 
-Status: Phase 0.5 baseline. Related: [../threat-model/threat-model.md](../threat-model/threat-model.md), [authorization-model.md](authorization-model.md), [security-policy-profiles.md](security-policy-profiles.md), [../report/evidence-plan.md](../report/evidence-plan.md).
+Status: Phase 0.5 baseline; section 3.2 implemented in Phase 3; section 3.3 (vault and cryptography) and the coverage gate implemented in Phase 4. Related: [../threat-model/threat-model.md](../threat-model/threat-model.md), [authorization-model.md](authorization-model.md), [security-policy-profiles.md](security-policy-profiles.md), [../report/evidence-plan.md](../report/evidence-plan.md).
 
 ## 1. Objectives
 
@@ -18,6 +18,7 @@ Status: Phase 0.5 baseline. Related: [../threat-model/threat-model.md](../threat
 | Security regression | `tests/security`: the suites in section 3 | Vitest, Playwright | Every PR |
 | Database | `tests/database`: migrations from zero, drift, constraints, append-only audit, role privileges, deletion behaviour, database client, seed, retention (section 3.1, implemented in Phase 2) | Vitest against a throwaway PostgreSQL database per run | Every PR |
 | Authentication | `tests/auth`: the `session`, `csrf` and `auth-abuse` suites of section 3 and the MFA, recovery, step-up, administrator and logging suites (section 3.2, implemented in Phase 3) | Vitest against the real API and a throwaway PostgreSQL database; Playwright for browser checks | Every PR |
+| Vault and cryptography | `packages/crypto` unit and known-answer tests, `tests/vault` (setup, re-wrap, reset, directory, BOLA, leakage) and `tests/e2e/vault.spec.ts` (section 3.3, implemented in Phase 4) | Vitest against the real API, real Argon2id and a throwaway PostgreSQL database; Playwright in three engines | Every PR |
 | End-to-end | Browser flows in Chromium, Firefox and WebKit | Playwright | Every PR (smoke), nightly (full) |
 | Static analysis | TypeScript strict, ESLint with security rules, forbidden-API lint rules | tsc, ESLint | Every PR |
 | Supply chain | Vulnerable dependencies, secrets, SBOM, container images | OSV-Scanner or `pnpm audit`, gitleaks, CycloneDX, Trivy | Every PR and weekly |
@@ -43,7 +44,7 @@ All scanning and testing targets only CipherMesh infrastructure, following the c
 | `session` | Cookie attributes, fixation, every rotation and invalidation event, idle and absolute expiry, logout, session limit ([session-and-csrf.md](session-and-csrf.md)) | T-08 |
 | `csrf` | `Sec-Fetch-Site` and `Origin` checks, the custom request header, content types, login CSRF, side-effect-free GETs, `Origin` behaviour under `no-referrer` in three engines | T-13 |
 | `auth-abuse` | Rate limits, backoff, TOTP attempt limits, replay, recovery-code reuse | T-09, T-10, T-30 |
-| `crypto-invariants` | Known-answer tests, tamper tests, context separation, IV uniqueness, commitment checks, the RSA wrapper rejecting anything but 32-byte keys | T-07, T-29 |
+| `crypto-invariants` | Known-answer tests, tamper tests, context separation, IV uniqueness, commitment checks, the RSA wrapper rejecting anything but 32-byte keys. **Phase 4:** implemented as the `packages/crypto` unit suites listed in section 3.3 (commitment checks follow in Phase 6) | T-07, T-29 |
 | `projection` | Responses contain only allowlisted fields; forbidden field names never appear | T-15 |
 | `log-redaction` | Canary secrets sent through every endpoint never appear in logs | T-15, T-16 |
 | `canary-scan` | After E2E runs, canary strings are absent from database dumps and bucket objects | T-01, T-02, T-28 |
@@ -51,12 +52,12 @@ All scanning and testing targets only CipherMesh infrastructure, following the c
 | `rekey` | Member loss sets REKEY_REQUIRED and deletes envelopes in one transaction; writes and invitations blocked while locked; recipient snapshot excludes departed members; idempotent, mismatched and stale finalize handling; lease-expiry recovery; concurrent starts; old-version writes rejected; old keys cannot unwrap new DEKs | T-21, T-37 |
 | `safety-code` | Known-answer vectors for the derivation and word mapping; the code changes with key, version and room; it never appears in requests, logs or storage; a two-browser harness with different keys shows different codes | T-29 |
 | `secret-envelope` | Secret payloads are AES-256-GCM ciphertext; only a 32-byte SEK is RSA-wrapped; a tampered payload or wrapped SEK fails; burn sets both to NULL | T-07, T-33 |
-| `key-injection` | Before OCD-12: a documented demonstration of the gap in a test environment. After OCD-12: clients reject key versions and envelopes not created by an authorized member | T-36 |
+| `key-injection` | Clients reject key versions and envelopes not created by an authorized member: unsigned, forged, wrongly attributed and unauthorized versions, commitment mismatch, missing recipient (ADR-015, Phase 6). Phase 4 tests the identity part: binding signatures, fingerprints and signed re-wraps | T-36 |
 | `audit-tamper` | Edited, deleted or reordered events and recomputed chains are detected; the worker refuses to sign a diverged chain; conflicting and revoked-key checkpoints are reported; anchor deletion is denied; scenarios A to D of the audit trust model are simulated | T-20, T-38 |
 | `xss` | Payload corpus in every user-controlled field never executes | T-12 |
 | `upload` | HTML and SVG never render inline; size and quota limits; storage keys independent of filenames | T-11 |
-| `browser-storage` | No key material or plaintext in localStorage, sessionStorage, IndexedDB or cookies after use | T-23 |
-| `identity` | Lookup responses label identifiers as unverified; fingerprint confirmation enforced in RESTRICTED invitations; key changes are audited | T-25, T-35 |
+| `browser-storage` | No key material or plaintext in localStorage, sessionStorage, IndexedDB or cookies after use. **Phase 4:** `tests/e2e/vault.spec.ts` also checks the Cache API and the network traffic of every vault flow | T-23 |
+| `identity` | Lookup responses label identifiers as unverified; fingerprint confirmation enforced in RESTRICTED invitations; key changes are audited. **Phase 4:** the directory part is in `tests/vault/reset-and-directory.test.ts`; invitations follow in Phase 6 | T-25, T-35 |
 
 ### 3.2 Authentication suites (`tests/auth`, Phase 3)
 
@@ -73,7 +74,27 @@ The real API runs on a loopback port against a throwaway database as `cm_api`, w
 | `step-up`, `admin`, `logging` | Server-side gates, forged claims, re-verification limits, CLI-only administrator role, disabling, secret-free logs and events | T-08, T-16, T-30 |
 | `tests/e2e/auth.spec.ts` | Cookie attributes in the browser, no secrets in browser storage, real `Origin` under `no-referrer`, MFA flows in three engines | T-08, T-13, T-23 |
 
-`pnpm security:negative-controls` writes ten deliberate defects into the code one at a time (CSRF gate removed, reusable recovery codes, MFA step removed, TOTP replay, password not redacted, route outside the registry, cookie without HttpOnly, step-up gate disabled, disabled accounts kept, no dummy verification) and requires the suites to fail for each, then pass on the unmodified code. It restores every file and is run before phase sign-off.
+`pnpm security:negative-controls` writes deliberate defects into the code one at a time and requires the suites to fail for each, then pass on the unmodified code. Phase 3 added ten controls (CSRF gate removed, reusable recovery codes, MFA step removed, TOTP replay, password not redacted, route outside the registry, cookie without HttpOnly, step-up gate disabled, disabled accounts kept, no dummy verification); Phase 4 adds seventeen (section 3.3). It restores every file, compares each touched file with its original by SHA-256, and is run before phase sign-off.
+
+### 3.3 Vault and cryptography suites (Phase 4)
+
+| Suite | What it proves | Threats |
+|---|---|---|
+| `packages/crypto/src/primitives.test.ts` | SHA-256 (FIPS 180-2), HKDF (RFC 5869 cases 1 to 3), AES-256-GCM (GCM specification cases 13 to 16) known answers; tamper of IV, ciphertext, tag and AAD; no IV parameter; 10,000 distinct IVs; wrapped private keys bound to their AAD | T-07 |
+| `rsa-oaep.test.ts`, `signing.test.ts` | Wycheproof RSA-OAEP-3072 SHA-256 (37 cases) and ECDSA P-256 P1363 (114 cases), RFC 6979 A.2.5, OpenSSL interoperability; 32-byte values only; canonical key encodings only | T-07, T-25 |
+| `argon2id.test.ts`, `argon2id-no-simd.test.ts`, `kdf-worker.test.ts` | RFC 9106 vector with both WebAssembly builds, OpenSSL differential at floor and target, embedded bytes equal the pinned package, floor and ceiling, one derivation at a time, the worker message protocol | T-22, T-26, T-27 |
+| `canonical.test.ts`, `contexts.test.ts`, `encoding.test.ts` | RFC 8785 sorting example and byte dump, the Phase 3 `cm.srv.totp` bytes, exact field sets, domain separation, strict base64url, hex and UTF-8 | T-07 |
+| `identity.test.ts`, `vault.test.ts`, `passphrase.test.ts` | Binding signature and fingerprint over both keys; unlock failures are generic; tamper, swap, substitution and pair-check mismatch; format version and parameter refusals; signed re-wrap and upgrade; passphrase policy | T-07, T-22, T-25, T-40 |
+| `fail-closed.test.ts`, `boundary.test.ts` | Missing WebCrypto, CSPRNG, WebAssembly or Worker, a CSP that blocks compilation, worker errors and timeouts all fail closed with fixed codes; the export surface and the test-only seam are fixed | INV-15, T-27 |
+| `tests/vault/setup.test.ts`, `rewrap.test.ts`, `reset-and-directory.test.ts`, `leakage.test.ts` | Step-up gates, strict schemas, the stored row, identity verification on the server, signed and compare-and-swap re-wraps, reset in one transaction, directory projection and rate limit, BOLA, no secrets or ciphertext in logs and events | T-01, T-06, T-15, T-22, T-35, T-40 |
+| `tests/e2e/web-shell.spec.ts` (SF-04-01) | With every client script blocked, the prerendered sign-in and registration forms cannot be submitted: the button is disabled, and a forced submission is refused by the CSP (`form-action 'none'`) without any request or URL carrying the typed values | T-15, T-16 |
+| `tests/e2e/vault.spec.ts` | In Chromium, Firefox and WebKit: no passphrase (raw, URL, base64, base64url or hex) and no PKCS#8 in any request; empty browser storage; independent fingerprint check; a vault created in Chromium opens in the other two engines; a modified record is refused; auto-lock with a controlled clock; sign-out and session-end locks; a failed background refresh keeps an unlocked vault under the auto-lock without a false identity-change message (R-04-01); no CSP violations; a negative control for the leak checks | T-23, T-24, T-25 |
+
+Negative controls NC-04-01 to NC-04-14: AAD removed from the private-key wrap, fixed AES-GCM nonce, directory leaking wrapped-key data, vault ownership bypass, fingerprint over one key only, version downgrade accepted, re-wrap signature not checked, KDF floor and ceiling not enforced, unlocked keys extractable, canonical JSON without sorting, RSA wrapper accepting any size, passphrase in localStorage, passphrase sent at setup, auto-lock disabled; NC-04-15 and NC-04-16 revert the two layers of the SF-04-01 fix (CSP `form-action 'self'`, buttons enabled before hydration); NC-04-17 lets a failed background refresh replace the unlocked vault (R-04-01). NC-04-12 to NC-04-14, NC-04-16 and NC-04-17 are browser controls: the script rebuilds the web client with the defect and runs the Playwright test that must catch it, then rebuilds the clean client.
+
+Coverage: `pnpm test:coverage:crypto` enforces at least 90% statements, branches, functions and lines for `packages/crypto` in CI. Phase 4 result: 99.5% statements and 91.8% branches. The uncovered branches are `?? 0` defaults that `noUncheckedIndexedAccess` requires for typed-array reads and checks on WebCrypto's own output; none can run with a correct platform.
+
+Performance: `pnpm bench:vault` measures the real crypto code in the three engines under the production CSP (crypto-decisions section 8).
 
 ### 3.1 Database suite (`tests/database`, Phase 2)
 
@@ -99,15 +120,15 @@ This is the automated proof of invariants INV-01 and INV-16, and a strong piece 
 
 ## 5. Cryptography tests
 
-- **Known-answer tests** for AES-256-GCM (NIST CAVP-style vectors), RSA-OAEP decryption of fixed vectors, HKDF (RFC 5869 vectors), SHA-256, Argon2id (RFC 9106 vectors) and RFC 8785 canonicalization vectors.
+- **Known-answer tests** for AES-256-GCM (NIST CAVP-style vectors), RSA-OAEP decryption of fixed vectors, HKDF (RFC 5869 vectors), SHA-256, Argon2id (RFC 9106 vectors) and RFC 8785 canonicalization vectors. **Implemented in Phase 4** (section 3.3), plus Wycheproof RSA-OAEP and ECDSA vectors for the identity keys (CP-26).
 - **Tamper tests** for every decrypt path: bit flips in IV, ciphertext and tag; wrong AAD field; envelope moved to another room, version, user or key; wrapped DEK moved between items.
 - **Context separation:** two contexts that differ in any field produce different bytes; decryption under the wrong context fails.
 - **IV management:** production encryption functions accept no IV; many encryptions produce distinct IVs; the test-only IV seam is absent from production builds.
 - **Commitment:** an envelope with the wrong RKM is rejected and reported. A test documents the limit: a harness that serves a different commitment together with a matching envelope passes this check, and only the Safety Code comparison reveals it.
 - **RSA input restriction:** the RSA wrapper accepts only 32-byte keys, and a lint rule forbids direct RSA-OAEP `encrypt` calls outside `packages/crypto` (INV-17).
 - **Room Safety Code:** known-answer vectors for HKDF output and word mapping, including the numeric form; context separation from RWK_v and RKC_v.
-- **Cross-browser:** Playwright runs the crypto suite in Chromium, Firefox and WebKit, including OAEP labels and unwrapping into HKDF keys (OCD-01).
-- **Parameter floors:** vault creation and unlock refuse Argon2id parameters below the floor; the API rejects them too.
+- **Cross-browser:** Playwright runs the crypto suite in Chromium, Firefox and WebKit, including OAEP labels and unwrapping into HKDF keys (OCD-01). **Phase 4:** the vault flows run in all three engines, and a vault created in Chromium is opened in Firefox and WebKit; envelope interoperability follows in Phase 6.
+- **Parameter floors:** vault creation and unlock refuse Argon2id parameters below the floor, and since Phase 4 above the ceiling; the API rejects them too.
 
 ## 6. CI gates
 
@@ -118,7 +139,7 @@ A pull request cannot merge unless all of these pass:
 3. E2E smoke tests.
 4. Secret scan with no findings.
 5. Dependency scan with no unresolved Critical or High findings (exceptions need a documented risk acceptance in Jira).
-6. Coverage thresholds for `packages/crypto`, the authorization module and the policy engine (CLAUDE.md section 10).
+6. Coverage thresholds for `packages/crypto` (enforced since Phase 4 by `pnpm test:coverage:crypto`), the authorization module and the policy engine (CLAUDE.md section 10).
 
 ## 7. Security assessment (Phase 20)
 

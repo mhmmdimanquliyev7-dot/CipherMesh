@@ -1,0 +1,38 @@
+EV-04-14: Security finding SF-04-01, regression test before and after the fix
+Captured: 2026-10-05 (UTC) on branch feature/CM-T023-cryptographic-vault (Phase 4, uncommitted working tree)
+Finding: the prerendered /login and /register forms declared no method. Submitted before the client bundle had run,
+the browser sent a native GET with every field in the URL. Severity High (account password in URLs, server logs and
+browser history). Introduced in Phase 3, found and fixed in Phase 4. Record: docs/management/phase-04-traceability.md section 4.
+Redaction: the probe used the synthetic canary value <canary> (no account was created).
+
+1. Reproduction on the unfixed build (scratch probe: client scripts blocked, fields filled, submit clicked):
+   /register -> GET /register?email=probe%40example.test&displayName=&password=<canary>&confirm=
+   /login    -> GET /login?email=probe%40example.test&password=<canary>
+
+2. The new regression test on the unfixed build (Chromium) FAILS:
+$ npx playwright test tests/e2e/web-shell.spec.ts -g "before the client runs" --project=chromium
+     1) [chromium] › tests\e2e\web-shell.spec.ts:74:3 › /login: a form submitted before the client runs sends no typed value anywhere 
+       Error: expect(locator).toBeDisabled() failed
+       Expected: disabled
+       Received: enabled
+     2) [chromium] › tests\e2e\web-shell.spec.ts:74:3 › /register: a form submitted before the client runs sends no typed value anywhere 
+       Error: expect(locator).toBeDisabled() failed
+       Expected: disabled
+       Received: enabled
+     2 failed
+
+3. Fix: CSP form-action 'none' (apps/web/scripts/csp-lib.mjs) and buttons disabled until hydration
+   (apps/web/src/components/ui.tsx). Generated header after the rebuild: form-action 'none'.
+   Prerendered button: <button type="submit" disabled="" ...>
+
+4. The same test on the fixed build PASSES in all three engines:
+$ npx playwright test tests/e2e/web-shell.spec.ts -g "before the client runs"
+   [1/6] [chromium] › tests\e2e\web-shell.spec.ts:74:3 › /login: a form submitted before the client runs sends no typed value anywhere
+   [2/6] [webkit] › tests\e2e\web-shell.spec.ts:74:3 › /login: a form submitted before the client runs sends no typed value anywhere
+   [3/6] [firefox] › tests\e2e\web-shell.spec.ts:74:3 › /login: a form submitted before the client runs sends no typed value anywhere
+   [4/6] [chromium] › tests\e2e\web-shell.spec.ts:74:3 › /register: a form submitted before the client runs sends no typed value anywhere
+   [5/6] [webkit] › tests\e2e\web-shell.spec.ts:74:3 › /register: a form submitted before the client runs sends no typed value anywhere
+   [6/6] [firefox] › tests\e2e\web-shell.spec.ts:74:3 › /register: a form submitted before the client runs sends no typed value anywhere
+     6 passed (8.9s)
+
+5. Negative controls NC-04-15 (CSP back to form-action 'self') and NC-04-16 (buttons enabled before hydration): see EV-04-09.

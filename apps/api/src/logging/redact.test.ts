@@ -48,6 +48,26 @@ const SENSITIVE_FIELDS = [
   'preAuthToken',
   'challenge',
   'set-cookie',
+  // Vault fields (Phase 4). The API never receives most of these; they are redacted anyway.
+  'vaultPassword',
+  'vault_passphrase',
+  'vaultKey',
+  'vaultRootKey',
+  'vrk',
+  'kek',
+  'keyEncryptionKey',
+  'pkwk',
+  'privateKeyPkcs8',
+  'signingPrivateKeyPkcs8',
+  'pkcs8',
+  'decryptedPrivateKey',
+  'vaultPlaintext',
+  'vaultCiphertext',
+  'vaultBlob',
+  'wrappedEncryptionKey',
+  'wrappedSigningKey',
+  'encryptedPrivateKey',
+  'encryptedSigningPrivateKey',
 ];
 
 describe('redact', () => {
@@ -109,6 +129,35 @@ describe('redact', () => {
     expect(output).not.toContain('canary-pw');
     expect(output).not.toContain('canary-new');
     expect(output).not.toContain('654321');
+  });
+
+  it('redacts vault bodies at any depth but keeps public identity data readable (Phase 4)', () => {
+    const body = {
+      vault: {
+        identity: { keyId: 'k-1', fingerprint: 'ab'.repeat(32), signingPublicKey: 'MFkw-public' },
+        wrappedEncryptionKey: { iv: 'iv-canary', ciphertext: 'ct-canary-1' },
+        wrappedSigningKey: { iv: 'iv-canary', ciphertext: 'ct-canary-2' },
+      },
+      client: { vaultPassphrase: 'pp-canary', kek: 'kek-canary', privateKeyPkcs8: 'MIIG-canary' },
+    };
+    const output = JSON.stringify(redact({ request: { body } }));
+    for (const canary of ['ct-canary-1', 'ct-canary-2', 'pp-canary', 'kek-canary', 'MIIG-canary']) {
+      expect(output).not.toContain(canary);
+    }
+    // Public keys and fingerprints are not secrets (CP-17); redacting them would only hide context.
+    expect(output).toContain('ab'.repeat(32));
+    expect(output).toContain('MFkw-public');
+  });
+
+  it('redacts secrets carried by cryptography exceptions and their properties (Phase 4)', () => {
+    // WebCrypto and WASM errors are generic, but an error object may still carry key material in a
+    // property added by a caller; bytes become [Binary] and sensitive keys are redacted.
+    const error = Object.assign(new Error('OperationError: The operation failed for an operation-specific reason'), {
+      keyMaterial: new Uint8Array([9, 9, 9]),
+      details: { kek: 'kek-canary', wrappedSigningKey: { ciphertext: 'ct-canary' } },
+    });
+    const output = JSON.stringify(redact({ err: error, cause: { pkcs8: 'MIIE-canary' } }));
+    for (const canary of ['kek-canary', 'ct-canary', 'MIIE-canary', '9,9,9']) expect(output).not.toContain(canary);
   });
 
   it('never logs raw bytes, which may be key material', () => {

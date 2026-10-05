@@ -380,38 +380,50 @@ model LoginAttempt {
 /// data-model 4.5. The private key is stored only as AES-256-GCM ciphertext under PKWK, which is
 /// derived in the browser from the Vault Passphrase. The server cannot decrypt it.
 model UserKeyPair {
-  /// class: ID (client-generated keyId; part of the private-key AAD)
-  id                   String        @id @db.Uuid
+  /// class: ID (client-generated identity key ID; part of every vault context, ADR-015)
+  id                         String        @id @db.Uuid
   /// class: ID
-  userId               String        @map("user_id") @db.Uuid
+  userId                     String        @map("user_id") @db.Uuid
   /// class: META
-  status               KeyPairStatus @default(ACTIVE)
+  status                     KeyPairStatus @default(ACTIVE)
   /// class: META
-  algorithmSuite       String        @map("algorithm_suite") @db.VarChar(16)
-  /// class: PUBK (RSA-3072 SPKI, DER)
-  publicKeySpki        Bytes         @map("public_key_spki")
-  /// class: INT (hex SHA-256 of the SPKI, CP-17)
-  publicKeyFingerprint String        @unique @map("public_key_fingerprint") @db.Char(64)
-  /// class: CT (AES-256-GCM of the PKCS#8 private key under PKWK; NULL once SUPERSEDED or REVOKED)
-  encryptedPrivateKey  Bytes?        @map("encrypted_private_key")
+  algorithmSuite             String        @map("algorithm_suite") @db.VarChar(16)
+  /// class: PUBK (encryption key: RSA-OAEP-3072 SPKI, DER, 422 bytes)
+  publicKeySpki              Bytes         @map("public_key_spki")
+  /// class: PUBK (signing key: ECDSA P-256 SPKI, DER, 91 bytes; ADR-015)
+  signingPublicKeySpki       Bytes         @map("signing_public_key_spki")
+  /// class: INT (hex SHA-256 identity fingerprint over both public keys, CP-17 as revised by ADR-015)
+  publicKeyFingerprint       String        @unique @map("public_key_fingerprint") @db.Char(64)
+  /// class: INT (ECDSA signature over cm.identity.binding, IEEE P1363, 64 bytes; ADR-015)
+  identitySignature          Bytes         @map("identity_signature")
+  /// class: CT (AES-256-GCM of the PKCS#8 encryption private key under its vault wrapping key; NULL once SUPERSEDED or REVOKED)
+  encryptedPrivateKey        Bytes?        @map("encrypted_private_key")
   /// class: META (IV, not secret)
-  privateKeyIv         Bytes         @map("private_key_iv")
+  privateKeyIv               Bytes         @map("private_key_iv")
+  /// class: CT (AES-256-GCM of the PKCS#8 signing private key under its vault wrapping key; NULL once SUPERSEDED or REVOKED)
+  encryptedSigningPrivateKey Bytes?        @map("encrypted_signing_private_key")
+  /// class: META (IV, not secret)
+  signingPrivateKeyIv        Bytes         @map("signing_private_key_iv")
+  /// class: META (vault format version, docs/crypto/vault.md)
+  vaultVersion               Int           @map("vault_version")
   /// class: META
-  kdfAlgorithm         String        @map("kdf_algorithm") @db.VarChar(16)
+  kdfAlgorithm               String        @map("kdf_algorithm") @db.VarChar(16)
   /// class: META
-  kdfMemoryKiB         Int           @map("kdf_memory_kib")
+  kdfMemoryKiB               Int           @map("kdf_memory_kib")
   /// class: META
-  kdfIterations        Int           @map("kdf_iterations")
+  kdfIterations              Int           @map("kdf_iterations")
   /// class: META
-  kdfParallelism       Int           @map("kdf_parallelism")
+  kdfParallelism             Int           @map("kdf_parallelism")
   /// class: META (salt, not secret)
-  kdfSalt              Bytes         @map("kdf_salt")
+  kdfSalt                    Bytes         @map("kdf_salt")
   /// class: META
-  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdAt                  DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// class: META (last passphrase change or parameter upgrade)
+  rewrappedAt                DateTime?     @map("rewrapped_at") @db.Timestamptz(3)
   /// class: META
-  supersededAt         DateTime?     @map("superseded_at") @db.Timestamptz(3)
+  supersededAt               DateTime?     @map("superseded_at") @db.Timestamptz(3)
   /// class: META
-  revokedAt            DateTime?     @map("revoked_at") @db.Timestamptz(3)
+  revokedAt                  DateTime?     @map("revoked_at") @db.Timestamptz(3)
 
   user                User          @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   envelopes           KeyEnvelope[]

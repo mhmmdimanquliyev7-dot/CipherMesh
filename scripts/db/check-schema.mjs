@@ -34,7 +34,10 @@ const FORBIDDEN_FIELDS = [
   ],
   [(n) => /passphrase/.test(n), 'Vault Passphrase value, hash or verifier (INV-01)'],
   [
-    (n) => /privatekey/.test(n) && !['encryptedprivatekey', 'privatekeyiv'].includes(n),
+    (n) =>
+      /privatekey/.test(n) &&
+      // Ciphertext and IVs of the two wrapped identity keys (ADR-015); never a plaintext key.
+      !['encryptedprivatekey', 'privatekeyiv', 'encryptedsigningprivatekey', 'signingprivatekeyiv'].includes(n),
     'plaintext private key (INV-01)',
   ],
   [
@@ -72,6 +75,7 @@ const KEY_FIELD_ALLOWED = [
   /version$/,
   /^keystate$/,
   /^publickey(spki|fingerprint)$/,
+  /^signingpublickeyspki$/,
   /^objectkey$/,
 ];
 

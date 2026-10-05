@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)), awaiting approval. Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
+Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)); Phase 4 implemented (2026-10-05, [phase-04-traceability.md](phase-04-traceability.md)), awaiting approval. Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
 
 ## 1. Principles
 
@@ -109,11 +109,11 @@ Phases 17 and 18 are separate for evidence purposes and can run back to back: th
 | Aspect | Details |
 |---|---|
 | Goal | The crypto package and the user Vault |
-| Dependencies | Phases 1 and 3; OCD-12 decided (CM-T086), because it may add a signing key to the identity format |
+| Dependencies | Phases 1 and 3; OCD-12 decided (CM-T086), because it may add a signing key to the identity format. **Phase 4 outcome:** ADR-015 accepted before implementation; the identity has a signing key |
 | Deliverables | WebCrypto wrappers and canonical contexts; RFC 8785 implementation; Argon2id WASM in a Web Worker; vault setup, unlock, auto-lock and passphrase change; public-key directory and fingerprints |
 | Security checkpoint | Known-answer tests pass; no public function accepts an IV; final CP-04 parameters recorded and ADR-010 accepted; network inspection shows no passphrase or private key leaving the browser; no keys in browser storage |
 | Tests | `crypto-invariants` and `browser-storage` suites; Playwright vault tests in three engines |
-| Documentation updates | CP-04, LIB-03, LIB-05 final; OCD-02 and OCD-04 closed; ADR-010 status |
+| Documentation updates | CP-04, LIB-03, LIB-05 final; OCD-02 and OCD-04 closed; ADR-010 status. **Done in Phase 4**, plus ADR-015, CP-26, CP-27 and [../crypto/vault.md](../crypto/vault.md) |
 | Jira evidence | Benchmark table; database row with the encrypted private key; network capture showing only public data and ciphertext |
 
 ### Phase 5: Secure Rooms and RBAC (M2, CM-T029 to CM-T032)

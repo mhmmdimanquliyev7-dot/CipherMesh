@@ -7,6 +7,9 @@ import { z } from './zod';
  */
 export const uuidV4Schema = z.string().refine(isUuidV4, { message: 'Expected a UUID version 4' });
 
+/** ISO 8601 UTC with milliseconds, the timestamp format of every API response. */
+export const isoTimestampSchema = z.iso.datetime({ offset: false, precision: 3 });
+
 /** Used by routes that accept no query parameters. */
 export const emptyQuerySchema = z.strictObject({});
 
