@@ -75,5 +75,5 @@ Captured on `feature/CM-T023-cryptographic-vault` (from `main` at `f86a2ce`) aga
 | EV-04-10 | [phase-04/EV-04-10_browser-tests.txt](phase-04/EV-04-10_browser-tests.txt) | 2026-10-05 | CM-T025 to CM-T028 | Playwright in Chromium, Firefox and WebKit, including cross-engine unlock |
 | EV-04-11 | [phase-04/EV-04-11_totp-context-migration.txt](phase-04/EV-04-11_totp-context-migration.txt) | 2026-10-05 | CM-T023 | Phase 3 TOTP ciphertext opens with the shared context builder (CD-22) |
 | EV-04-12 | [phase-04/EV-04-12_supply-chain.txt](phase-04/EV-04-12_supply-chain.txt) | 2026-10-05 | CM-T024 | Dependency audit, SBOM and secret scan with the new dependencies |
-| EV-04-13 | Pending | | CM-T023 to CM-T028 | CI run of the Phase 4 pull request |
+| EV-04-13 | [phase-04/EV-04-13_ci-run.txt](phase-04/EV-04-13_ci-run.txt) | 2026-10-05 | CM-T023 to CM-T028 | CI run of pull request #10: every job passed (772 Vitest tests, coverage gate, E2E in three engines, audit, gitleaks) |
 | EV-04-14 | [phase-04/EV-04-14_sf-04-01-regression.txt](phase-04/EV-04-14_sf-04-01-regression.txt) | 2026-10-05 | SF-04-01 | Security finding: regression test fails before the fix and passes after it |

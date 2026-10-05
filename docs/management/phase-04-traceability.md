@@ -2,7 +2,7 @@
 
 Status: Phase 4 implemented on 2026-10-05, awaiting project owner approval. Covers CM-T086 and CM-T023 to CM-T028 in [jira-backlog.md](jira-backlog.md) (checked against the current backlog before the work started). No item is DONE: DONE requires SECURITY REVIEW and TESTING in Jira and the full Definition of Done (CLAUDE.md section 14), including CI on the pull request.
 
-Branch: `feature/CM-T023-cryptographic-vault`, created from the updated `main` (`f86a2ce`, which contains Phases 1 to 3 through pull requests #1, #7, #8 and #9).
+Branch: `feature/CM-T023-cryptographic-vault`, created from the updated `main` (`f86a2ce`, which contains Phases 1 to 3 through pull requests #1, #7, #8 and #9). Pull request #10; CI run 37347479619 passed every job (EV-04-13).
 
 Order of work: CM-T086 first. ADR-015 was written and accepted by the project owner on 2026-10-05 before any identity or vault code existed. Specifications: [../crypto/vault.md](../crypto/vault.md), [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md) section 5, [ADR-010](../architecture/adr/ADR-010-browser-argon2id.md), [ADR-015](../architecture/adr/ADR-015-identity-signing-keys.md).
 
@@ -80,5 +80,5 @@ Each row reads: requirement, then implementation, then test, then evidence.
 ## 5. Pending outside the repository
 
 - Jira: status changes for CM-T086 and CM-T023 to CM-T028 through SECURITY REVIEW and TESTING; the benchmark table and the issue history as roadmap evidence.
-- EV-04-13 (CI run of the pull request) after the pull request is opened.
+- GitGuardian incident 37892113 on pull request #10 is a reviewed false positive (the first 12 bytes of a test ciphertext in EV-04-02, removed in `dbe943d`); the project owner marks it in the GitGuardian dashboard.
 - A phone benchmark (L-37).
