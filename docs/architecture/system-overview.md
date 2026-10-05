@@ -1,6 +1,6 @@
 # System Overview
 
-Status: Phase 0.5 baseline. Normative for implementation. Related: [data-flow.md](data-flow.md), [trust-boundaries.md](trust-boundaries.md), [data-model.md](data-model.md), [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md).
+Status: Phase 0.5 baseline; the cryptographic identity and the ADR list updated in Phase 4. Normative for implementation. Related: [data-flow.md](data-flow.md), [trust-boundaries.md](trust-boundaries.md), [data-model.md](data-model.md), [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md).
 
 ## 1. Purpose and scope
 
@@ -73,7 +73,7 @@ flowchart LR
 | Component | Responsibility | Never does |
 |---|---|---|
 | Web UI (`apps/web`) | Rendering, user workflows, calling the API, calling `packages/crypto` | Persist unlocked keys or plaintext; render user content as HTML; load third-party scripts |
-| Crypto package (`packages/crypto`) | Key generation, AES-GCM, RSA-OAEP, HKDF, SHA-256, Argon2id (Web Worker), canonical contexts | Accept caller-supplied IVs; use custom primitives; talk to the network |
+| Crypto package (`packages/crypto`) | Key generation, AES-GCM, RSA-OAEP, ECDSA, HKDF, SHA-256, Argon2id (Web Worker), canonical contexts, the vault format; identity verification shared with the API (`@ciphermesh/crypto/identity`) | Accept caller-supplied IVs; use custom primitives; talk to the network; return private-key bytes |
 | Nginx | TLS termination, HSTS, CSP and other headers, rate limits, body-size limits, static assets, `/api` proxy | Log request bodies or query strings of storage URLs; expose internal services |
 | API (`apps/api`) | Registration, login, sessions, MFA, authorization, policy enforcement, room and membership management, envelope storage, presigned URLs, audit append | Receive or derive content keys; return raw database models; trust client-supplied roles |
 | Worker (`apps/api`, separate entrypoint) | Expiry cleanup, cryptoperiod and abandoned-rekey handling, audit chain verification, signed checkpoints and export | Accept inbound connections |
@@ -86,7 +86,7 @@ The API and worker form a **modular monolith**: one codebase, one image, two ent
 ## 6. Core domain concepts
 
 - **User**: an account with an authentication password (Argon2id-hashed on the server), optional TOTP MFA, and a cryptographic identity.
-- **Cryptographic identity (Vault)**: an RSA-OAEP-3072 key pair. The private key is stored only encrypted under a key derived from the Vault Passphrase ([cryptographic-architecture.md](../crypto/cryptographic-architecture.md)).
+- **Cryptographic identity (Vault)**: an RSA-OAEP-3072 encryption key pair and an ECDSA P-256 signing key pair under one key ID and one fingerprint (ADR-015). Both private keys are stored only encrypted under keys derived from the Vault Passphrase ([../crypto/vault.md](../crypto/vault.md)). The public identity is available to other signed-in users through the directory.
 - **Secure Room**: a collaboration space with members, roles (OWNER, ADMIN, MEMBER, VIEWER), a security profile, versioned key material, encrypted content and an audit trail.
 - **Security profile**: STANDARD, CONFIDENTIAL or RESTRICTED. Each profile is a set of backend-enforced controls ([security-policy-profiles.md](../security/security-policy-profiles.md)).
 - **Room key version**: random 256-bit key material for one epoch of the room. It is distributed as per-member RSA-OAEP envelopes and replaced by a client-driven rekey.
@@ -103,7 +103,7 @@ The API and worker form a **modular monolith**: one codebase, one image, two ent
 | Email, display name, login metadata | Yes | Needed for authentication and administration |
 | Authentication password | Transiently during login and registration, over TLS | Stored only as an Argon2id hash |
 | Vault Passphrase | **No** | Used only in the browser |
-| User private key | **No** (only AES-GCM ciphertext) | Offline guessing against the Vault Passphrase is possible after database theft (threat T-22) |
+| User private keys (encryption and signing) | **No** (only AES-GCM ciphertext) | Offline guessing against the Vault Passphrase is possible after database theft or with a stolen session (T-22, L-39) |
 | Room key material, DEKs | **No** (only wrapped forms) | |
 | File content, filenames, MIME types | **No** (ciphertext and encrypted manifest) | Ciphertext size is visible |
 | Note titles and bodies, secret payloads | **No** | |
@@ -125,10 +125,11 @@ The API and worker form a **modular monolith**: one codebase, one image, two ent
 | [ADR-007](adr/ADR-007-asymmetric-key-wrapping.md) | RSA-OAEP-3072 with SHA-256 for room-key distribution (proposed) |
 | [ADR-008](adr/ADR-008-server-side-sessions.md) | Opaque server-side sessions instead of JWTs |
 | [ADR-009](adr/ADR-009-tamper-evident-audit-ledger.md) | Hash-chained audit ledger with signed, anchored checkpoints |
-| [ADR-010](adr/ADR-010-browser-argon2id.md) | Argon2id in the browser for the Vault (proposed) |
-| [ADR-011](adr/ADR-011-static-frontend-delivery.md) | Next.js static export served by Nginx (proposed) |
+| [ADR-010](adr/ADR-010-browser-argon2id.md) | Argon2id in the browser for the Vault (accepted in Phase 4) |
+| [ADR-011](adr/ADR-011-static-frontend-delivery.md) | Next.js static export served by Nginx (accepted for the export and CSP; identifier routing confirmed in Phase 5) |
 | [ADR-012](adr/ADR-012-room-safety-code.md) | Room Safety Code for manual key consistency checks |
 | [ADR-013](adr/ADR-013-rekey-state-machine.md) | Client-driven rekey state machine with write lock |
+| [ADR-015](adr/ADR-015-identity-signing-keys.md) | Per-user ECDSA signing keys and signed room-key versions (OCD-12) |
 
 ## 9. Differentiating features and where they are designed
 

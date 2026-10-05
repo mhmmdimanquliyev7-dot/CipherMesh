@@ -1,152 +1,121 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-04, end of Prompt 05. Repository and workflow state updated on 2026-10-04 (UTC) after the GitHub integration of Phases 1 to 3. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-05, end of Prompt 06 (Phase 4). The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
 | Item | State |
 |---|---|
-| Completed | Prompt 05 / Phase 3, Authentication (CM-T015 to CM-T022): implemented, awaiting project owner approval |
-| Next | Prompt 06 / Phase 4, Cryptographic Identity and Vault. Do not start without explicit approval |
-| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`). It contains Phases 0 to 3; the Phase 3 merge commit is `8a8e10c` |
-| Integration | Phases 1, 2 and 3 were merged through pull requests #1, #7 and #8 with merge commits (`ad179b8`, `786cef1`, `8a8e10c`). GitHub Actions CI passed on the final head of each pull request; for PR #8 that came after the two fixes listed below. The phase branches remain on GitHub, take no further commits, and their histories must never be rewritten |
-| Prompt 06 branch | **Create it from the updated `main`** (`git checkout main && git pull --ff-only`), never from a phase branch |
-
-Recent commits (oldest first):
-
-| Commit | Content |
-|---|---|
-| `cb3b222`, `5945d70` | Phase 0 and 0.5 architecture baseline |
-| `900b664` | Phase 1 application foundation (CM-T006 to CM-T012) |
-| `50eaabb`, `1952980`, `147f633`, `92418c3` | Phase 2 schema, roles and migrations; API database connection; database tests and CI; docs |
-| `1542247`, `5225cff`, `0ecf4fa`, `3b3f0a3`, `4b77d00` | Phase 3 auth_challenges migration; authentication; web screens; tests; docs |
-| `fc611cf` | This engineering handoff |
-| `753cc99`, `0a7f1e1` | Fixes from the Phase 3 pull-request CI: random per-run authentication keys for the CI seed step; zod `jitless` so the shared schemas cause no CSP violation (CSP unchanged, new E2E checks) |
-| `ad179b8`, `786cef1`, `8a8e10c` | Merge commits of pull requests #1, #7 and #8 |
+| Completed | Prompt 06 / Phase 4, Cryptographic Identity and Vault (CM-T086, CM-T023 to CM-T028): implemented, awaiting project owner approval. Traceability: [phase-04-traceability.md](phase-04-traceability.md) |
+| Next | Prompt 07 / Phase 5, Secure Rooms and RBAC (CM-T029 to CM-T032). Do not start without explicit approval |
+| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 3 (`f86a2ce`, after pull requests #1, #7, #8 and #9) |
+| Phase 4 branch | `feature/CM-T023-cryptographic-vault`, created from `f86a2ce`. Its pull request is opened for review and CI; it is merged only after the project owner approves Phase 4, with a normal merge commit |
+| Prompt 07 branch | Create it from `main` after the Phase 4 pull request is merged (`git checkout main && git pull --ff-only`) |
 
 ## 2. Architecture implemented so far
 
-- pnpm 12 monorepo, Node 24, TypeScript 6 strict: `apps/api` (Express 5, esbuild bundle), `apps/web` (Next.js 16 static export, strict hashed CSP), `packages/shared`, `packages/validation` (zod 4), `packages/crypto` (**still boundary-only: no crypto code yet**).
-- API pipeline: request ID, security headers, request log, same-origin gate (INV-19), JSON gate, body parser, route registry (deny by default, public allowlist of six routes, central session resolution, step-up and platform-admin gates, response projections), error handler.
+- pnpm 12 monorepo, Node 24, TypeScript 6 strict: `apps/api` (Express 5, esbuild bundle), `apps/web` (Next.js 16 static export, strict hashed CSP), `packages/shared`, `packages/validation` (zod 4), `packages/crypto` (Phase 4, see section 5).
+- API pipeline: request ID, security headers, request log, same-origin gate (INV-19), JSON gate, body parser, route registry (deny by default, public allowlist, central session resolution, step-up and platform-admin gates, response projections), error handler.
+- CSP: `script-src 'self' 'wasm-unsafe-eval'` plus inline-script hashes, `form-action 'none'` (since SF-04-01), no `'unsafe-inline'` or `'unsafe-eval'`. Buttons stay disabled until the page has hydrated.
 - Database access only through `apps/api/src/db` (ESLint enforced). Logs are JSON with central redaction.
 - Engineering details: `docs/architecture/engineering-baseline.md`.
 
 ## 3. Database state
 
-- PostgreSQL 17, Prisma 7.10.0 with the pg adapter. Schema v1: 16 tables, 211 classified fields (`/// class:`), five migrations; the last is `20261004000000_auth_challenges`.
-- Roles: `cm_migrator` (owner, never on the VM), `cm_api`, `cm_worker`, `cm_verifier`, with a tested grant matrix. `audit_events` is append-only (grants plus triggers); **the hash chain does not exist yet** (Phase 12).
-- About 116 CHECK constraints, including write-once public keys and key-version commitments, and size checks for envelopes, wrapped keys, IVs and digests.
-- The vault columns already exist in `user_key_pairs` (SPKI, fingerprint, encrypted private key, IV, KDF parameters, salt) but are unused.
-- Commands: `pnpm services:up && pnpm db:bootstrap && pnpm db:migrate`; checks `pnpm db:check-schema`, `pnpm db:drift`. Details: `docs/security/database-security.md`.
+- PostgreSQL 17, Prisma 7.10.0 with the pg adapter. 16 tables, 217 classified fields (`/// class:`), six migrations; the last is `20261005000000_identity_signing_key` (Phase 4).
+- Roles `cm_migrator` (owner, never on the VM), `cm_api`, `cm_worker`, `cm_verifier`, with a tested grant matrix (unchanged in Phase 4). `audit_events` is append-only; **the hash chain does not exist yet** (Phase 12).
+- `user_key_pairs` now holds one identity per row: both SPKIs, the binding signature, the fingerprint, both wrapped private keys and IVs, KDF parameters and salt, the vault format version. CHECKs bound sizes and the KDF floor and ceiling; a trigger keeps identity columns write-once and retired identities retired.
+- Commands: `pnpm services:up && pnpm db:bootstrap && pnpm db:migrate`; checks `pnpm db:check-schema`, `pnpm db:drift`. Details: `docs/security/database-security.md` (section 12 for Phase 4).
 
 ## 4. Authentication and sessions (Phase 3)
 
 - Argon2id through Node.js `crypto.argon2` (LIB-04), CP-05 m = 65536 KiB, t = 3, p = 4, with a concurrency limit. CP-06 password policy with a breach blocklist.
-- Opaque 256-bit session tokens stored as SHA-256 digests, cookie `__Host-cm_session` (HttpOnly, Secure, SameSite=Strict). 30-minute idle and 12-hour absolute lifetime, rotation, revocation, 10-session limit. No insecure-cookie switch exists; local E2E runs over HTTPS (`tests/e2e/static-server.mjs`).
-- Abuse controls: per-address limits, per-account and per-identifier backoff without lockout, and no database writes for refused requests.
-- Security events go to the redacted log through `apps/api/src/auth/security-events.ts`, **not** to `audit_events` (INV-09; Phase 12 swaps the sink).
-- Full description: `docs/security/authentication-security.md`.
+- Opaque 256-bit session tokens stored as SHA-256 digests, cookie `__Host-cm_session` (HttpOnly, Secure, SameSite=Strict); idle and absolute expiry, rotation, revocation, 10-session limit. Local E2E runs over HTTPS (`tests/e2e/static-server.mjs`).
+- TOTP MFA (LIB-06), recovery codes, step-up (`standard` 15 minutes, `strict` 5 minutes). The TOTP AAD is now built by the shared canonical builder (CD-22); Phase 3 ciphertexts still open.
+- Security events go to the redacted log through `apps/api/src/auth/security-events.ts`, **not** to `audit_events` (INV-09; Phase 12 swaps the sink). Phase 4 added the vault events.
+- Full description: `docs/security/authentication-security.md` (section 16 for Phase 4).
 
-## 5. MFA, recovery codes and step-up
+## 5. Cryptography and vault (Phase 4)
 
-- TOTP (`otpauth`, LIB-06; CP-09), secrets encrypted at rest under `TOTP_ENCRYPTION_KEY` with AAD `cm.srv.totp` (CP-11), replay protection per time step.
-- The MFA login step uses `auth_challenges` (5 minutes, 5 attempts, single use, cookie `__Host-cm_preauth`).
-- Ten 100-bit recovery codes stored as digests; single use; regeneration needs a step-up.
-- Step-up via `POST /auth/step-up` (password, plus TOTP when enabled). Route gates are `requires: { stepUp: 'standard' }` (15 minutes) or `'strict'` (5 minutes). `requireRecentAuthentication` is ready for PC-02.
-- PLATFORM_ADMIN only through `pnpm admin:platform-role` (MFA required). It grants no room access.
+- **OCD-12 decided by [ADR-015](../architecture/adr/ADR-015-identity-signing-keys.md)** (accepted 2026-10-05, before implementation): an identity is an RSA-OAEP-3072 encryption key and an ECDSA P-256 signing key under one key ID, with a binding signature and a fingerprint over both keys. Room statements (genesis, membership grants, key versions) are signed from Phase 6; the verification rule and `KEY_AUTHENTICATION_FAILED` are specified in ADR-015 section 4.
+- `packages/crypto`: AES-256-GCM with internal IVs, RSA-OAEP (32-byte values only), ECDSA, HKDF, SHA-256, RFC 8785 for the CP-15 subset (in-repo, LIB-05), the context catalogue (`contexts.ts`), identity verification shared with the API (`@ciphermesh/crypto/identity`), the vault format version 1 ([vault.md](../crypto/vault.md)). Known answers from FIPS 180-2, RFC 5869, the GCM specification, Wycheproof, RFC 6979, RFC 8785 and RFC 9106. Coverage 99.5% statements, 91.8% branches (`pnpm test:coverage:crypto`, CI gate).
+- Browser Argon2id: `argon2id` 1.0.1 (LIB-03), WebAssembly embedded and checksummed, a fresh Web Worker per derivation, one at a time, 120-second timeout. CP-04 target m = 64 MiB, t = 3, p = 1; floor and ceiling enforced in the browser, the API and the database. ADR-010 accepted. No phone benchmark (L-37).
+- Vault flows: setup (standard step-up), unlock in memory with pair checks (keys exist only while the view is unlocked, R-04-01), auto-lock (15 minutes without trusted input, sign-out, `pagehide`, session end), signed passphrase change and upgrade with compare-and-swap, reset (strict step-up, new identity, other sessions revoked), directory lookup (exact address, own vault required, rate-limited).
+- API routes: `GET /vault`, `POST /vault`, `POST /vault/rewrap`, `POST /vault/reset`, `POST /directory/lookup`.
 
 ## 6. Invariants every session must preserve
 
-All of CLAUDE.md section 6 (INV-01 to INV-19). For Prompt 06 especially:
-- **INV-01, CD-01:** the Vault Passphrase, vault-derived keys and the private key never reach the server. The account password is never reused for the vault.
-- **INV-02, INV-15, CD-14:** fresh 96-bit IVs only inside `packages/crypto`; no caller-supplied IVs; no KDF fallback, so the vault fails closed.
-- **INV-17:** RSA-OAEP only on 32-byte values.
-- **INV-10:** no keys, passphrases or decrypted data in logs.
-- Canonical contexts (CP-15) come only from the builders. No custom cryptography.
+All of CLAUDE.md section 6 (INV-01 to INV-19). For Prompt 07 especially:
+- **INV-05, INV-06:** authorization only through the central module with membership loaded from the database; room-scoped queries filtered by room ID and membership; non-members get 404.
+- **INV-08:** policy controls in the API, never only in the UI.
+- **INV-01, INV-04:** the server never receives the Vault Passphrase, private keys or room key material; Phase 5 creates no keys.
 - **INV-09:** no unchained rows in `audit_events`.
 - Never weaken tests, grants, cookies or authorization to make something pass.
 
-## 7. Documents Prompt 06 must read
+## 7. Documents Prompt 07 must read
 
-- CLAUDE.md; `docs/management/project-roadmap.md` (Phase 4); `docs/management/jira-backlog.md` (CM-T023 to CM-T028 and CM-T086).
-- `docs/crypto/` all four files, especially the parameter register CP-01 to CP-04, CP-15 to CP-18; the library register LIB-01, LIB-03, LIB-05; the decision log CD-01, CD-14 to CD-16, CD-22; open decisions OCD-02, OCD-04, OCD-10, OCD-12.
-- ADR-002, ADR-003, ADR-007 (Proposed), ADR-010 (Proposed), ADR-008, ADR-011.
-- `docs/architecture/data-flow.md` DF-03 and DF-04; `docs/architecture/data-model.md` 4.5; `docs/security/authentication-security.md`; `docs/threat-model/threat-model.md` T-22, T-23, T-25, T-36, sections 8 and 9; `docs/security/limitations.md` L-01, L-07, L-08, L-15, L-17, L-23.
+- CLAUDE.md; `docs/management/project-roadmap.md` (Phase 5); `docs/management/jira-backlog.md` (CM-T029 to CM-T032).
+- `docs/security/authorization-model.md`, `docs/security/security-policy-profiles.md`; `docs/architecture/data-model.md` 4.6 to 4.8 and section 8 (planned signed statements); `docs/architecture/data-flow.md` DF-05 and DF-06; ADR-011 (identifier routing confirmed in Phase 5), ADR-013, ADR-015.
+- `docs/threat-model/threat-model.md` T-04 to T-06, T-21, T-37 and section 10; `docs/security/limitations.md`.
 
-## 8. Test counts (last full run, 2026-10-04, locally and in the final PR #8 CI run)
+## 8. Test counts (last full local runs, 2026-10-05)
 
 | Suite | Tests |
 |---|---|
-| unit | 169 |
+| unit (24 files, including 14 in `packages/crypto` with 124 tests) | 314 |
 | integration | 19 |
-| security | 75 |
-| auth (`tests/auth`, real API and database) | 186 |
-| database (`tests/database`) | 105 |
-| **`pnpm test` total** | **554 in 36 files** |
-| `pnpm test:e2e` (Chromium, Firefox, WebKit) | 27 |
-| `pnpm security:negative-controls` | 10 of 10 defects caught (local run, Prompt 05) |
+| security | 76 |
+| auth (`tests/auth`, real API and database) | 222 |
+| vault (`tests/vault`, real API, real Argon2id and database) | 23 |
+| database (`tests/database`) | 118 |
+| **`pnpm test` total** | **772 in 53 files** |
+| `pnpm test:e2e` (Chromium, Firefox, WebKit) | 54 (52 run, 2 skipped by design: the cross-engine test runs once, from Chromium) |
+| `pnpm security:negative-controls` | 27 of 27 defects caught (local run) |
 
-The auth, database, E2E and smoke runs need the local database. CI provides a throwaway PostgreSQL service and random per-run role passwords and authentication keys.
-
-Known intermittent failure, not yet fixed: `tests/database/deletion.test.ts` "the worker may delete expired sessions…" occasionally gets 0 deleted rows. Both it and `tests/database/retention.test.ts` use the same shared test database, and Vitest runs files in parallel. `runAuthRetention` deletes every session that ended more than 30 days ago, which includes the deletion test's 40-day-old session if it runs between that test's insert and delete. The proposed fix gives that session an end time inside the 30-day window, or isolates the retention test's database, and belongs in its own fix pull request.
+The auth, vault, database, E2E and smoke runs need the local database. CI provides a throwaway PostgreSQL service and random per-run role passwords and authentication keys. Local note: with many other containers running, a parallel E2E run once crashed browser processes for lack of memory; it passed when run alone.
 
 ## 9. Known limitations and residual risks
 
-- Audit hash chain absent; table owner can bypass append-only (L-26); auth events only in the log (L-33).
+- New in Phase 4: no phone benchmark (L-37); the vault lock is client-side (L-38); a session holder can download the encrypted vault and guess offline (L-39); a passphrase change does not re-key (L-40); the directory reveals which addresses have a vault (L-41).
+- T-36 stays open until Phase 6 implements the signed key-version verification (L-23).
+- Audit hash chain absent; table owner can bypass append-only (L-26); auth and vault events only in the log (L-33).
 - Targeted login delay through backoff (L-30); in-memory rate limits per process (L-32); no Nginx yet.
-- No TOTP key rotation tooling (L-31); TOTP is phishable (L-34).
-- Registration reveals taken emails (L-35); emails unverified (L-21); static breach list (L-36).
-- Argon2id benchmark ran on a 2-CPU container, not the production VM.
-- Constraints check shapes, not meaning (L-27); local roles are not cloud IAM (L-28); no local database TLS (L-29).
-- Admin-assisted reset (PA-04) is a documented procedure without tooling.
+- No TOTP key rotation tooling (L-31); TOTP is phishable (L-34). Registration reveals taken emails (L-35); emails unverified (L-21).
 - Full list: `docs/security/limitations.md`.
 
 ## 10. Deferred decisions
 
 | Decision | Status |
 |---|---|
-| **OCD-12 / CM-T086: key-version authentication (T-36)** | **Open. A P0 prerequisite of Phase 4:** decide by ADR before vault work, because it may add a signing key to the identity format |
-| OCD-02 / LIB-03, CP-04: browser Argon2id library and parameters | Phase 4 (ADR-010 Proposed) |
-| OCD-04 / LIB-05: RFC 8785 implementation | Phase 4; must reproduce the bytes of the server context `cm.srv.totp` (CD-22) |
-| OCD-01 / ADR-007: RSA-OAEP-3072 versus HPKE | Before Phase 6 |
-| OCD-10: printable vault recovery key | Phase 4 stretch |
-| OCD-11: WebAuthn | After Phase 3, stretch |
+| OCD-01 / ADR-007: RSA-OAEP-3072 versus HPKE | Before Phase 6: an envelope created in one engine must open in another |
+| ADR-015 section 4: exact room-statement formats and columns | Phase 6 (CM-T033 to CM-T036) and Phase 11 (CM-T050); planned fields in data-model section 8 |
+| OCD-06: fingerprint pinning | After Phase 12, stretch |
+| OCD-10: user-held vault recovery key | Not implemented; later stretch, never server escrow |
+| OCD-11: WebAuthn | Stretch |
+| Phone benchmark of CP-04 | Open (L-37) |
 | Production VM Argon2id benchmark; Nginx limits; secret files; TOTP key rotation | Phase 17 |
-| Worker scheduling for `pnpm worker:retention` | Phase 12 |
 
 ## 11. Outstanding work outside the repository
 
-- Done: GitHub remote created; Phases 1 to 3 merged through pull requests #1, #7 and #8, each with CI passing on its final head.
-- Branch protection (CM-T012): `main` has a ruleset (pull request required, resolved review threads, no force push or deletion), but its list of required status checks is empty, so a pull request with failing checks could still merge. Add the three CI jobs as required checks to meet "pull requests cannot merge with failing checks". Then capture EV-01-01 (CI run), EV-01-02 and EV-01-03 from GitHub.
-- GitGuardian: tag the three PR #8 incidents (37860799 to 37860801) as false positives (synthetic test credentials), as done for Phase 1. The classification is in the PR #8 comments.
-- Dependabot pull requests #2 to #6 are open. #2 (PostgreSQL 18) conflicts with the approved PostgreSQL 17 and needs an ADR. #6 (`@types/node` 26) is ahead of Node 24 in `.nvmrc`. Review the others through CI and SECURITY REVIEW.
-- Jira: import the backlog (`docs/management/jira-import-guide.md`); move CM-T006 to CM-T022 through IN PROGRESS, SECURITY REVIEW and TESTING. Nothing is DONE yet.
-- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, and the roadmap's Jira history items for Phases 2 and 3.
-- Captured evidence: `docs/report/evidence/index.md`.
+- GitHub: the Phase 4 pull request awaits review, CI and the project owner's approval; merge only with a normal merge commit.
+- Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including the coverage step) as required checks. Then capture EV-01-01 (CI run), EV-01-02 and EV-01-03.
+- GitGuardian: review any incident on the Phase 4 pull request; the Wycheproof vectors contain public test keys by design (`packages/crypto/vectors/README.md`).
+- Dependabot pull requests #2 to #6 remain open (see the Phase 3 handoff notes: #2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24).
+- Jira: import the backlog (the CSV now matches ADR-015); move CM-T006 to CM-T028 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING. Create the security finding SF-04-01 (label `security-finding`, fixed in the Phase 4 pull request). Nothing is DONE yet.
+- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 4, EV-04-13 (CI run).
 
-## 12. Scope of Prompt 06 (Phase 4, CM-T023 to CM-T028, after CM-T086)
+## 12. Scope of Prompt 07 (Phase 5, CM-T029 to CM-T032)
 
-1. **CM-T086 first:** ADR for OCD-12, then update the identity, envelope and key-version formats as decided.
-2. **CM-T023** `packages/crypto`:
-   - WebCrypto wrappers: AES-256-GCM with internal IVs, RSA-OAEP with labels, HKDF, SHA-256, base64url.
-   - RFC 8785 canonicalization and the context builders.
-   - Known-answer and tamper tests; at least 90% coverage.
-3. **CM-T024** browser Argon2id: LIB-03 selection, Web Worker, benchmark, final CP-04, ADR-010 accepted.
-4. **CM-T025** vault setup (DF-03):
-   - Key-pair generation and private-key wrapping in the browser.
-   - Upload of the public key and the ciphertext only.
-   - API validation of the uploaded key.
-5. **CM-T026** vault unlock (DF-04): non-extractable private key, auto-lock (CP-22, logout, tab close, session invalidation), generic error for a wrong passphrase.
-6. **CM-T027** public-key directory and fingerprint display (SS-05, CP-17).
-7. **CM-T028** passphrase change and re-wrap.
-8. Add vault reset to the session invalidation table (it revokes other sessions).
-9. Security checkpoint: no passphrase or private key leaves the browser (network capture); no keys in browser storage.
+1. **CM-T029** central authorization module implementing the shared matrix; route-registry enforcement.
+2. **CM-T030** room creation, listing, renaming and deletion (room keys arrive in Phase 6: check the backlog item for the key-material boundary).
+3. **CM-T031** membership administration: role changes and ownership transfer.
+4. **CM-T032** BOLA and IDOR suite for every room-scoped route.
+5. Security checkpoint: every route declared and tested; PLATFORM_ADMIN has no room access; non-members receive 404.
 
-## 13. Prompt 06 must NOT implement
+## 13. Prompt 07 must NOT implement
 
-- Secure Rooms, room RBAC or the authorization matrix (Phase 5).
-- Room key material, envelopes, rekey, the Room Safety Code (Phase 6 onward).
+- Room key material, envelopes, signed room statements, rekey or the Room Safety Code (Phase 6 onward).
 - File, note or secret encryption; object storage (Phases 7 to 9).
-- Security policy engine (Phase 10); audit hash chain or checkpoints (Phase 12); Crypto Inspector or Security Dashboard (Phases 13 and 14).
+- The security policy engine (Phase 10), the audit hash chain (Phase 12), the Crypto Inspector or the Security Dashboard (Phases 13 and 14).
 - Deployment, Nginx or cloud resources (Phase 17 onward).
-- Any server-side handling of the Vault Passphrase or private key; any reuse of the account password for the vault.
+- Any server-side handling of the Vault Passphrase or private keys.

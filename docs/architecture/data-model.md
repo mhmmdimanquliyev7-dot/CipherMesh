@@ -1,6 +1,6 @@
 # Data Model Proposal
 
-Status: Phase 0.5 design, implemented in Phase 2 as `prisma/schema.prisma` (schema v1). Section 7 records how the implementation maps to this design and every justified deviation. Database security controls: [../security/database-security.md](../security/database-security.md). Related: [data-flow.md](data-flow.md), [../crypto/key-hierarchy.md](../crypto/key-hierarchy.md), [../security/authorization-model.md](../security/authorization-model.md).
+Status: Phase 0.5 design, implemented in Phase 2 as `prisma/schema.prisma` (schema v1) and extended in Phase 4 (section 4.5, identity signing key, ADR-015). Section 7 records how the implementation maps to this design and every justified deviation; section 8 lists the additions that ADR-015 plans for Phases 6 and 11. Database security controls: [../security/database-security.md](../security/database-security.md). Related: [data-flow.md](data-flow.md), [../crypto/key-hierarchy.md](../crypto/key-hierarchy.md), [../security/authorization-model.md](../security/authorization-model.md).
 
 ## 1. Principles
 
@@ -124,21 +124,28 @@ Retention: deleted by the worker one day after expiry.
 Retention: 90 days, then deleted by the worker. Feeds rate limiting and the Security Dashboard.
 
 ### 4.5 UserKeyPair (cryptographic identity, "Vault")
-Ownership: the user. Only the owner can fetch `encryptedPrivateKey`. Other members see the public fields.
+Ownership: the user. One row is one identity: an RSA-OAEP encryption key pair and an ECDSA signing key pair under one key ID (ADR-015). Only the owner can fetch the wrapped private keys and the KDF metadata (`GET /api/vault`). Other users see only the public identity, through the directory (CM-T027). Format: [../crypto/vault.md](../crypto/vault.md).
 
 | Field | Type | Class | Notes |
 |---|---|---|---|
-| id (keyId), userId | uuid | ID | Client-generated keyId, validated for uniqueness |
-| status | enum ACTIVE, SUPERSEDED, REVOKED | META | One ACTIVE per user (partial unique index) |
+| id (keyId), userId | uuid | ID | Client-generated UUIDv4 key ID; it is part of every vault context |
+| status | enum ACTIVE, SUPERSEDED, REVOKED | META | One ACTIVE per user (partial unique index). A retired identity never becomes ACTIVE again (trigger) |
 | algorithmSuite | text | META | `CM1` |
-| publicKeySpki | bytea | PUBK | RSA-3072, e = 65537, validated on upload |
-| publicKeyFingerprint | text(64), unique | INT | Hex SHA-256 of the SPKI bytes |
-| encryptedPrivateKey | bytea | CT | AES-256-GCM of the PKCS#8 private key under PKWK |
+| publicKeySpki | bytea(422) | PUBK | Encryption key: RSA-OAEP-3072, e = 65537, validated on upload |
+| signingPublicKeySpki | bytea(91) | PUBK | Signing key: ECDSA P-256 (Phase 4, ADR-015) |
+| publicKeyFingerprint | text(64), unique | INT | Identity fingerprint: hex SHA-256 over both public keys (CP-17 as revised by ADR-015) |
+| identitySignature | bytea(64) | INT | Binding signature of the signing key over `cm.identity.binding` (Phase 4) |
+| encryptedPrivateKey | bytea, 1025 to 2048 bytes | CT | AES-256-GCM of the PKCS#8 encryption private key under its wrapping key; NULL unless ACTIVE |
 | privateKeyIv | bytea(12) | META | Not secret |
+| encryptedSigningPrivateKey | bytea, 64 to 256 bytes | CT | AES-256-GCM of the PKCS#8 signing private key under its own wrapping key; NULL unless ACTIVE (Phase 4) |
+| signingPrivateKeyIv | bytea(12) | META | Not secret (Phase 4) |
+| vaultVersion | int | META | Vault format version, 1 (Phase 4) |
 | kdfAlgorithm | text | META | `argon2id`, version 0x13 |
-| kdfMemoryKiB, kdfIterations, kdfParallelism | int | META | Must meet the floor in the parameter register |
-| kdfSalt | bytea(16) | META | Not secret |
-| createdAt, supersededAt, revokedAt | timestamptz | META | |
+| kdfMemoryKiB, kdfIterations, kdfParallelism | int | META | Between the floor and the ceiling in the parameter register (CP-04) |
+| kdfSalt | bytea(16) | META | Not secret; new on every vault write |
+| createdAt, rewrappedAt, supersededAt, revokedAt | timestamptz | META | `rewrappedAt` records the last passphrase change or upgrade (Phase 4) |
+
+The identity columns (user, suite, both public keys, fingerprint, binding signature) are write-once. A passphrase change updates only the wrapped keys, their IVs, the KDF metadata and `rewrappedAt`.
 
 ### 4.6 Room
 Ownership: the room OWNER. Content belongs to the room.
@@ -339,7 +346,7 @@ Any of these in a schema, log, API response or migration is a critical defect.
 |---|---|
 | Plaintext or reversibly encrypted account password (`password`, `passwordEncrypted`) | Passwords are hashed with Argon2id only (INV-11) |
 | Any Vault Passphrase value, hash or verifier | Would enable passphrase recovery or faster guessing; the passphrase never reaches the server (INV-01) |
-| Plaintext private key, VRK, PKWK or any vault-derived key | INV-01 |
+| Plaintext private key (encryption or signing), VRK, PKWK or any vault-derived key | INV-01 |
 | Plaintext room key material, RWK, or any column named like `roomKey` holding key bytes | INV-04 |
 | Plaintext FEK, NEK or SEK | INV-01 |
 | Plaintext filename, MIME type or plaintext hash of a file | Metadata and confirmation-of-file attacks (INV-16) |
@@ -376,8 +383,23 @@ Schema v1 implements sections 4.1 to 4.13 and 4.15 as 15 tables. Every stored fi
 | Room key state | CHECK that ACTIVE has no reasons and REKEY_REQUIRED or REKEYING has at least one | ADR-013: manual rotation keeps the room ACTIVE, so REKEYING always follows REKEY_REQUIRED |
 | SecurityPolicy (4.16), Organization (4.17) | Not tables, as designed | The checker fails on a SecurityPolicy model |
 | AuthChallenge (4.3.1) | **Added in Phase 3** (migration `20261004000000_auth_challenges`) | The session design specifies a pre-authentication state with its own cookie, lifetime and attempt limit but not its storage. A separate table keeps it from ever being confused with a session |
+| Identity signing key (4.5) | **Added in Phase 4** (migration `20261005000000_identity_signing_key`): signing SPKI, binding signature, wrapped signing key and its IV, vault format version, `rewrapped_at` | ADR-015 (OCD-12). The new columns are NOT NULL without defaults on purpose: no identity existed before Phase 4, and the migration would fail rather than invent a signing key for an existing row |
+| Identity constraints (4.5) | **Phase 4:** CHECK constraints for the new sizes, the format version, the KDF ceiling, an upper bound of 2048 bytes for the wrapped encryption key and ACTIVE if and only if the wrapped signing key is present; the write-once trigger also covers the signing key and the binding signature and makes a retired status final | A database write cannot attach a different signing key to an identity, revive an old identity or store parameters that make browsers derive without bound. The constraints check shapes, not meaning (L-27) |
 
 ### 7.2 Not decided by the schema
 
 - Whether a non-burn secret keeps its payload after the first reveal is not specified in 4.13. The schema allows it (`status` stays ACTIVE with `revealed_at` set) and forbids a REVEALED secret with a payload. Phase 9 (CM-T043 to CM-T044) decides and documents it.
-- Variable-length ciphertexts (notes, manifests, secret payloads, encrypted private keys) have lower bounds only. Upper bounds belong to the API request schemas of the feature phases.
+- Variable-length ciphertexts (notes, manifests, secret payloads) have lower bounds only. Upper bounds belong to the API request schemas of the feature phases. The wrapped private keys have both bounds since Phase 4.
+
+## 8. Planned additions for signed room statements (ADR-015)
+
+ADR-015 section 4 makes room authority verifiable by members. The exact columns are decided and migrated with their features in Phase 6 (CM-T033 to CM-T036) and Phase 11 (CM-T050); this list fixes what has to be stored so that every statement can be verified later by any member.
+
+| Entity | Planned fields | Purpose |
+|---|---|---|
+| Room (4.6) | `creatorKeyId`, `genesisSignature` (64 bytes) | The creator's signature over `cm.room.genesis` {roomId, creator user and key ID, suite}: the root of the room's authority chain |
+| RoomMember (4.7) and Invitation (4.8) | `subjectKeyId`, `grantorUserId`, `grantorKeyId`, `grantSignature` (64 bytes) | `cm.room.membership-grant` signed by the inviter, or by the OWNER for ADMIN grants and ownership transfers |
+| RoomKeyVersion (4.9) | `createdByKeyId`, `previousCommitment`, the signed recipient list (user and key IDs), `keyVersionSignature` (64 bytes) | `cm.room.key-version` signed by the creating OWNER or ADMIN. Members check that they are in the signed list and that the commitment of the decrypted key matches (CD-24) |
+| RekeyOperation (4.9.1) | The signed key-version statement is part of the finalize payload and therefore of `payloadDigest` | Idempotent finalize covers the signature |
+
+Public keys of SUPERSEDED and REVOKED identities stay in `user_key_pairs`, so statements signed before a reset remain verifiable.

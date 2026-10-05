@@ -1,13 +1,13 @@
 # Data Flows
 
-Status: Phase 0.5 baseline. Normative for implementation. Related: [trust-boundaries.md](trust-boundaries.md), [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md), [../crypto/key-hierarchy.md](../crypto/key-hierarchy.md).
+Status: Phase 0.5 baseline; DF-03 and DF-04 updated to the Phase 4 implementation (identity signing key, ADR-015), with DF-04a (passphrase change) and DF-04b (vault reset) added. Normative for implementation. Related: [trust-boundaries.md](trust-boundaries.md), [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md), [../crypto/key-hierarchy.md](../crypto/key-hierarchy.md).
 
 Notation used in this document:
 
 | Symbol | Meaning |
 |---|---|
 | VRK | Vault Root Key: Argon2id output, never stored |
-| PKWK | Private-Key Wrapping Key, derived from VRK with HKDF |
+| PKWK | Private-Key Wrapping Key, derived from VRK with HKDF; one per private key (purpose encryption or signing) |
 | RKM_v | Room Key Material for room key version v (32 random bytes) |
 | RWK_v | Room Wrapping Key, derived from RKM_v with HKDF, wraps DEKs |
 | RKC_v | Room Key Commitment, derived from RKM_v with HKDF, stored in clear |
@@ -22,7 +22,9 @@ All identifiers that appear inside cryptographic contexts (user, key, room, file
 |---|---|---|---|
 | DF-01 Registration and login | Email, display name, auth password (TLS only) | None | Vault Passphrase |
 | DF-02 MFA | TOTP codes, recovery codes (TLS only) | None | None |
-| DF-03 Vault setup | Public key, fingerprint, KDF parameters, salt | Encrypted private key | Vault Passphrase, VRK, PKWK, private key |
+| DF-03 Vault setup | Both public keys, binding signature, fingerprint, KDF parameters, salt | Both wrapped private keys with their IVs | Vault Passphrase, VRK, PKWKs, private keys |
+| DF-04a Passphrase change | Previous and new salt, KDF parameters, signature | Both re-wrapped private keys with new IVs | Old and new Vault Passphrase, VRKs, PKWKs, private keys |
+| DF-04b Vault reset | ID of the identity being replaced, new public identity, KDF parameters, salt | Both new wrapped private keys | Vault Passphrase, VRK, PKWKs, private keys |
 | DF-05 Room creation | Room name, profile, commitment | RKM envelope for the owner | RKM, RWK |
 | DF-06 Invitation | Invitee ID, role, confirmed fingerprint | RKM envelopes for the invitee | RKM |
 | DF-07 and DF-08 Files | Sizes, ciphertext hash, expiry | File ciphertext, encrypted manifest, wrapped FEK | Filename, MIME type, plaintext hash, FEK |
@@ -102,25 +104,33 @@ sequenceDiagram
   participant W as Web Worker (Argon2id)
   participant A as API
   participant D as PostgreSQL
-  U->>B: choose Vault Passphrase (stays in the browser)
-  B->>B: generate RSA-OAEP-3072 key pair and keyId
-  B->>B: generate 128-bit random salt
-  B->>W: passphrase, salt, Argon2id parameters
-  W-->>B: VRK (32 bytes)
-  B->>B: PKWK = HKDF-SHA-256(VRK, info ctx vault.pk-wrap)
-  B->>B: encryptedPrivateKey = AES-256-GCM wrap of PKCS8 private key, AAD ctx vault.private-key
-  B->>B: fingerprint = SHA-256 of the SPKI public key
-  B->>A: POST /api/vault with SPKI, fingerprint, encrypted private key, IV, salt, parameters, keyId
-  A->>A: check RSA 3072 and e=65537, fingerprint matches SPKI, parameters at or above floor
-  A->>D: insert user key pair as ACTIVE, audit VAULT_CREATED
-  A-->>B: 201 Created
-  B->>B: drop extractable key handle, zero VRK buffer (best effort)
+  U->>B: account password (and MFA code) for a step-up, unless recent
+  B->>A: POST /api/auth/step-up
+  U->>B: choose Vault Passphrase (stays in the browser), acknowledge that it cannot be recovered
+  B->>B: check the passphrase policy locally (CP-06)
+  par identity
+    B->>B: generate keyId, RSA-OAEP-3072 and ECDSA P-256 key pairs
+    B->>B: binding signature over ctx identity.binding, fingerprint over both public keys
+  and key derivation
+    B->>W: passphrase bytes (transferred), new 128-bit salt, target parameters
+    W-->>B: VRK (32 bytes), imported at once as a non-extractable HKDF key
+  end
+  B->>B: PKWK_encryption, PKWK_signing = HKDF(VRK, ctx vault.pk-wrap with purpose)
+  B->>B: wrap both PKCS8 private keys with AES-256-GCM, AAD ctx vault.private-key
+  B->>A: POST /api/vault: public identity, KDF parameters and salt, both IVs and ciphertexts
+  A->>A: strict schema, sizes, KDF floor and ceiling, format version, verify the identity (shared code)
+  A->>D: insert identity as ACTIVE (one per user), security event VAULT_CREATED
+  A-->>B: 201 Created with the fingerprint
+  B->>A: GET /api/vault
+  A-->>B: stored record
+  B->>B: open the stored record with the derived keys as non-extractable keys, run the pair checks
 ```
 
 Security notes:
-- The private key is generated extractable only so that it can be wrapped once. After setup the page reloads it through the unlock flow as a non-extractable key.
-- The server validates the declared KDF parameters against the floor in the parameter register. Declared parameters are the ones actually used, because other devices must derive the same key.
-- The server never stores any verifier of the Vault Passphrase.
+- The private keys are generated extractable only so that they can be wrapped once. They are wrapped inside WebCrypto (`wrapKey`), so their PKCS#8 bytes never appear in JavaScript, and they go out of scope after the stored record has been opened as non-extractable keys.
+- The server validates the declared KDF parameters against the floor and ceiling in the parameter register. Declared parameters are the ones actually used, because other devices must derive the same key.
+- The server never stores any verifier of the Vault Passphrase. The request schema refuses unknown fields, so no other value can travel with the record.
+- Details and every check: [../crypto/vault.md](../crypto/vault.md).
 
 ## DF-04 Vault unlock
 
@@ -131,22 +141,67 @@ sequenceDiagram
   participant B as Browser and packages/crypto
   participant W as Web Worker (Argon2id)
   participant A as API
-  B->>A: GET /api/vault (own record only)
-  A-->>B: SPKI, keyId, encrypted private key, IV, salt, KDF parameters
-  B->>B: refuse parameters below the floor (fail closed)
+  B->>A: GET /api/vault (own record only, no identifier accepted)
+  A-->>B: public identity, KDF parameters and salt, both IVs and ciphertexts
+  B->>B: refuse unknown versions and parameters outside floor and ceiling (fail closed)
+  B->>B: verify the identity: binding signature, fingerprint, user ID
   U->>B: Vault Passphrase
-  B->>W: derive VRK
+  B->>W: derive VRK (one derivation at a time per tab)
   W-->>B: VRK
-  B->>B: PKWK = HKDF(VRK), unwrap private key as non-extractable
-  alt authentication tag fails
-    B-->>U: generic message: wrong passphrase or damaged vault
+  B->>B: PKWKs = HKDF(VRK), unwrap both private keys as non-extractable
+  alt authentication tag or pair check fails
+    B-->>U: one generic message: wrong passphrase or damaged vault
   else success
-    B->>B: pair check: encrypt a random 32-byte value with SPKI, decrypt with private key
-    B->>B: keep private key in memory only, start auto-lock timer
+    B->>B: pair checks: RSA-OAEP round trip of a random 32-byte value, ECDSA sign and verify of a random challenge
+    B->>B: keep the private keys in memory only, start the auto-lock timer
   end
 ```
 
-Passphrase guesses in this flow are offline and invisible to the server. The protection against guessing is the Argon2id cost and passphrase strength, not rate limiting (T-22).
+Passphrase guesses in this flow are offline and invisible to the server. The protection against guessing is the Argon2id cost and passphrase strength, not rate limiting (T-22). The vault locks after 15 minutes without user input, on sign-out, when the page is closed and when the API reports the session as ended (CP-22).
+
+## DF-04a Vault Passphrase change and parameter upgrade
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant B as Browser and packages/crypto
+  participant W as Web Worker (Argon2id)
+  participant A as API
+  participant D as PostgreSQL
+  U->>B: step-up with the account password, then current and new Vault Passphrase
+  B->>W: derive the current VRK from the stored salt
+  B->>B: unwrap both private keys (extractable for this operation only), pair checks
+  B->>W: derive the new VRK from a new salt and parameters at least as strong
+  B->>B: wrap the same private keys under the new PKWKs
+  B->>B: sign ctx vault.rewrap with the identity's signing key
+  B->>A: POST /api/vault/rewrap: keyId, previous salt, new KDF data, new IVs and ciphertexts, signature
+  A->>A: key ID and previous salt current, not weaker, salt not reused, signature valid under the stored signing key
+  A->>D: update only if the stored salt still equals the previous salt (compare-and-swap), event VAULT_REWRAPPED
+  A-->>B: 200 OK
+  B->>B: open the stored result with the new keys as non-extractable keys
+```
+
+The identity, the key ID and the fingerprint do not change. A parameter upgrade is the same flow with the same passphrase. Old copies of the record still open with the old passphrase (L-40).
+
+## DF-04b Vault reset after a lost passphrase
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant B as Browser and packages/crypto
+  participant A as API
+  participant D as PostgreSQL
+  U->>B: strict step-up (account password and MFA code, 5 minutes), new Vault Passphrase, acknowledgement
+  B->>B: create a new identity and vault as in DF-03
+  B->>A: POST /api/vault/reset: supersedesKeyId, new record
+  A->>A: same validation as DF-03; supersedesKeyId must be the current ACTIVE identity
+  A->>D: one transaction: old identity SUPERSEDED with its wrapped keys set to NULL, new identity ACTIVE, other sessions revoked, current session rotated, event VAULT_RESET
+  A-->>B: 201 Created with the new fingerprint and a new session cookie
+```
+
+The new identity has a new fingerprint, which contacts can notice. From Phase 6 the same transaction also handles the room envelopes and invitations of the old identity (key-lifecycle section 3).
 
 ## DF-05 Room creation and initial key version
 

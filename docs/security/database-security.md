@@ -1,6 +1,6 @@
 # Database Security (Phase 2)
 
-Status: implemented in Phase 2 (CM-T013, CM-T014), awaiting project owner approval. Normative for every later phase that touches PostgreSQL. Related: [../architecture/data-model.md](../architecture/data-model.md), [../architecture/trust-boundaries.md](../architecture/trust-boundaries.md) (TB-05), [../threat-model/threat-model.md](../threat-model/threat-model.md), [limitations.md](limitations.md).
+Status: implemented in Phase 2 (CM-T013, CM-T014); section 12 records the Phase 4 identity migration. Normative for every later phase that touches PostgreSQL. Related: [../architecture/data-model.md](../architecture/data-model.md), [../architecture/trust-boundaries.md](../architecture/trust-boundaries.md) (TB-05), [../threat-model/threat-model.md](../threat-model/threat-model.md), [limitations.md](limitations.md).
 
 The database is treated as a security boundary, not as trusted storage. The design goal is that a full copy of the database reveals metadata but no content, keys or passwords, and that a compromised API process cannot rewrite the schema, the audit table or its own privileges.
 
@@ -100,7 +100,7 @@ Prisma expresses the tables, enums, foreign keys and partial unique indexes. The
 | A login attempt stores exactly one of account ID or 32-byte identifier HMAC | `num_nonnulls(...) = 1` | 4.4 |
 | Identifiers are UUIDv4 | Format check on every primary key | Principle 6 |
 | Files at most 50 MiB of plaintext | `ciphertext_size BETWEEN 16 AND 52428816` | CP-19 |
-| Public identity keys and key-version commitments are write-once | `BEFORE UPDATE` triggers | 4.5, 4.9, T-25, T-36 |
+| Public identity keys and key-version commitments are write-once; a retired identity never becomes ACTIVE again (Phase 4) | `BEFORE UPDATE` triggers | 4.5, 4.9, T-25, T-36, T-40 |
 | No cascading deletes | Every foreign key is `ON DELETE RESTRICT`, except the purge of closed rekey operations (`SET NULL`) | Section 5 |
 
 Constraints are a second layer behind API validation. They do not know whether a 384-byte value really is an RSA-OAEP ciphertext; they only make a whole class of mistakes (plaintext in a ciphertext column, a missing tombstone step) impossible to store.
@@ -127,8 +127,8 @@ The question for T-01: what damage follows if an attacker copies the entire Post
 | TOTP secret | AES-256-GCM under a key held outside the database (SENC) | Nothing without the server key file | TOTP secrets |
 | Session tokens, recovery codes | SHA-256 digests of 256-bit and 100-bit random values (DIG) | Nothing usable: the values cannot be recovered from digests of high-entropy secrets | Sessions, recovery codes |
 | Login attempts | Account ID or identifier HMAC, IP address, user agent | Login timing and source addresses for 90 days | Unknown identifiers (keyed HMAC) |
-| Identity private keys | AES-256-GCM under PKWK, derived in the browser from the Vault Passphrase with Argon2id (CT) | Offline guessing of weak Vault Passphrases (T-22, L-08), at Argon2id cost per guess | Strong passphrases; no server-side verifier exists to speed up guessing |
-| Public keys and fingerprints | Plaintext (PUBK, INT) | Nothing secret | |
+| Identity private keys (encryption and signing, Phase 4) | AES-256-GCM under one wrapping key per private key, derived in the browser from the Vault Passphrase with Argon2id m = 64 MiB, t = 3 (CT) | Offline guessing of weak Vault Passphrases (T-22, L-08), at Argon2id cost per guess; one guess tests both keys, because they share the passphrase | Strong passphrases; no server-side verifier exists to speed up guessing |
+| Public keys, binding signatures and fingerprints | Plaintext (PUBK, INT) | Nothing secret | |
 | Room names, profiles, membership, roles, key versions, timestamps | Plaintext (META) | The social graph and activity metadata (L-05, T-28) | |
 | Room key material | Only RSA-OAEP-3072 envelopes per member key (WK) | Nothing without a member's private key | Every room key |
 | Key-version commitments | HKDF output (INT) | Nothing about the key: HKDF output does not reveal its input | |
@@ -194,3 +194,17 @@ Phase 3 added the first retention job, `pnpm worker:retention` (`apps/api/src/db
 
 The Phase 2 record stated that `apps/api/src/logging/redact.test.ts` tested the redaction of URLs carrying credentials. The redaction rule existed, but the test had not been written: the scripted edit that should have added it did not match its anchor and changed nothing, and the gap was not noticed because the other tests passed. The test was added in Phase 3 (`redacts URLs that carry credentials`), and later scripted edits check that their anchor exists.
 
+## 12. Phase 4: identity signing key (migration `20261005000000_identity_signing_key`)
+
+ADR-015 adds a signing key to every identity. The hand-written migration adds `signing_public_key_spki`, `identity_signature`, `encrypted_signing_private_key`, `signing_private_key_iv`, `vault_version` and `rewrapped_at` to `user_key_pairs`, each declared and classified in `prisma/schema.prisma` (`/// class:`) and accepted by the forbidden-field checker (the two private-key columns are on its ciphertext allowlist).
+
+| Rule | Mechanism |
+|---|---|
+| Signing SPKI 91 bytes, binding signature 64 bytes, signing-key IV 12 bytes, wrapped signing key 64 to 256 bytes, wrapped encryption key at most 2048 bytes | Length checks |
+| Vault format version 1 only | `vault_version = 1` |
+| KDF ceiling m = 262144 KiB, t = 10, p = 4 (CP-04) | Range check next to the Phase 2 floor |
+| Only the ACTIVE identity keeps its wrapped signing key | `(status = 'ACTIVE') = (encrypted_signing_private_key IS NOT NULL)`, like the encryption key |
+| `rewrapped_at` never precedes `created_at` | Check |
+| The signing key and the binding signature are write-once; a SUPERSEDED or REVOKED identity can never change status again | The Phase 2 trigger function, replaced with the extended version |
+
+The new columns are NOT NULL without defaults: no identity existed before Phase 4, and on a database with key-pair rows the migration fails instead of inventing values. Grants are unchanged: `cm_api` already holds SELECT, INSERT and UPDATE on `user_key_pairs` (section 2), which the passphrase change and the reset need. `tests/database/constraints.test.ts` covers every new rule by SQLSTATE, including the write-once signing key, a permitted re-wrap and the final retired status. A copy of the database now also reveals the signing public keys and binding signatures, which are public by design (section 6).

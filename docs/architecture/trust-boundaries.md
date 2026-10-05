@@ -1,6 +1,6 @@
 # Trust Boundaries
 
-Status: Phase 0.5 baseline. Related: [system-overview.md](system-overview.md), [data-flow.md](data-flow.md), [../threat-model/threat-model.md](../threat-model/threat-model.md).
+Status: Phase 0.5 baseline; TB-01 and TB-03 updated in Phase 4 (the Argon2id Web Worker and the vault). Related: [system-overview.md](system-overview.md), [data-flow.md](data-flow.md), [../threat-model/threat-model.md](../threat-model/threat-model.md).
 
 A trust boundary is any point where data or control passes between parties that trust each other differently. Every boundary below has explicit validation and a list of what may cross it. Threat IDs (T-xx) refer to the threat model.
 
@@ -67,7 +67,9 @@ TB-10 (member to member) is logical: it runs through the API and is not drawn se
 - **Crosses:** Vault Passphrase and auth password typed by the user; decrypted content displayed to the user.
 - **Risks:** compromised device, malicious extensions, shoulder surfing, clipboard leakage (T-23).
 - **Controls:** keys held only in memory; non-extractable `CryptoKey` objects; vault auto-lock on inactivity; no persistence of plaintext or unlocked keys in browser storage; guidance for RESTRICTED rooms (dedicated browser profile, no extensions).
-- **Residual:** a compromised device sees everything its user sees. Documented limitation.
+- **Inner boundary, page to Argon2id Web Worker (Phase 4):** the page transfers the passphrase bytes, the salt and the parameters to a fresh dedicated worker loaded from the same origin; the worker returns only the 32-byte result. Both sides validate every message (`packages/crypto/src/kdf/protocol.ts`): the worker accepts one request of the expected shape with parameters inside floor and ceiling, and the page accepts only a 32-byte answer. The worker wipes its copy of the passphrase and is terminated after each derivation. It is part of Z1 and runs under the same CSP, so it is a resource and isolation boundary, not a trust boundary against the page.
+- **Implementation (Phase 4):** unlock in memory only, verified by Playwright inspection of cookies, localStorage, sessionStorage, IndexedDB and the Cache API in three engines; auto-lock after 15 minutes without trusted input, on sign-out, on `pagehide` and when the session ends ([../crypto/vault.md](../crypto/vault.md) section 6.3).
+- **Residual:** a compromised device sees everything its user sees. Documented limitation (L-01); the auto-lock is client-side only (L-38).
 
 ### TB-02 Browser to Nginx over the internet
 - **Crosses:** credentials at login and registration, session cookie, CSRF-relevant headers, ciphertext of notes and secrets, wrapped keys, metadata.
@@ -77,7 +79,7 @@ TB-10 (member to member) is logical: it runs through the API and is not drawn se
 ### TB-03 Code delivery from server to browser
 - **Crosses:** the JavaScript, WebAssembly and HTML that perform all client-side cryptography.
 - **Why it matters:** this is the weakest point of any web-based client-side encryption design. Whoever controls the served code controls the keys the moment a user unlocks the Vault (T-24).
-- **Controls:** static assets built in CI from reviewed commits; content-hashed, immutable filenames; strict CSP (`script-src 'self'` plus hashes, `'wasm-unsafe-eval'` only for Argon2id, no `'unsafe-inline'` or `'unsafe-eval'`); no third-party runtime scripts; Subresource Integrity where the build supports it; published build hashes per release.
+- **Controls:** static assets built in CI from reviewed commits; content-hashed, immutable filenames; strict CSP (`script-src 'self'` plus hashes, `'wasm-unsafe-eval'` only for Argon2id, no `'unsafe-inline'` or `'unsafe-eval'`; since Phase 4 the Argon2id WebAssembly is embedded in a same-origin script bundle, so no separate WebAssembly file is fetched, and `form-action 'none'` refuses native form submissions, SF-04-01); no third-party runtime scripts; Subresource Integrity where the build supports it; published build hashes per release.
 - **Residual:** no browser mechanism lets users pin application code for ordinary websites. Documented limitation L-02.
 
 ### TB-04 Nginx to API

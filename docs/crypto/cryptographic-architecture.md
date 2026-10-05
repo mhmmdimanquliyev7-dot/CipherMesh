@@ -1,6 +1,6 @@
 # Cryptographic Architecture
 
-Status: Phase 0.5 baseline. Normative. Algorithms and parameters are defined only in [crypto-decisions.md](crypto-decisions.md) (CP-xx). Related: [key-hierarchy.md](key-hierarchy.md), [key-lifecycle.md](key-lifecycle.md), [../architecture/data-flow.md](../architecture/data-flow.md).
+Status: Phase 0.5 baseline, updated in Phase 4 (sections 2 to 5, 7.5, 7.6, 8 to 10, 16 and 17; the vault is specified in [vault.md](vault.md)). Normative. Algorithms and parameters are defined only in [crypto-decisions.md](crypto-decisions.md) (CP-xx). Related: [key-hierarchy.md](key-hierarchy.md), [key-lifecycle.md](key-lifecycle.md), [../architecture/data-flow.md](../architecture/data-flow.md).
 
 ## 1. Goals
 
@@ -21,7 +21,7 @@ Status: Phase 0.5 baseline. Normative. Algorithms and parameters are defined onl
 | Removed member, for future content | Yes, once the rekey completes | The room is write-locked until a new key version exists (ADR-013) |
 | Removed member, for content already obtained | No | Nothing can revoke knowledge (L-04) |
 | Malicious member | Partly | Can read what their role allows; cannot make members hold different room keys while the server is honest (commitment) |
-| Server-side attacker distributing a room key of its own | Not in the baseline | Detectable only after OCD-12 (section 7.6, T-36) |
+| Server-side attacker distributing a room key of its own | From Phase 6 | Decided by ADR-015: Phase 4 adds per-user signing keys, Phase 6 signs and verifies key versions (section 7.6, T-36) |
 | Server-side attacker showing different keys to different members | Only if members compare Room Safety Codes | Section 7.4 |
 | Attacker controlling the server and the served JavaScript | No | Can capture passphrases and plaintext (L-02) |
 | Compromised user device | No | L-01 |
@@ -33,55 +33,60 @@ Status: Phase 0.5 baseline. Normative. Algorithms and parameters are defined onl
 | Content encryption and all symmetric key wrapping | AES-256-GCM with AAD | CP-01 |
 | Wrapping 32-byte key material to users: room key material and SEKs (never content) | RSA-OAEP-3072, SHA-256, with OAEP label | CP-02 (proposed), INV-17 |
 | Key separation, key commitments and the Room Safety Code | HKDF-SHA-256 | CP-03, CP-24 |
+| Signing canonical statements: identity binding, vault re-wrap, room statements from Phase 6 | ECDSA P-256 with SHA-256, P1363 signatures | CP-26 (ADR-015) |
 | Vault Passphrase to key | Argon2id (browser, WASM) | CP-04 |
 | Account password storage | Argon2id (server) | CP-05 |
 | Fingerprints, ciphertext hashes, audit chain, token digests | SHA-256 | CP-07 |
 | Audit checkpoints | Ed25519 | CP-14 |
-| Canonical encoding of contexts and audit records | RFC 8785 JCS | CP-15 |
+| Canonical encoding of contexts, signed statements and audit records | RFC 8785 JCS | CP-15 |
 
 ## 4. Two separate secrets
 
 | | Authentication password | Vault Passphrase |
 |---|---|---|
-| Purpose | Proves account identity to the server | Protects the private key of the cryptographic identity |
+| Purpose | Proves account identity to the server | Protects the two private keys of the cryptographic identity (ADR-015) |
 | Sent to the server | Yes, over TLS, at login and registration | **Never** |
 | Stored by the server | Argon2id hash (CP-05) | Nothing: no hash, no verifier |
-| Consequence of loss | Administrator-assisted reset (audited); no content is lost | Personal key is lost; room access is restored when admins re-share room keys to a new key pair |
+| Consequence of loss | Administrator-assisted reset (audited); no content is lost | The identity is lost. A vault reset creates a new identity with a new fingerprint; room access returns when admins re-share room keys to it (L-17) |
 | Consequence of theft | Attacker can log in (unless MFA) and see metadata and ciphertext, but cannot decrypt | Combined with the encrypted private key, attacker can decrypt everything the user could |
 
 Alternatives considered: deriving both from one password on the client (the approach of some password managers, which send a derived authentication hash) and OPAQUE (an asymmetric password-authenticated key exchange). Both would allow a single secret, but add protocol complexity and make the separation harder to demonstrate. The two-secret design is simpler, explainable and matches the project requirement. The UX cost (two secrets) is accepted and documented.
 
 ## 5. The Vault (cryptographic identity)
 
-### 5.1 Creation
-1. The browser generates an RSA-OAEP-3072 key pair (CP-02) and a key ID.
-2. It generates a 128-bit random salt and derives the Vault Root Key: `VRK = Argon2id(NFKC(passphrase), salt, params)` inside a Web Worker (CP-04).
-3. It derives the Private-Key Wrapping Key: `PKWK = HKDF-SHA-256(VRK, info = ctx vault.pk-wrap)`, imported as a non-extractable AES-GCM key with usages `wrapKey` and `unwrapKey` only.
-4. It wraps the private key: `encryptedPrivateKey = AES-256-GCM-wrap(PKCS#8, PKWK, fresh IV, AAD = ctx vault.private-key)`.
-5. It uploads the SPKI public key, its SHA-256 fingerprint (CP-17), the encrypted private key, IV, salt and Argon2id parameters.
-6. The server validates key type and size, fingerprint, and that parameters meet the floor, then stores the record. It never receives the passphrase, VRK, PKWK or private key.
+The complete specification, including the wire format and every check, is [vault.md](vault.md) (format version 1, CP-27). This section summarizes it.
 
-### 5.2 Unlock and lock
-- The browser fetches its own vault record, refuses parameters below the floor, derives VRK and PKWK, and unwraps the private key as **non-extractable** with usages `decrypt` and `unwrapKey`.
-- It then runs a pair check: encrypt a random 32-byte value to the SPKI returned by the server and decrypt them with the unwrapped private key. This detects a server that returns a public key that does not match the private key.
-- Unlocked keys live only in memory. Nothing unlocked is written to localStorage, sessionStorage, IndexedDB or cookies.
-- The vault locks after 15 minutes of inactivity (CP-22), on logout, on tab close, and when the API reports the session as invalid or revoked. Locking drops all references to keys and decrypted content. JavaScript cannot guarantee memory wiping (L-15), so this is best effort.
+### 5.1 Identity
+A user's cryptographic identity is a bundle of two key pairs under one browser-generated key ID (ADR-015): an RSA-OAEP-3072 encryption key (CP-02), which receives only 32-byte values (INV-17), and an ECDSA P-256 signing key (CP-26), which signs only canonical statements. The signing key signs a binding statement over the user ID, key ID, suite and both public keys. The fingerprint (CP-17) is SHA-256 over a canonical statement containing both public keys, so one comparison covers the whole identity. Browsers and the API verify identities with the same function from `packages/crypto`.
 
-### 5.3 Passphrase change
-The browser unlocks with the old passphrase, derives a new VRK from a **new salt**, re-wraps the same private key and replaces the stored record. This does not help against an attacker who already has the old encrypted blob and knows the old passphrase. That case requires an identity-key reset (see [key-lifecycle.md](key-lifecycle.md)).
+### 5.2 Creation
+1. The browser generates the identity and, in parallel, derives the Vault Root Key `VRK = Argon2id(NFKC(passphrase), salt, CP-04 target)` in a fresh Web Worker. The 32 bytes are imported at once as a non-extractable HKDF key and wiped.
+2. For each private key it derives its own wrapping key, `PKWK_purpose = HKDF-SHA-256(VRK, info = cm.vault.pk-wrap {userId, keyId, purpose})`, a non-extractable AES-256-GCM key with usages `wrapKey` and `unwrapKey`.
+3. It wraps each private key as PKCS#8 inside WebCrypto with a fresh IV and the AAD `cm.vault.private-key` {userId, keyId, purpose, fingerprint, suite, vaultVersion}. Each wrapping key encrypts exactly one message per vault write (CD-25).
+4. It uploads the public identity, the KDF parameters and salt, and the two IVs and ciphertexts, after a recent step-up.
+5. The server validates sizes, encodings, the KDF floor and ceiling and the format version, verifies the identity, and stores the record. It never receives the passphrase, the VRK, a wrapping key or a private key.
 
-### 5.4 Lost passphrase
-There is no server-side recovery by design. The user resets the vault, which generates a new key pair. Room OWNERs and ADMINs then re-share current room keys to the new public key. Content under earlier key versions is only recoverable if the history policy of the room lets the admin re-share those versions. An optional printable recovery key is tracked as OCD-10.
+### 5.3 Unlock and lock
+- The browser fetches its own record, refuses unknown versions and parameters outside floor and ceiling, verifies the identity, derives the wrapping keys and unwraps both private keys as **non-extractable** keys (`decrypt` and `unwrapKey`; `sign`).
+- Pair checks follow: an RSA-OAEP round trip of a random 32-byte value and an ECDSA signature over a random challenge, verified with the public keys of the record. Together with the fingerprint in the AAD, they detect a server that returns public keys that do not match the private keys.
+- Every failure except an unavailable environment is the same `VAULT_UNLOCK_FAILED`: a wrong passphrase and a damaged record are indistinguishable by design.
+- Unlocked keys live only in memory. Nothing unlocked is written to cookies, localStorage, sessionStorage, IndexedDB or the Cache API.
+- The vault locks after 15 minutes without trusted user input (CP-22), on "Lock now", on sign-out, when the page is hidden for navigation or closed, when the API reports the session as ended, and after a reset. Locking drops all references to keys. JavaScript cannot guarantee memory wiping (L-15), and the server cannot enforce the lock (L-38).
 
-### 5.5 Browser-side Argon2id considerations
-- WebCrypto does not provide Argon2. A WASM implementation is required (LIB-03), selected in Phase 4 against RFC 9106 test vectors.
-- Derivation runs in a Web Worker so the UI stays responsive.
-- Memory is the main constraint. Browsers limit WebAssembly memory and mobile devices have less of it. Parameters are chosen by benchmark with the floor as a hard minimum. They are stored per vault, so they can be raised later by re-wrapping.
-- Browser WASM is usually single-threaded, so the parallelism parameter stays at 1.
-- The Content Security Policy must allow `'wasm-unsafe-eval'` to compile WebAssembly. Nothing else about script restrictions is relaxed.
+### 5.4 Passphrase change and parameter upgrade
+The browser opens the vault with the current passphrase, derives new wrapping keys from the new passphrase and a **new salt**, wraps the same private keys again and signs the change with the identity's signing key (`cm.vault.rewrap`, CD-26). The API verifies the signature against the stored signing key and applies the change only if the previous salt is still current, so a stolen session cannot replace the wrapped keys and replays fail. The identity and its fingerprint do not change. This does not help against an attacker who already has an old copy of the record and the old passphrase (L-40); that case requires a vault reset. A vault below the target parameters is offered the same re-wrap with an unchanged passphrase (ADR-010).
+
+### 5.5 Lost passphrase
+There is no server-side recovery by design: no escrow, no administrator key, no recovery derived from the account password. The user resets the vault after a strict step-up; the browser creates a new identity, and the API retires the old one (its wrapped private keys are deleted, its public keys kept) and ends the user's other sessions. Room OWNERs and ADMINs then re-share current room keys to the new identity. Content under earlier key versions is only recoverable if the history policy of the room lets the admin re-share those versions. An optional user-held recovery key remains OCD-10.
+
+### 5.6 Browser-side Argon2id
+- WebCrypto does not provide Argon2. CipherMesh uses the `argon2id` library (LIB-03), whose two small WebAssembly builds are embedded in the bundle and checked against the installed package by a unit test. It reproduces the RFC 9106 test vector and matches OpenSSL.
+- Each derivation runs in a fresh dedicated Web Worker, one at a time per page (`KDF_BUSY` otherwise), with a 120-second timeout (CD-27). The page stays responsive (crypto-decisions section 8).
+- Parameters are stored per vault, so they can be raised later by re-wrapping. Parallelism stays at 1 because browser WebAssembly runs single-threaded.
+- The Content Security Policy adds `'wasm-unsafe-eval'` so WebAssembly can compile. Nothing else about script restrictions is relaxed.
 - There is **no fallback** to PBKDF2 or any weaker KDF (CD-14, INV-15).
-- The Argon2id output and the passphrase string are overwritten where the language allows (typed arrays) and dropped immediately. Strings are immutable in JavaScript, so this is best effort.
-- Because an attacker who steals the database can guess passphrases offline at the Argon2id cost, passphrase length (CP-06) and strength feedback matter more than any server-side control.
+- The passphrase bytes and the Argon2id output are overwritten where the language allows (typed arrays) and dropped immediately. Strings are immutable in JavaScript, so this is best effort.
+- Because an attacker with the encrypted record can guess passphrases offline at the Argon2id cost, passphrase length (CP-06) matters more than any server-side control (L-08).
 
 ## 6. Envelope encryption of content
 
@@ -201,19 +206,23 @@ code  = first 66 bits of RSC_v as six 11-bit indices into a fixed 2048-word list
 ### 7.5 The public-key directory problem
 
 The server distributes public keys. An attacker who controls the server or can write to the database could therefore substitute an invitee's public key and receive the room key (T-25). Controls:
-- Every public key has a SHA-256 fingerprint (CP-17), shown in the UI to its owner and to inviters.
+- Every identity has a SHA-256 fingerprint over both public keys (CP-17), shown in the UI to its owner and to inviters. The directory (CM-T027, Phase 4) returns only public identity data; the browser verifies the binding signature and computes the fingerprint itself.
 - In RESTRICTED rooms the inviter must confirm the fingerprint, compared out of band. The API checks that the confirmed value equals the invitee's current key. The API cannot prove that the human comparison happened (L-18).
-- A user's public key is immutable per key ID. A new key is a new key ID. That invalidates pending invitations, and the change is recorded in the audit log and shown to room administrators.
+- A user's public keys are immutable per key ID (enforced by a database trigger since Phase 4). A new key is a new key ID. That invalidates pending invitations, and the change is recorded in the audit log and shown to room administrators.
 - The OAEP label contains the recipient key ID, so an envelope is bound to one specific key.
 - The rekeying client shows the recipient list with fingerprints before wrapping (ADR-013).
 
 The Room Safety Code does not detect substitution when the attacker unwraps the room key and re-wraps it to the victim's real key: everyone then holds the same key. Fingerprint comparison is the control. Residual risk: users who skip out-of-band verification can be attacked by an active server-side adversary. Fingerprint pinning is tracked as OCD-06.
 
-### 7.6 Unauthenticated key distribution (open decision OCD-12)
+### 7.6 Authenticated key distribution (OCD-12, decided by ADR-015)
 
-RSA-OAEP provides no sender authentication, and anyone can encrypt to a public key. A server-side attacker with database write access or control of API responses can therefore create a key version of its own and wrap it to every member. It can then store a matching commitment and make that version current. Every member accepts it, and every Safety Code matches, because all members hold the same attacker-known key. New content would then be readable by the attacker (T-36, L-23).
+RSA-OAEP provides no sender authentication, and anyone can encrypt to a public key. Without further measures, a server-side attacker with database write access or control of API responses could create a key version of its own and wrap it to every member. It could store a matching commitment and make that version current. Every member would accept it, and every Safety Code would match, because all members would hold the same attacker-known key (T-36, L-23).
 
-The baseline has no cryptographic defence against this. Only server-side controls apply: authorization of rekey operations, least-privilege database roles and audit. OCD-12 decides the fix before Phase 4 (CM-T086). The recommended option is per-user ECDSA P-256 signing keys that sign key-version packages and envelopes, with the fingerprint covering both of a user's public keys.
+[ADR-015](../architecture/adr/ADR-015-identity-signing-keys.md), accepted before Phase 4, closes OCD-12 with per-user ECDSA P-256 signing keys:
+- **Phase 4 (implemented):** every identity contains a signing key, bound to the encryption key by a self-signature and covered by the fingerprint, and the vault stores its private key.
+- **Phase 6 and Phase 11 (planned):** the room creator signs a genesis statement, inviters and the OWNER sign membership grants, and the creator of each key version signs a statement with the commitment and the recipient list. Envelopes are authenticated through the signed commitment (CD-24). A client uses a key version only if the signatures verify and the creator's authority follows from the grant chain; otherwise it reports `KEY_AUTHENTICATION_FAILED`.
+
+Until Phase 6 implements the verification, no rooms exist, so no room key can be injected. The residual risk after Phase 6 is identity substitution (section 7.5), a legitimate member's keys, or control of the served code (L-02).
 
 ### 7.7 History access
 The security profile decides which versions a new member receives:
@@ -222,12 +231,17 @@ The security profile decides which versions a new member receives:
 
 ## 8. Canonical contexts
 
-Every AAD, OAEP label and HKDF info value is `JCS({ctx, v, ...fields})` (CP-15). Field sets are fixed; missing optional values are serialized as `null`, never omitted.
+Every AAD, OAEP label, HKDF info value and signed statement is `JCS({ctx, v, ...fields})` (CP-15). Field sets are fixed; missing optional values are serialized as `null`, never omitted. Binary values are unpadded base64url strings. Since Phase 4 the only producer is `packages/crypto/src/contexts.ts` (also used by the API), which refuses missing, extra or malformed fields; the result is a branded type that the encryption, wrapping and signing functions require.
 
 | `ctx` value | Used as | Additional fields |
 |---|---|---|
-| `cm.vault.pk-wrap` | HKDF info for PKWK | userId, keyId |
-| `cm.vault.private-key` | AES-GCM AAD for the private-key wrap | userId, keyId, suite |
+| `cm.vault.pk-wrap` | HKDF info for a private-key wrapping key | userId, keyId, purpose |
+| `cm.vault.private-key` | AES-GCM AAD for a wrapped private key | userId, keyId, purpose, fingerprint, suite, vaultVersion |
+| `cm.vault.pair-check` | RSA-OAEP label for the unlock pair check | userId, keyId, suite |
+| `cm.vault.signing-check` | Statement signed in the unlock pair check | userId, keyId, challenge |
+| `cm.vault.rewrap` | Statement signed for a passphrase change or upgrade | userId, keyId, suite, vaultVersion, previousKdfSalt, kdfAlgorithm, kdfMemoryKiB, kdfIterations, kdfParallelism, kdfSalt, encryptionKeyIv, encryptionKeyCiphertext, signingKeyIv, signingKeyCiphertext |
+| `cm.identity.binding` | Statement signed by the identity's own signing key | userId, keyId, suite, encryptionKeySpki, signingKeySpki |
+| `cm.identity.fingerprint` | SHA-256 input of the identity fingerprint | suite, encryptionKeySpki, signingKeySpki |
 | `cm.room.envelope` | RSA-OAEP label for RKM_v | roomId, keyVersion, recipientUserId, recipientKeyId, suite |
 | `cm.room.dek-wrap-key` | HKDF info for RWK_v | roomId, keyVersion |
 | `cm.room.commitment` | HKDF info for RKC_v | roomId, keyVersion |
@@ -248,8 +262,8 @@ Example: the AAD for file content is the UTF-8 bytes of
 - Every AES-GCM encryption uses a fresh 96-bit IV from the CSPRNG. The IV is generated **inside** `packages/crypto`. Encryption functions do not accept an IV argument, so callers cannot reuse one by mistake.
 - IVs are stored next to their ciphertext. They are not secret.
 - Random IVs are used instead of counters because clients are stateless, users have several devices, and there is no reliable shared counter.
-- Invocation bounds per key (CP-16): each DEK is used for one or two encryptions; RWK_v wraps at most 2^20 DEKs before the server forces rotation; PKWK is used once per vault write, and a passphrase change derives a new PKWK from a new salt. All are far below the 2^32 limit that NIST SP 800-38D sets for random 96-bit IVs.
-- Tests: known-answer tests with fixed IVs through a test-only seam that is not exported in production builds; a property test that many encryptions produce distinct IVs; a review rule that no production code constructs an IV.
+- Invocation bounds per key (CP-16): each DEK is used for one or two encryptions; RWK_v wraps at most 2^20 DEKs before the server forces rotation; each private-key wrapping key is used once per vault write, and every re-wrap derives new ones from a new salt. All are far below the 2^32 limit that NIST SP 800-38D sets for random 96-bit IVs.
+- Tests: known-answer tests with fixed IVs through the test-only seam `packages/crypto/src/internal/raw.ts`, which the package does not export (`boundary.test.ts`); a property test that many encryptions produce distinct IVs; a review rule that no production code constructs an IV.
 
 ## 10. Integrity, fingerprints and the role of SHA-256
 
@@ -257,7 +271,7 @@ AES-GCM authentication (with AAD) is the integrity mechanism for all content and
 
 | What is hashed | Why | Stored where | Visible to |
 |---|---|---|---|
-| SPKI public key | Key fingerprint for verification | UserKeyPair | Owner and room members |
+| Canonical statement with both public keys of an identity | Identity fingerprint for verification (CP-17) | UserKeyPair | Owner, directory users and room members |
 | File ciphertext | Storage integrity reference and Crypto Inspector | EncryptedFile | Room members |
 | File plaintext | Confirms a correct end-to-end round trip | Only inside the encrypted manifest | Room members after decryption |
 | Audit records | Hash chain | AuditEvent | OWNER, ADMIN (room events), PLATFORM_ADMIN |
@@ -295,10 +309,13 @@ Every encrypted record stores its algorithm suite (`CM1`, CP-18) and every conte
 
 | Key | Algorithm | Extractable | Usages |
 |---|---|---|---|
-| User private key (after unlock) | RSA-OAEP, SHA-256 | No | `decrypt`, `unwrapKey` |
-| User public key | RSA-OAEP, SHA-256 | Yes (public) | `encrypt`, `wrapKey`, only through the 32-byte key wrapper (INV-17) |
+| User encryption private key (after unlock) | RSA-OAEP, SHA-256 | No | `decrypt`, `unwrapKey` |
+| User encryption public key | RSA-OAEP, SHA-256 | Yes (public) | `encrypt`, `wrapKey`, only through the 32-byte key wrapper (INV-17) |
+| User signing private key (after unlock) | ECDSA P-256 | No | `sign` |
+| User signing public key | ECDSA P-256 | Yes (public) | `verify` |
+| Private keys during a re-wrap only | As above | Yes, for that operation only | As above, plus wrapping by `wrapKey` |
 | VRK import | HKDF | No | `deriveKey` |
-| PKWK | AES-GCM 256 | No | `wrapKey`, `unwrapKey` |
+| PKWK (one per private key) | AES-GCM 256 | No | `wrapKey`, `unwrapKey` |
 | RKM_v import | HKDF | No | `deriveKey` (RWK_v), `deriveBits` (RKC_v and RSC_v) |
 | RWK_v | AES-GCM 256 | No | `wrapKey`, `unwrapKey` |
 | New DEK before wrapping | AES-GCM 256 | Yes, only until wrapped | `encrypt`, `decrypt` |
@@ -306,8 +323,10 @@ Every encrypted record stores its algorithm suite (`CM1`, CP-18) and every conte
 
 Notes to verify during implementation:
 - Sharing RKM_v with another member requires its raw bytes, so envelopes are opened with `decrypt` and the bytes are imported and dropped as soon as possible (CD-16).
-- OAEP label support and RSA-OAEP decryption into an HKDF key must be tested in Chromium, Firefox and WebKit in Phase 6 (OCD-01). If label support differs, the fallback is recorded in an ADR update, not improvised.
-- RSA-3072 key generation takes noticeable time on slow devices. It happens once per vault and shows a progress state.
+- OAEP labels work in Chromium, Firefox and WebKit (Phase 4 probe and the vault pair check in all three engines). Decryption of envelopes created in another engine is confirmed in Phase 6 (OCD-01). If behaviour differs, the fallback is recorded in an ADR update, not improvised.
+- Ed25519 is not available in the Playwright WebKit build, which is why identities use ECDSA P-256 (ADR-015). ECDSA signatures are in the IEEE P1363 form that WebCrypto produces.
+- PKCS#8 exports of the same RSA key differ by one or two bytes between engines (DER integer encoding), so size checks on wrapped keys use ranges. Vaults created in one engine open in the other two (Phase 4 E2E test).
+- RSA-3072 key generation takes noticeable time: up to about 4 seconds in WebKit on the development laptop (crypto-decisions section 8). It happens once per identity and shows a progress state.
 
 ## 17. Limitations
-Cryptography does not protect against a compromised device, malicious code delivered by a compromised server, copying by authorized users, metadata analysis, or future quantum attacks on RSA. In the baseline it also does not authenticate who created a room-key version (section 7.6). The Room Safety Code helps only when members compare it. The complete list is in [../security/limitations.md](../security/limitations.md).
+Cryptography does not protect against a compromised device, malicious code delivered by a compromised server, copying by authorized users, metadata analysis, or future quantum attacks on RSA. Until Phase 6 implements ADR-015 section 4, it also does not authenticate who created a room-key version (section 7.6). The Room Safety Code helps only when members compare it. The complete list is in [../security/limitations.md](../security/limitations.md).

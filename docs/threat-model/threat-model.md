@@ -1,6 +1,6 @@
 # Threat Model and Risk Register
 
-Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phase and whenever an asset, trust boundary, entry point or data flow changes. Related: [../architecture/trust-boundaries.md](../architecture/trust-boundaries.md), [../architecture/data-flow.md](../architecture/data-flow.md), [../security/limitations.md](../security/limitations.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
+Status: Phase 0.5 revision of the Phase 0 model, with implementation checks for Phases 2, 3 and 4 (sections 8 to 10; T-40 added in Phase 4). Review at the end of every phase and whenever an asset, trust boundary, entry point or data flow changes. Related: [../architecture/trust-boundaries.md](../architecture/trust-boundaries.md), [../architecture/data-flow.md](../architecture/data-flow.md), [../security/limitations.md](../security/limitations.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
 
 ## 1. Method
 
@@ -23,7 +23,7 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 |---|---|---|
 | A-01 | Room content plaintext (files, notes, secrets) | Confidentiality, integrity |
 | A-02 | Room content ciphertext, wrapped DEKs, key envelopes | Integrity, availability |
-| A-03 | Encrypted private keys and Vault Passphrases | Confidentiality |
+| A-03 | Encrypted private keys (encryption and signing, ADR-015) and Vault Passphrases | Confidentiality, integrity |
 | A-04 | Room key material (RKM) | Confidentiality |
 | A-05 | Account credentials: passwords, Argon2id hashes, TOTP secrets, recovery codes | Confidentiality |
 | A-06 | Session tokens | Confidentiality |
@@ -33,6 +33,7 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 | A-10 | Application code, build pipeline and dependencies | Integrity |
 | A-11 | Infrastructure and service availability | Availability |
 | A-12 | Project-management data in Jira and GitHub | Confidentiality, integrity |
+| A-13 | Public identities: public keys, binding signatures, fingerprints and the directory (Phase 4) | Integrity, authenticity |
 
 ## 3. Adversaries
 
@@ -271,9 +272,9 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 - **Assets:** A-03, then A-04 and A-01
 - **Threat:** Offline guessing of a Vault Passphrase using the encrypted private key from a database copy.
 - **Attack scenario:** After T-01, the attacker runs Argon2id with candidate passphrases and the stored salt and parameters, and uses the AES-GCM tag to recognize a correct guess.
-- **Security controls:** Argon2id memory-hard parameters with a server-enforced floor (CP-04); passphrase minimum length and blocklist (CP-06); per-vault salt; no server-side verifier; parameters upgradeable.
+- **Security controls:** Argon2id memory-hard parameters with a floor and a ceiling enforced by the browser and the API (CP-04); passphrase minimum length, blocklist and identity checks (CP-06); a new salt on every vault write; no server-side verifier; parameters upgradeable by a signed re-wrap. **Phase 4:** implemented as specified in [../crypto/vault.md](../crypto/vault.md); target m = 64 MiB, t = 3, p = 1. The record is also served to its owner's sessions, so a stolen session yields the same offline guessing opportunity (L-39).
 - **Residual risk:** Weak passphrases fall to targeted attacks (L-08). A cracked vault exposes every room key ever wrapped to that key and every secret sent to it.
-- **Testing strategy:** RFC 9106 known-answer tests; client refuses to create or unlock vaults below the floor; API rejects vault uploads below the floor; benchmark documented as evidence.
+- **Testing strategy:** RFC 9106 known-answer tests; client refuses to create or unlock vaults below the floor; API rejects vault uploads below the floor; benchmark documented as evidence. **Phase 4:** `packages/crypto/src/argon2id.test.ts`, `vault.test.ts`, `tests/vault/setup.test.ts` and `rewrap.test.ts`; benchmark in crypto-decisions section 8; negative control NC-04-08.
 - **Rating:** Likelihood Medium, Impact High, inherent **High**. Treatment: Mitigate and Accept. Residual: **Medium**.
 
 ### T-23 Compromised client or browser
@@ -283,7 +284,7 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 - **Attack scenario:** A keylogger records the Vault Passphrase; an extension reads decrypted notes; someone uses an unlocked, unattended laptop.
 - **Security controls:** Keys only in memory; non-extractable keys; vault auto-lock (CP-22); session idle timeout; no plaintext persistence; guidance for RESTRICTED rooms.
 - **Residual risk:** **High and accepted.** CipherMesh cannot protect a device that is itself compromised (L-01).
-- **Testing strategy:** Playwright checks that no key material or plaintext appears in localStorage, sessionStorage, IndexedDB or cookies after unlock and use; auto-lock timer test.
+- **Testing strategy:** Playwright checks that no key material or plaintext appears in localStorage, sessionStorage, IndexedDB or cookies after unlock and use; auto-lock timer test. **Phase 4:** `tests/e2e/vault.spec.ts` in three engines (storage including the Cache API, network capture, auto-lock with a controlled clock, sign-out and session-end locks) and negative controls NC-04-12 to NC-04-14.
 - **Rating:** Likelihood Medium, Impact High, inherent **High**. Treatment: Accept. Residual: **High** (accepted, documented).
 
 ### T-24 Malicious application code delivery
@@ -301,7 +302,7 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 - **Assets:** A-04, then A-01
 - **Threat:** An attacker with control of the server or write access to the database substitutes a user's public key so that room keys are wrapped to the attacker.
 - **Attack scenario:** Before an ADMIN invites Bob, the attacker replaces Bob's public key with their own. The ADMIN browser wraps RKM to the attacker key; the attacker unwraps it and decrypts room content.
-- **Security controls:** Fingerprints shown in the UI; mandatory fingerprint confirmation in RESTRICTED rooms, checked by the API against the current key; immutable keys per key ID; key changes audited and surfaced to room administrators; recipient key ID bound into the OAEP label.
+- **Security controls:** Fingerprints shown in the UI; mandatory fingerprint confirmation in RESTRICTED rooms, checked by the API against the current key; immutable keys per key ID; key changes audited and surfaced to room administrators; recipient key ID bound into the OAEP label. **Phase 4:** the fingerprint covers both public keys of an identity, a binding signature ties them to the user and key ID, and every browser verifies directory results and computes fingerprints itself (CM-T027); the database keeps identities write-once.
 - **Residual risk:** Users who skip out-of-band verification are exposed to an active server-side attacker (L-07, L-18). Fingerprint pinning is tracked as OCD-06. The Room Safety Code does not detect substitution when the attacker re-wraps the real key to the victim, because everyone then holds the same key.
 - **Testing strategy:** In a test database, replace a public key before invitation; the RESTRICTED flow must reject the confirmation; key-change events must appear in the audit log.
 - **Rating:** Likelihood Low, Impact High, inherent **Medium**. Treatment: Mitigate and Accept. Residual: **Medium**.
@@ -311,7 +312,7 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 - **Assets:** A-11
 - **Threat:** Attackers exhaust CPU, memory, storage or database capacity.
 - **Attack scenario:** Floods of login requests (each costing an Argon2id computation), large or many uploads, audit-log flooding, expensive list queries.
-- **Security controls:** Nginx rate limits and body-size limits; API rate limits per user and IP; a concurrency limit for Argon2id computations; upload size limits and quotas; pagination limits; container resource limits.
+- **Security controls:** Nginx rate limits and body-size limits; API rate limits per user and IP; a concurrency limit for Argon2id computations; upload size limits and quotas; pagination limits; container resource limits. **Phase 4:** vault and directory rate limits per user; in the browser, a KDF ceiling, one derivation at a time per tab and a 120-second worker timeout, so a modified vault record cannot make a browser derive without bound.
 - **Residual risk:** Volumetric attacks beyond VM capacity (L-20).
 - **Testing strategy:** Rate-limit tests; a small load test of the login endpoint to confirm the Argon2id concurrency limit protects memory.
 - **Rating:** Likelihood Medium, Impact Medium, inherent **Medium**. Treatment: Mitigate and Accept. Residual: **Medium**.
@@ -406,7 +407,7 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 - **Assets:** A-01, A-04
 - **Threat:** An attacker registers an account with another person's email address or a confusable name and receives invitations or secrets meant for that person.
 - **Attack scenario:** Knowing that Bob will be invited, the attacker registers Bob's address first; the baseline has no email verification. The inviter looks up the address, sees a plausible display name and invites the attacker, whose browser then receives the room key legitimately.
-- **Security controls:** Identifiers are treated and labelled as unverified; the lookup shows the key fingerprint and the account creation date; fingerprint confirmation is required in RESTRICTED rooms and prompted in CONFIDENTIAL rooms; OWNER approval of ADMIN invitations (PC-04); invitation and membership events are audited.
+- **Security controls:** Identifiers are treated and labelled as unverified; the lookup shows the key fingerprint and the account creation date (implemented in Phase 4: exact address only, an own vault required, the same 404 for unknown, vault-less and disabled accounts, 20 lookups per 10 minutes, `emailVerified: false`); fingerprint confirmation is required in RESTRICTED rooms and prompted in CONFIDENTIAL rooms; OWNER approval of ADMIN invitations (PC-04); invitation and membership events are audited.
 - **Residual risk:** In STANDARD rooms, and where users skip the prompted comparison, an impersonator can be invited by mistake (L-21). Email verification would need an email service, which is new runtime SaaS and requires an ADR.
 - **Testing strategy:** Lookup responses and UI label the identifier as unverified; a RESTRICTED invitation without a matching confirmed fingerprint is rejected.
 - **Rating:** Likelihood Medium, Impact High, inherent **High**. Treatment: Mitigate and Accept. Residual: **Medium**.
@@ -421,9 +422,20 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
   - Parameterized queries and least-privilege database roles, which limit database write access.
   - Audit events for every key version, which a database-level attacker could also forge in the unanchored tail.
   - The UI shows who created each version (server-asserted), and the rekey review lists recipients.
-- **Residual risk:** **Unresolved in the baseline** (L-23). Planned mitigation OCD-12: authenticate key-version packages and envelopes cryptographically. The recommended option is per-user ECDSA P-256 signing keys covered by the fingerprint. The alternative is an authenticator chained to the previous room key. Decision gate before Phase 4 (CM-T086).
-- **Testing strategy:** Until OCD-12 is implemented, a documented demonstration in a test environment. Afterwards, tests that clients reject unsigned, forged or wrongly attributed versions and envelopes.
-- **Rating:** Likelihood Low, Impact High, inherent **Medium**. Treatment: Mitigate (planned); accepted until OCD-12 is implemented. Residual: **Medium**.
+- **Decided mitigation (OCD-12, [ADR-015](../architecture/adr/ADR-015-identity-signing-keys.md), accepted 2026-10-05):** every identity has an ECDSA P-256 signing key covered by the fingerprint (implemented in Phase 4). From Phase 6 the creator of each key version signs a statement with the commitment and the recipient list, membership grants are signed back to a signed genesis statement, and clients refuse a version unless the signatures verify, the creator's authority follows from the grant chain and the decrypted key matches the signed commitment (CD-24).
+- **Residual risk:** **Open until Phase 6 implements the verification** (L-23); in Phase 4 no rooms exist, so there is nothing to inject yet. Afterwards the attack needs identity substitution that users do not detect (T-25), a legitimate member's keys, or control of the served code (T-24).
+- **Testing strategy:** Phase 4: identity binding, fingerprint and signature tests (Wycheproof ECDSA vectors, `identity.test.ts`, NC-04-05, NC-04-07). Phase 6: the `key-injection` suite (unsigned, forged, wrongly attributed and unauthorized versions, commitment mismatch, missing recipient) and a negative control that removes the verification.
+- **Rating:** Likelihood Low, Impact High, inherent **Medium**. Treatment: Mitigate (designed; implemented in Phase 6), accepted until then. Residual: **Medium**, re-rated when Phase 6 implements the verification.
+
+### T-40 Unauthorized replacement or reset of a vault
+- **STRIDE:** Tampering, Spoofing, Denial of service
+- **Assets:** A-03, A-13, then A-04 and A-01
+- **Threat:** Someone other than the owner replaces the wrapped private keys or the whole identity of a user, so that the user loses the identity or contacts later wrap keys to an identity the attacker controls.
+- **Attack scenario:** With a stolen session (T-08), the attacker uploads a re-wrap under a passphrase of their choice, or resets the vault with an identity they generated. A variant replays an earlier, legitimately signed re-wrap to restore an old passphrase.
+- **Security controls:** Setup and re-wrap require a recent step-up and reset a strict one (account password and MFA code); every re-wrap is signed by the identity's signing key and applied by compare-and-swap on the previous salt, so it cannot be forged or replayed; the identity columns are write-once, one identity per user is ACTIVE, and a retired identity can never be reactivated (database trigger); a reset revokes all other sessions and gives the user a new fingerprint that contacts can notice; security events record every change.
+- **Residual risk:** An attacker with the account password and the second factor can reset the vault. That destroys the victim's identity (availability) and installs one the attacker controls, which contacts detect only through the fingerprint change (L-07). A database-level attacker bypasses the API checks entirely (T-25, T-32).
+- **Testing strategy:** `tests/vault/rewrap.test.ts` (modified after signing, signed by another identity, replayed, stale, weaker parameters), `tests/vault/reset-and-directory.test.ts` (strict step-up, wrong target, sessions revoked), database constraint tests (write-once identity, final retired status), negative control NC-04-07.
+- **Rating:** Likelihood Low, Impact High, inherent **Medium**. Treatment: Mitigate and Accept. Residual: **Low**.
 
 ### T-37 Rekey operation abuse and incomplete rekeys
 - **STRIDE:** Tampering, Denial of service, Elevation of privilege
@@ -503,10 +515,11 @@ Status: Phase 0.5 revision of the Phase 0 model. Review at the end of every phas
 | T-33 | External link leakage | M | M | Medium | Mitigate, Accept | Medium | L-03 |
 | T-34 | Management SaaS leakage | L | M | Low | Mitigate, Transfer | Low | |
 | T-35 | Identity spoofing via unverified identifiers | M | H | High | Mitigate, Accept | Medium | L-21 |
-| T-36 | Injected room-key version by a server-side attacker | L | H | Medium | Mitigate (planned, OCD-12), Accept until then | Medium | L-23 |
+| T-36 | Injected room-key version by a server-side attacker | L | H | Medium | Mitigate (ADR-015; verification in Phase 6), Accept until then | Medium | L-23 |
 | T-37 | Rekey abuse and incomplete rekeys | M | M | Medium | Mitigate | Low | L-24 |
 | T-38 | Audit signing-key compromise | M | M | Medium | Mitigate, Accept | Medium (Level 1) | L-25 |
 | T-39 | Over-privileged database roles and schema drift | M | H | High | Mitigate | Low | L-26, L-28 |
+| T-40 | Unauthorized replacement or reset of a vault | L | H | Medium | Mitigate, Accept | Low | L-07, L-40 |
 
 Residual risks rated **High** (T-23) and every **Accept** decision require explicit acknowledgement by the project owner at the end of Phase 0 and again before the final report.
 
@@ -514,11 +527,11 @@ Residual risks rated **High** (T-23) and every **Accept** decision require expli
 
 | Category | Threats |
 |---|---|
-| Spoofing | T-03, T-08, T-09, T-10, T-13, T-17, T-23, T-25, T-29, T-30, T-35, T-36, T-38 |
-| Tampering | T-04, T-06, T-07, T-11, T-13, T-14, T-18, T-20, T-24, T-27, T-29, T-31, T-32, T-37, T-39 |
+| Spoofing | T-03, T-08, T-09, T-10, T-13, T-17, T-23, T-25, T-29, T-30, T-35, T-36, T-38, T-40 |
+| Tampering | T-04, T-06, T-07, T-11, T-13, T-14, T-18, T-20, T-24, T-27, T-29, T-31, T-32, T-37, T-39, T-40 |
 | Repudiation | T-04, T-20, T-38 |
 | Information disclosure | T-01, T-02, T-05, T-06, T-12, T-14, T-15, T-16, T-18, T-21, T-22, T-23, T-24, T-25, T-28, T-31, T-33, T-34, T-36 |
-| Denial of service | T-11, T-26, T-32, T-37 |
+| Denial of service | T-11, T-26, T-32, T-37, T-40 |
 | Elevation of privilege | T-04, T-05, T-06, T-11, T-12, T-14, T-17, T-19, T-21, T-27, T-30, T-37, T-39 |
 
 ## 7. Maintenance
@@ -563,3 +576,24 @@ Phase 3 implemented the authentication controls behind TB-02 and TB-05. New entr
 | T-30 Recovery and MFA abuse | Enrollment, disabling and recovery-code regeneration require a step-up; MFA becomes active only after a valid code; recovery-code login revokes other sessions; administrators must keep MFA; PLATFORM_ADMIN only through the server-side CLI | Administrator-assisted reset is a documented procedure without tooling (PA-04) |
 | T-35 Identity spoofing | Emails remain unverified and are labelled so in the UI | Unchanged (L-21) |
 
+## 10. Phase 4 implementation check (cryptographic identity and vault)
+
+Phase 4 implemented the client-side vault and the public-key directory. New entry points: `GET /api/vault`, `POST /api/vault`, `POST /api/vault/rewrap`, `POST /api/vault/reset` and `POST /api/directory/lookup` (reviewed allowlist in `tests/security/route-inventory.test.ts`). New data flows: DF-03 and DF-04 as implemented, DF-04a (passphrase change) and DF-04b (reset). New asset: A-13 (public identities). New inner boundary: page to Argon2id Web Worker inside TB-01 ([../architecture/trust-boundaries.md](../architecture/trust-boundaries.md)). New threat: T-40. Ratings are unchanged except where noted; they are re-rated after Phase 12 as planned, and T-36 after Phase 6. Traceability: [../management/phase-04-traceability.md](../management/phase-04-traceability.md).
+
+| Threat | Implemented and tested in Phase 4 | Still open |
+|---|---|---|
+| T-01 Stolen database | Vault rows hold public keys, ciphertext, IVs, salt and parameters only; a test inspects the stored row and finds no PKCS#8 structure | Canary scan of dumps once content exists (Phase 6 onward) |
+| T-06 BOLA / IDOR | Vault routes take no identifier: the owner is the session user; query strings are refused and identity headers ignored; another user's key ID gives 404 or 409; negative control NC-04-04 | Room-scoped routes (Phase 5) |
+| T-07 Ciphertext modification | Any changed byte of a wrapped key, IV, tag, salt or parameter, a swap of the two wrapped keys and a changed version all fail before or at unwrapping; the AAD binds user, key ID, purpose, fingerprint, suite and version (NC-04-01, NC-04-06) | |
+| T-12 XSS | CSP unchanged apart from `'wasm-unsafe-eval'`; unlocked private keys are non-extractable (NC-04-09) | Script in the origin can still use unlocked keys while the vault is open (L-01) |
+| T-13 CSRF | The four new state-changing routes are in the CSRF suite | |
+| T-15 Disclosure | Security finding SF-04-01 fixed: prerendered forms can no longer be submitted natively, which before hydration put the account password into a URL (CSP `form-action 'none'`, hydration-gated buttons, regression test in three engines, NC-04-15, NC-04-16). Directory projection with public fields only; one 404 for unknown, vault-less and disabled accounts; no passphrase, ciphertext, IV or salt in logs or security events (`tests/vault/leakage.test.ts`); extended redaction list (NC-04-03) | Directory reveals which addresses have a vault (L-41) |
+| T-22 Stolen encrypted private key | Argon2id at the target with floor and ceiling enforced on both sides, passphrase policy with a 3,350-entry blocklist, a new salt per write, no verifier, RFC 9106 and OpenSSL known answers, benchmark in three engines (NC-04-08) | Phone benchmark (L-37); offline guessing by a session holder (L-39) |
+| T-23 Compromised client | Memory-only, non-extractable keys that exist only while the vault is unlocked; storage and network inspection, auto-lock and session-end lock in three engines; review finding R-04-01 fixed (a failed refresh no longer leaves keys outside the auto-lock) (NC-04-12 to NC-04-14, NC-04-17) | Accepted (L-01, L-38) |
+| T-24 Malicious code delivery | WebAssembly embedded in the same-origin bundle and checked against the pinned package; no new script source | Published build hashes (later phases) |
+| T-25 Public-key substitution | Binding signature, fingerprint over both keys computed by each browser, verified directory results, write-once identities (NC-04-05) | Fingerprint confirmation in invitation flows (Phase 6); pinning (OCD-06) |
+| T-26 Resource exhaustion | KDF ceiling, one derivation per tab, worker timeout, vault and directory rate limits | Nginx limits (Phase 17) |
+| T-27 Supply chain | `argon2id` pinned without install scripts; embedded WebAssembly checksums compared with the package; test vectors stored with source and SHA-256 | |
+| T-35 Identity spoofing | Exact-match, rate-limited directory that requires an own vault and labels addresses unverified | Unchanged (L-21) |
+| T-36 Injected key version | ADR-015 accepted; identity signing keys, binding signatures and signed re-wraps implemented (Wycheproof ECDSA vectors, NC-04-07) | The room verification itself (Phase 6) |
+| T-40 Vault replacement or reset | As described in T-40 | Account takeover with both factors can reset the vault (residual) |

@@ -1,6 +1,6 @@
 # Key Lifecycle
 
-Status: Phase 0.5 baseline. Normative. Related: [key-hierarchy.md](key-hierarchy.md), [crypto-decisions.md](crypto-decisions.md), [ADR-013](../architecture/adr/ADR-013-rekey-state-machine.md), [../security/security-policy-profiles.md](../security/security-policy-profiles.md).
+Status: Phase 0.5 baseline, updated in Phase 4 (section 3: identities with signing keys, implemented vault events). Normative. Related: [key-hierarchy.md](key-hierarchy.md), [crypto-decisions.md](crypto-decisions.md), [ADR-013](../architecture/adr/ADR-013-rekey-state-machine.md), [../security/security-policy-profiles.md](../security/security-policy-profiles.md).
 
 The lifecycle stages follow the model of NIST SP 800-57 Part 1: generation, distribution, active use, retirement (decrypt-only), destruction and compromise handling.
 
@@ -108,7 +108,7 @@ The departed member's API access ends in that same transaction.
 
 - **Achieves:** content created after activation is protected by a key that departed members never received. Departed members lose API access to all ciphertext and envelopes as soon as the loss is recorded, and no new content is created while the room is locked.
 - **Cannot achieve:** a departed member keeps any plaintext they saw and any key material they received. If they later obtain old ciphertext, for example through a database leak, they can decrypt content from versions they held. **A rekey never makes anyone forget.** Re-encrypting historical content is a deferred option (OCD-07) and would still not undo earlier access.
-- **Assumes an honest server:** a server-side attacker could activate a key version of its own (T-36). Authenticated key versions are open decision OCD-12.
+- **Authenticated from Phase 6:** without signatures a server-side attacker could activate a key version of its own (T-36). ADR-015 (accepted) makes the creator sign every key version, and clients refuse unsigned or unauthorized versions; the verification is implemented in Phase 6 and applied to rekeys in Phase 11.
 
 ### 1.7 Destruction
 
@@ -126,15 +126,29 @@ When no file or note references a RETIRED version, the worker deletes its envelo
 
 ## 3. User identity keys
 
-| Event | Effect |
-|---|---|
-| Vault creation | New ACTIVE key pair (DF-03) |
-| Unlock and lock | Private key in memory only while unlocked (CP-22) |
-| Passphrase change | Same key pair, re-wrapped under a new salt and a new PKWK |
-| Vault reset (lost passphrase) | Old key pair SUPERSEDED, its encrypted private key set to NULL and its envelopes deleted. A new ACTIVE key pair is created. Pending invitations for the old key become invalid, and unrevealed secrets addressed to the old key are destroyed because they can no longer be decrypted. The membership epoch of each room of the user increments. Room admins re-share keys, and the next rekey includes the new key automatically. Other sessions are revoked |
-| Suspected identity compromise | As for a reset, plus REKEY_REQUIRED in every room of the user (R5), because the attacker may hold every RKM wrapped to the old key |
-| Account disabled | Memberships become SUSPENDED and envelopes are deleted (R3). After re-enabling, an OWNER or ADMIN reinstates each membership by re-sharing keys |
-| Account deletion | Key pair REVOKED, encrypted private key set to NULL, memberships removed, REKEY_REQUIRED in each room (R4) |
+An identity is the encryption key pair and the signing key pair under one key ID (ADR-015). Both pairs always share one status and change together; there is no separate rotation of the signing key.
+
+```mermaid
+stateDiagram-v2
+  [*] --> ACTIVE: vault setup or reset
+  ACTIVE --> SUPERSEDED: vault reset (lost passphrase) or identity compromise
+  ACTIVE --> REVOKED: account deletion
+  SUPERSEDED --> [*]
+  REVOKED --> [*]
+```
+
+A retired identity never becomes ACTIVE again, its public keys never change, and at most one identity per user is ACTIVE (database trigger and partial unique index, Phase 4).
+
+| Event | Effect | Phase |
+|---|---|---|
+| Vault creation | New ACTIVE identity generated in the browser; the server verifies and stores public keys and ciphertext (DF-03). Needs a recent step-up | 4, implemented |
+| Unlock and lock | Private keys in memory only while unlocked (CP-22) | 4, implemented |
+| Passphrase change | Same identity (key ID and fingerprint), both private keys re-wrapped under a new salt and new wrapping keys; signed by the identity and applied by compare-and-swap (CD-26). Does not help if an old copy of the record and the old passphrase are both known (L-40): reset instead | 4, implemented |
+| Parameter upgrade | As a passphrase change, with the same passphrase, for vaults below the target parameters (ADR-010) | 4, implemented |
+| Vault reset (lost passphrase) | Needs a strict step-up. Old identity SUPERSEDED with both encrypted private keys set to NULL (public keys kept). A new ACTIVE identity is created, other sessions are revoked and the current one is rotated, in one transaction. **When rooms exist (from Phase 6; the complete procedure is CM-T053 in Phase 11):** the same transaction deletes the old identity's envelopes, invalidates pending invitations for it, destroys unrevealed secrets addressed to it (they can no longer be decrypted) and increments the membership epoch of each room of the user; room admins re-share keys, and the next rekey includes the new identity automatically | Session and identity parts in 4; room parts from 6, completed in 11 |
+| Suspected identity compromise | As for a reset, plus REKEY_REQUIRED in every room of the user (R5), because the attacker may hold every RKM wrapped to the old key and can sign as the old identity | 11 (CM-T053) |
+| Account disabled | Sessions end (Phase 3). Memberships become SUSPENDED and envelopes are deleted (R3). After re-enabling, an OWNER or ADMIN reinstates each membership by re-sharing keys | Sessions in 3; rooms in 6 |
+| Account deletion | Identity REVOKED, encrypted private keys set to NULL, memberships removed, REKEY_REQUIRED in each room (R4) | 11 (CM-T051) |
 
 **Re-sharing after a reset (AZ-14):** an OWNER or ADMIN browser fetches the new public key, wraps the versions allowed by the history policy and posts the envelopes. The API applies the same checks as for invitations, including fingerprint confirmation in RESTRICTED rooms. Key changes are audited and shown to room administrators, because an unexpected key change can indicate key substitution (T-25).
 
@@ -156,7 +170,7 @@ When no file or note references a RETIRED version, the worker deletes its envelo
 |---|---|
 | Room key version | STANDARD: event-driven only. CONFIDENTIAL: 180 days. RESTRICTED: 90 days |
 | DEKs | Lifetime of one item version |
-| User key pair | No fixed expiry in the baseline; replaced on reset or compromise |
+| User identity (encryption and signing key pairs) | No fixed expiry in the baseline; replaced on reset or compromise |
 | Session token | At most 12 hours (CP-08) |
 | Server keys | As in section 4 |
 

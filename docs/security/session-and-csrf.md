@@ -1,6 +1,6 @@
 # Session and CSRF Security
 
-Status: Phase 0.5 design, normative; **implemented in Phase 3** (CM-T016, CM-T017, CM-T020, CM-T021). Implementation notes are in section 11 and in [authentication-security.md](authentication-security.md). Related: [ADR-008](../architecture/adr/ADR-008-server-side-sessions.md), [trust-boundaries.md](../architecture/trust-boundaries.md) TB-02, [threat-model.md](../threat-model/threat-model.md) T-08 and T-13, parameter register CP-08.
+Status: Phase 0.5 design, normative; **implemented in Phase 3** (CM-T016, CM-T017, CM-T020, CM-T021), with the vault events of Phase 4. Implementation notes are in sections 11 and 12 and in [authentication-security.md](authentication-security.md). Related: [ADR-008](../architecture/adr/ADR-008-server-side-sessions.md), [trust-boundaries.md](../architecture/trust-boundaries.md) TB-02, [threat-model.md](../threat-model/threat-model.md) T-08 and T-13, parameter register CP-08.
 
 ## 1. Summary
 
@@ -127,7 +127,13 @@ Failed checks return 403 `ORIGIN_REJECTED` (or 415 for the content type) before 
 - **Pre-authentication state storage.** Section 3 fixes its behaviour; the implementation stores it in its own table, `auth_challenges` (data-model 4.3.1): a SHA-256 token digest, the user, creation and expiry times (CHECK: at most 5 minutes), an attempt counter (CHECK: 0 to 5) and a consumption time. It is never a row in `sessions`, so it can never be mistaken for a session.
 - **Idle expiry.** An idle-expired session is refused because `idle_expires_at` has passed; the row is not additionally updated to revoked. The effect is the same as revocation (the token can never work again), without a write triggered by a stale cookie. The worker deletes the row 30 days later.
 - **Revocation reasons** use `SessionRevokeReason` (data-model section 7.1). "Sign out other sessions" and per-session revocation record `REVOKED_BY_USER`; the session limit records `SESSION_LIMIT`.
-- **Vault lock on logout** (section 5, step 3) applies from Phase 4, when the vault exists.
+- **Vault lock on logout** (section 5, step 3) applies from Phase 4, when the vault exists; see section 12.
 - **Local HTTPS.** E2E tests run behind `tests/e2e/static-server.mjs`, which serves the export and proxies `/api` over HTTPS with a throwaway self-signed certificate, so the `__Host-` cookie works unchanged. The local Nginx of section 2 arrives in Phase 17.
 - **Account disabling** is enforced twice: all sessions are revoked in the same transaction, and every request checks that the account is ACTIVE.
 
+## 12. Implementation notes (Phase 4: the vault and sessions)
+
+- **Vault reset** (`POST /api/vault/reset`, section 4) is implemented as specified: in one transaction the old identity is superseded, the user's other sessions are revoked with reason `VAULT_RESET`, and the current session is rotated; the response sets the new cookie. It needs the strict step-up window (5 minutes), because it replaces the user's cryptographic identity.
+- **Step-up for vault changes.** Vault setup, passphrase change and parameter upgrade need the standard window (15 minutes). The step-up proves the Account Password (and the MFA code); it never involves the Vault Passphrase.
+- **Session and vault are separate states.** A valid session does not unlock the vault, and an unlocked vault does not extend the session. The vault locks on logout (section 5, step 3), when the page is closed, after 15 minutes without user input, and when any API answer reports the session as ended (checked at least every 60 seconds while the user is active). Each tab unlocks separately; nothing unlocked is shared through browser storage.
+- **CSRF.** The four new state-changing routes (`/vault`, `/vault/rewrap`, `/vault/reset`, `/directory/lookup`) pass the same-origin gate like every other state change and are in the `csrf` suite. `GET /api/vault` has no side effects and accepts no query string.
