@@ -15,3 +15,12 @@ $ pnpm sbom:generate
   components: 288
   argon2id: 1.0.1 pkg:npm/argon2id@1.0.1
   @vitest/coverage-v8 is a development dependency and correctly absent from the production SBOM (--prod).
+
+$ pnpm scan:secrets   (gitleaks 8.30.1, pinned image, full git history)
+  == gitleaks git /repo
+  INF 33 commits scanned.
+  INF scanned ~2989437 bytes (2.99 MB) in 7.72s
+  INF no leaks found
+  Four generic-api-key matches in Phase 4 commits were inspected and are false positives (a UUID test constant,
+  the list of redacted field names, a ciphertext prefix and a public fingerprint in evidence files). They are
+  listed with reasons in .gitleaksignore; the triggering lines were renamed, removed or reworded afterwards.
