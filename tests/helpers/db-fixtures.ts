@@ -16,10 +16,13 @@ export const DUMMY = {
   iv: () => dummyBytes(12),
   salt: () => dummyBytes(16),
   spki: () => dummyBytes(422),
+  signingSpki: () => dummyBytes(91),
+  signature: () => dummyBytes(64),
   rsaCiphertext: () => dummyBytes(384),
   wrappedDek: () => dummyBytes(48),
   ciphertext: (length = 64) => dummyBytes(length),
   encryptedPrivateKey: () => dummyBytes(1810),
+  encryptedSigningPrivateKey: () => dummyBytes(154),
 } as const;
 
 /** A syntactically valid Argon2id PHC string that no password produces (not a real hash). */
@@ -52,9 +55,14 @@ export async function insertKeyPair(
     status: 'ACTIVE',
     algorithm_suite: 'CM1',
     public_key_spki: DUMMY.spki(),
+    signing_public_key_spki: DUMMY.signingSpki(),
     public_key_fingerprint: hexFingerprint(),
+    identity_signature: DUMMY.signature(),
     encrypted_private_key: DUMMY.encryptedPrivateKey(),
     private_key_iv: DUMMY.iv(),
+    encrypted_signing_private_key: DUMMY.encryptedSigningPrivateKey(),
+    signing_private_key_iv: DUMMY.iv(),
+    vault_version: 1,
     kdf_algorithm: 'argon2id',
     kdf_memory_kib: 65536,
     kdf_iterations: 3,
