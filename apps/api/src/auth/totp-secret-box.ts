@@ -1,3 +1,4 @@
+import { contextBytes } from '@ciphermesh/crypto/contexts';
 import { createCipheriv, createDecipheriv, createSecretKey, randomBytes, type KeyObject } from 'node:crypto';
 
 /**
@@ -10,25 +11,14 @@ import { createCipheriv, createDecipheriv, createSecretKey, randomBytes, type Ke
  * || GCM tag (16 bytes). The key ID is stored next to it (users.mfa_totp_key_id) for rotation.
  * AAD binds the ciphertext to the user and key (canonical context `cm.srv.totp`, CP-15), so a
  * ciphertext copied to another user's row fails authentication.
+ *
+ * CD-22: Phase 3 built this context with a restricted local builder. Since Phase 4 it comes from
+ * the general canonical context builders of packages/crypto, which produce the same bytes for
+ * this context; primitives.test.ts opens a secret sealed by the Phase 3 code to prove that stored
+ * MFA secrets stay readable. A user ID that is not a UUIDv4 now fails closed.
  */
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
-
-/**
- * Canonical context for a flat object of strings and safe integers: RFC 8785 serialization of
- * this restricted subset is JSON.stringify of each value with keys in code-unit order. Anything
- * else is refused. The general RFC 8785 implementation arrives with packages/crypto in Phase 4
- * (OCD-04); its test vectors must reproduce these bytes.
- */
-export function canonicalServerContext(fields: Readonly<Record<string, string | number>>): Buffer {
-  const keys = Object.keys(fields).sort();
-  const parts = keys.map((key) => {
-    const value = fields[key];
-    if (typeof value === 'number' && !Number.isSafeInteger(value)) throw new Error('Unsafe integer in context');
-    return `${JSON.stringify(key)}:${JSON.stringify(value)}`;
-  });
-  return Buffer.from(`{${parts.join(',')}}`, 'utf8');
-}
 
 export class TotpSecretBox {
   private readonly key: KeyObject;
@@ -40,8 +30,8 @@ export class TotpSecretBox {
     this.key = createSecretKey(Buffer.from(keyBase64Url, 'base64url'));
   }
 
-  private aad(userId: string, keyId: string): Buffer {
-    return canonicalServerContext({ ctx: 'cm.srv.totp', keyId, userId, v: 1 });
+  private aad(userId: string, keyId: string): Uint8Array {
+    return contextBytes('cm.srv.totp', { userId, keyId });
   }
 
   seal(userId: string, secret: Buffer): Buffer {
