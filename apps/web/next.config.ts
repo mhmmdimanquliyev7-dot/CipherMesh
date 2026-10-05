@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
   // Workspace packages ship TypeScript sources.
-  transpilePackages: ['@ciphermesh/shared', '@ciphermesh/validation'],
+  transpilePackages: ['@ciphermesh/shared', '@ciphermesh/validation', '@ciphermesh/crypto'],
   images: { unoptimized: true },
 };
 

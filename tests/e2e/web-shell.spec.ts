@@ -30,7 +30,8 @@ test('the shell loads under the strict CSP without violations', async ({ page })
 
   const csp = response?.headers()['content-security-policy'] ?? '';
   expect(csp).toContain("default-src 'none'");
-  expect(csp).not.toMatch(/unsafe-inline|unsafe-eval/);
+  // 'wasm-unsafe-eval' (ADR-010) is the only relaxation; the quoted keywords below never appear.
+  expect(csp).not.toMatch(/'unsafe-inline'|'unsafe-eval'/);
 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Client-side encrypted');
   await expect(page.getByText('Not yet available', { exact: false }).first()).toBeVisible();

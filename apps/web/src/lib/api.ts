@@ -22,6 +22,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Called when the API reports that the session is gone (expired, revoked, account disabled). The
+ * vault controller registers here so it can lock at once: a valid server session is a
+ * precondition for keeping the vault unlocked in this tab (CP-22).
+ */
+let unauthenticatedListener: (() => void) | undefined;
+export function onUnauthenticated(listener: (() => void) | undefined): void {
+  unauthenticatedListener = listener;
+}
+
 export async function api<S extends z.ZodType>(
   method: 'GET' | 'POST',
   path: string,
@@ -43,6 +53,7 @@ export async function api<S extends z.ZodType>(
   if (!response.ok) {
     const error = apiErrorBodySchema.safeParse(data);
     if (error.success) {
+      if (response.status === 401 && error.data.error.code === 'UNAUTHENTICATED') unauthenticatedListener?.();
       throw new ApiError(response.status, error.data.error.code, error.data.error.message, error.data.error.issues);
     }
     throw new ApiError(response.status, 'UNKNOWN', 'Unexpected response from the server');

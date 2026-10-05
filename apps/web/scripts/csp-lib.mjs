@@ -60,14 +60,17 @@ export function sha256Source(text) {
 }
 
 /**
- * Builds the CSP. No 'unsafe-inline' and no 'unsafe-eval'. 'wasm-unsafe-eval' is added
- * only in Phase 4 together with the Argon2id WebAssembly module (ADR-010), and the
- * object-storage origin is added to connect-src in Phase 7.
+ * Builds the CSP. No 'unsafe-inline' and no 'unsafe-eval'. Since Phase 4, 'wasm-unsafe-eval' lets
+ * the Argon2id WebAssembly module compile (ADR-010, LIB-03). It permits compiling WebAssembly
+ * only: it does not allow eval(), new Function() or inline scripts, and the module itself is
+ * part of a same-origin script bundle. The Argon2id Web Worker is a same-origin script, so
+ * script-src 'self' covers it (worker-src falls back to script-src). The object-storage origin is
+ * added to connect-src in Phase 7.
  * @param {readonly string[]} scriptHashes
  * @returns {string}
  */
 export function buildCsp(scriptHashes) {
-  const scriptSrc = ["'self'", ...[...new Set(scriptHashes)].sort()].join(' ');
+  const scriptSrc = ["'self'", "'wasm-unsafe-eval'", ...[...new Set(scriptHashes)].sort()].join(' ');
   return [
     "default-src 'none'",
     `script-src ${scriptSrc}`,

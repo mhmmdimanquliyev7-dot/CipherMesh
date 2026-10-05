@@ -125,6 +125,8 @@ async function resolveFile(urlPath) {
   return undefined;
 }
 
+const CLIENT_HEADER = 'x-e2e-client-address';
+
 const HOP_BY_HOP = new Set([
   'connection',
   'keep-alive',
@@ -142,9 +144,18 @@ createServer(tls, (req, res) => {
     /** @type {Record<string, string | string[]>} */
     const forward = {};
     for (const [name, value] of Object.entries(req.headers)) {
-      if (value !== undefined && !HOP_BY_HOP.has(name) && name !== 'x-forwarded-for') forward[name] = value;
+      if (value !== undefined && !HOP_BY_HOP.has(name) && name !== 'x-forwarded-for' && name !== CLIENT_HEADER) {
+        forward[name] = value;
+      }
     }
-    forward['x-forwarded-for'] = req.socket.remoteAddress ?? '127.0.0.1';
+    // Test-only: a test may name its client address from the IPv6 documentation range (RFC 3849),
+    // so per-address limits do not couple unrelated tests that all connect from 127.0.0.1. The
+    // Vitest suites do the same through X-Forwarded-For. Production Nginx has no such header.
+    const requested = req.headers[CLIENT_HEADER];
+    forward['x-forwarded-for'] =
+      typeof requested === 'string' && /^2001:db8:[0-9a-f:]{1,30}$/i.test(requested)
+        ? requested
+        : (req.socket.remoteAddress ?? '127.0.0.1');
     const upstream = httpRequest(
       { host: '127.0.0.1', port: apiPort, path: req.url, method: req.method, headers: forward },
       (answer) => {
