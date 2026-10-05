@@ -87,6 +87,8 @@ jobs:
           NODE_ENV=development APP_ORIGIN=https://localhost:8443 pnpm db:seed
       - name: Unit, integration, security and database tests
         run: pnpm test
+      - name: Coverage of packages/crypto (at least 90% statements and branches, CLAUDE.md section 10)
+        run: pnpm test:coverage:crypto
       - name: Build
         run: pnpm build
       - name: Smoke test of the built API (fail-closed readiness, real database, graceful shutdown)
