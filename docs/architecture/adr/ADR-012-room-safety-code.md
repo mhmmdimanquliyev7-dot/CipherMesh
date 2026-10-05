@@ -51,9 +51,9 @@ The Phase 0 documentation claimed more than that. A server, or an attacker contr
 - **Commitment only (Phase 0 design):** detects inconsistency only while the server is honest. The Phase 0 claim was too strong and has been corrected.
 - **Comparing the full commitment in hex:** equally strong, but 64 hex characters are impractical, and a hex prefix of equal strength is harder to read aloud than words.
 - **Codes provided by the server:** the server could show matching codes to everyone, so they prove nothing about the server.
-- **Per-user signatures on key versions (OCD-12):** authenticate who created a version. They complement the Safety Code but do not replace it.
+- **Per-user signatures on key versions (OCD-12, adopted in ADR-015):** authenticate who created a version. They complement the Safety Code but do not replace it: signatures reject versions created by the server, while the Safety Code reveals split views and rollback between members who compare.
 - **Key transparency log:** strong, but a large system that is out of scope.
-- **Including the member list in the code:** the member list comes from the server and is not authenticated, so it would not reliably reveal hidden recipients. Rejected for the baseline and revisited with OCD-12.
+- **Including the member list in the code:** the member list comes from the server and is not authenticated, so it would not reliably reveal hidden recipients. Rejected for the baseline. With ADR-015 the creator signs the recipient list of each key version, so members can inspect it in the client instead.
 
 ## Consequences
 
@@ -77,4 +77,4 @@ The Phase 0 documentation claimed more than that. A server, or an attacker contr
 
 ## Status
 
-Accepted. Implementation in Phase 6 (CM-T085). Review when OCD-12 is decided.
+Accepted. Implementation in Phase 6 (CM-T085). OCD-12 was decided by ADR-015 without changing this ADR.

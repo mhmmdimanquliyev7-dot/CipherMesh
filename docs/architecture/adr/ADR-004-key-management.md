@@ -1,6 +1,6 @@
 # ADR-004: Key-management approach
 
-- Status: Accepted (revised in Phase 0.5; the asymmetric mechanism is decided in ADR-007, key-version authentication is open as OCD-12)
+- Status: Accepted (revised in Phase 0.5; the asymmetric mechanism is decided in ADR-007, key-version authentication in [ADR-015](ADR-015-identity-signing-keys.md))
 - Date: 2026-09-28
 - Related: [key-hierarchy.md](../../crypto/key-hierarchy.md), [key-lifecycle.md](../../crypto/key-lifecycle.md), [ADR-012](ADR-012-room-safety-code.md), [ADR-013](ADR-013-rekey-state-machine.md), T-21, T-22, T-25, T-29, T-36
 
@@ -46,10 +46,10 @@ A layered envelope-encryption hierarchy:
 
 - The hierarchy is acyclic ([key-hierarchy.md](../../crypto/key-hierarchy.md) section 4).
 - The commitment defeats inconsistent envelopes from a malicious member while the server is honest. The Room Safety Code detects server-made split views only when compared (T-29, L-22).
-- **Open gap:** RSA-OAEP has no sender authentication, and public keys are public. A server-side attacker can therefore create a key version of its own and wrap it to every member (T-36, L-23). OCD-12 decides how to authenticate key versions before Phase 4.
+- **Gap closed by design in ADR-015:** RSA-OAEP has no sender authentication, and public keys are public, so without signatures a server-side attacker could create a key version of its own and wrap it to every member (T-36, L-23). ADR-015 (accepted 2026-10-05) gives every identity an ECDSA P-256 signing key (implemented in Phase 4) and makes key versions signed by their creator (implemented in Phase 6).
 - Public-key substitution by a server-side attacker is mitigated by fingerprints, not eliminated (T-25, L-07).
 - Tests: rekey suite, commitment and Safety Code tests, context-separation tests, the RSA input restriction, canary scans.
 
 ## Status
 
-Accepted. Review when OCD-12 is decided, and if re-encryption on rekey (OCD-07) is adopted.
+Accepted. OCD-12 was decided by ADR-015. Review if re-encryption on rekey (OCD-07) is adopted.

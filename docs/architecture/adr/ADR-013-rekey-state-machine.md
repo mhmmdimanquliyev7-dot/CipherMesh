@@ -99,7 +99,7 @@ stateDiagram-v2
 - A removed member never receives the new version, and no new content is created under a key they hold (T-21).
 - Replayed, raced, stale and interrupted operations are handled explicitly (T-37).
 - Rotation protects future content only. It cannot revoke plaintext or keys a member already obtained (L-04).
-- The design assumes the server enforces these rules honestly. A server-side attacker could activate a key version of its own (T-36), which is the subject of open decision OCD-12.
+- The state machine relies on the server to enforce its rules. Without signatures a server-side attacker could activate a key version of its own (T-36). Under [ADR-015](ADR-015-identity-signing-keys.md) the finalize payload carries the creator's signed key-version statement, and clients refuse versions without a valid signature by an authorized OWNER or ADMIN (Phase 11, CM-T050).
 
 ## Status
 
