@@ -1,0 +1,17 @@
+EV-04-12: Dependency audit, SBOM and secret scan with the Phase 4 dependencies
+Captured: 2026-10-05 (UTC) on branch feature/CM-T023-cryptographic-vault (Phase 4)
+New runtime dependency: argon2id 1.0.1 (packages/crypto, LIB-03; MIT, no dependencies, no install scripts).
+New development dependency: @vitest/coverage-v8 5.0.2 (coverage gate; MIT, no install scripts, released 2026-09-25,
+older than the 3-day minimumReleaseAge). Embedded WebAssembly checksums (compared with the package by argon2id.test.ts):
+  dist/simd.wasm, SHA-256 50647e10fc8e0adba4f60726f3f0d77db0e3c73516b05a83ad10390b3a8b4b0e
+  dist/no-simd.wasm, SHA-256 1f16d8de5a6d8a3a4fad5885c4784f57713d3626fd7d55f852fd79ecadbc4f8e
+
+$ pnpm audit:deps
+  $ pnpm audit --audit-level high
+  No known vulnerabilities found
+
+$ pnpm sbom:generate
+  CycloneDX SBOM written to sbom.cdx.json (git-ignored; CI uploads it as an artefact)
+  components: 288
+  argon2id: 1.0.1 pkg:npm/argon2id@1.0.1
+  @vitest/coverage-v8 is a development dependency and correctly absent from the production SBOM (--prod).

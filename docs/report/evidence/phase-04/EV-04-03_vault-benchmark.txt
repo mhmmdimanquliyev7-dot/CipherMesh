@@ -1,0 +1,32 @@
+EV-04-03: Browser Argon2id and vault benchmark (CP-04, ADR-010, LIB-03)
+Captured: 2026-10-05T12:09:26Z on branch feature/CM-T023-cryptographic-vault (Phase 4, uncommitted working tree)
+Command: pnpm bench:vault (scripts/bench/vault-browsers.mjs). The real packages/crypto code and its Argon2id worker,
+bundled with Vite and served on 127.0.0.1 with the production security headers and CSP (script-src 'self' 'wasm-unsafe-eval').
+Synthetic random identifiers and passphrases only; only timings left the page. No phone was measured (L-37).
+
+Vault benchmark, 2026-10-05T12:09:26.131Z
+Host: 12th Gen Intel(R) Core(TM) i7-12700H, 20 logical CPUs, 31.6 GiB RAM, win32 10.0.26200, Node.js v24.19.0
+
+| Operation | chromium 153.0.8010.12 | firefox 155.0 | webkit 26.6 |
+|---|---|---|---|
+| Argon2id at the floor (m = 19456 KiB, t = 2, p = 1) | 60 ms (60 to 62, n = 3) | 79 ms (75 to 115, n = 3) | 78 ms (76 to 81, n = 3) |
+| Argon2id at the target (m = 65536 KiB, t = 3, p = 1) | 263 ms (260 to 298, n = 5) | 299 ms (270 to 358, n = 5) | 321 ms (308 to 349, n = 5) |
+| Vault setup: RSA-3072 and ECDSA P-256 keys, Argon2id, wrapping, self-check | 558 ms (269 to 1085, n = 5) | 438 ms (402 to 590, n = 5) | 2029 ms (802 to 3955, n = 5) |
+| Vault unlock: Argon2id, unwrapping, pair checks | 424 ms (408 to 456, n = 5) | 308 ms (296 to 327, n = 5) | 664 ms (644 to 721, n = 5) |
+| Passphrase change: two derivations, re-wrap, signature | 883 ms (837 to 903, n = 3) | 605 ms (600 to 610, n = 3) | 1277 ms (1218 to 1282, n = 3) |
+| Longest main-thread timer gap (10 ms timer) during a target derivation | 17 ms | 11 ms | 19 ms |
+| Second concurrent derivation refused with KDF_BUSY | yes | yes | yes |
+| Wrong passphrase refused with VAULT_UNLOCK_FAILED | yes | yes | yes |
+| Logical CPUs reported to the page | 20 | 20 | 8 |
+| CSP violations or page errors | none | none | none |
+
+Library comparison (scratch harness, same CSP, each candidate in a Web Worker; median ms, hash-wasm / argon2id / @noble/hashes):
+| Parameters | Chromium | Firefox | WebKit |
+|---|---|---|---|
+| Floor m=19456 KiB, t=2, p=1 | 40 / 45 / 195 | 51 / 64 / 365 | 74 / 48 / 330 |
+| Target m=65536 KiB, t=3, p=1 | 214 / 251 / 1754 | 227 / 266 / 1804 | 370 / 441 / 2562 |
+| m=65536 KiB, t=4 (hash-wasm / argon2id) | 545 / 514 | 284 / 406 | 924 / 590 |
+| m=131072 KiB, t=3 (hash-wasm / argon2id) | 779 / 829 | 468 / 562 | 1437 / 977 |
+Node.js at the target: OpenSSL crypto.argon2 182 ms, hash-wasm 219 ms, argon2id 258 ms, @noble/hashes 1621 ms.
+Chromium CPU throttling x4 and x6 did not slow the worker proportionally (about 350 to 400 ms), so it was not used as a phone estimate.
+Decision and rationale: docs/crypto/crypto-decisions.md LIB-03, CP-04 and section 8.

@@ -1,0 +1,44 @@
+EV-04-01: What the browser sends at vault setup (DF-03)
+Captured: 2026-10-05T17:10:30.148Z on branch feature/CM-T023-cryptographic-vault (Phase 4, uncommitted working tree)
+Environment: built static export and built API behind tests/e2e/static-server.mjs (HTTPS, generated CSP),
+local PostgreSQL 17, Chromium from Playwright 1.63. Synthetic account (example.test).
+Redaction: the Vault Passphrase and the account password are random and replaced by <redacted>;
+ciphertexts and public keys are shortened. Nothing below is secret.
+
+POST /api/vault body, as captured from the page (keys of the JSON object exactly as sent):
+{
+  "vaultVersion": 1,
+  "identity": {
+    "keyId": "c1438b64-4f05-40e7-952f-47624c71d8da",
+    "suite": "CM1",
+    "encryptionPublicKey": "MIIBojANBgkqhkiG… (422 bytes)",
+    "signingPublicKey": "MFkwEwYHKoZIzj0C… (91 bytes)",
+    "bindingSignature": "kYBkG1_Hwv0DHKDr… (64 bytes)",
+    "fingerprint": "4113040befc90fdfc2b52f70cafc8ef208336367fac5bbfb348ca71825aca4f2"
+  },
+  "kdf": {
+    "algorithm": "argon2id",
+    "version": 19,
+    "memoryKiB": 65536,
+    "iterations": 3,
+    "parallelism": 1,
+    "salt": "MqqG1-iYe9eVkPpM… (16 bytes)"
+  },
+  "wrappedEncryptionKey": {
+    "iv": "Hn526mNqhg4tP93m… (12 bytes)",
+    "ciphertext": "jvV8NwqCMa3-QHa7… (1809 bytes)"
+  },
+  "wrappedSigningKey": {
+    "iv": "xrHk2VD6UW6-ym4l… (12 bytes)",
+    "ciphertext": "f-VFtycFXGbE8_vn… (154 bytes)"
+  }
+}
+
+Top-level fields: identity, kdf, vaultVersion, wrappedEncryptionKey, wrappedSigningKey
+Requests during setup (method and path): GET /api/auth/session; GET /api/vault; GET /_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js; GET /_next/static/chunks/turbopack-2sar0_i-o188o.js; GET /_next/static/chunks/2g207mj1r6l4h.js; POST /api/vault; GET /api/vault; GET /api/vault
+
+Leak scan over all 71 requests of the session (bodies and URLs):
+  Vault Passphrase as typed, URL-encoded, base64, base64url and hex: not found
+  PKCS#8 structures (rsaEncryption OID 2a864886f70d010101, id-ecPublicKey OID 2a8648ce3d0201): not found
+  Requests with a finding: 0
+CSP violations during the flow: 0

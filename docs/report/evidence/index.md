@@ -56,3 +56,24 @@ Captured on the stacked branch `feature/CM-T015-authentication` against the real
 | EV-03-10 | [phase-03/EV-03-10_account-disable.txt](phase-03/EV-03-10_account-disable.txt) | 2026-10-04 | CM-T022 | Administrator bootstrap and account disabling tests |
 | EV-03-11 | [phase-03/EV-03-11_negative-controls.txt](phase-03/EV-03-11_negative-controls.txt) | 2026-10-04 | CM-T016 to CM-T021 | Ten deliberate defects, each caught |
 | EV-03-12 | [phase-03/EV-03-12_browser-checks.txt](phase-03/EV-03-12_browser-checks.txt) | 2026-10-04 | CM-T016, CM-T019, CM-T020 | 18 Playwright tests in Chromium, Firefox and WebKit |
+
+## Phase 4
+
+Captured on `feature/CM-T023-cryptographic-vault` (from `main` at `f86a2ce`) against the real API, the built export behind the local HTTPS E2E server, throwaway test databases and the local development database. Synthetic accounts only; every Vault Passphrase and account password is random and redacted; ciphertexts and public keys are shortened (they are public or opaque by design).
+
+| ID | File | Date | Jira | Caption |
+|---|---|---|---|---|
+| EV-04-01 | [phase-04/EV-04-01_vault-setup-request.txt](phase-04/EV-04-01_vault-setup-request.txt) | 2026-10-05 | CM-T025 | The setup request holds public keys, KDF metadata and ciphertext; no passphrase or PKCS#8 in any request |
+| EV-04-02 | [phase-04/EV-04-02_stored-vault-row.txt](phase-04/EV-04-02_stored-vault-row.txt) | 2026-10-05 | CM-T025 | The stored `user_key_pairs` row: sizes, parameters, no plaintext private key |
+| EV-04-03 | [phase-04/EV-04-03_vault-benchmark.txt](phase-04/EV-04-03_vault-benchmark.txt) | 2026-10-05 | CM-T024 | Browser benchmark in three engines and the library comparison |
+| EV-04-04 | [phase-04/EV-04-04_browser-storage-after-unlock.txt](phase-04/EV-04-04_browser-storage-after-unlock.txt) | 2026-10-05 | CM-T026 | Browser storage after setup, lock and unlock: nothing readable by scripts |
+| EV-04-05 | [phase-04/EV-04-05_fingerprint.txt](phase-04/EV-04-05_fingerprint.txt), [phase-04/EV-04-05_fingerprint.png](phase-04/EV-04-05_fingerprint.png) | 2026-10-05 | CM-T027 | Displayed fingerprint equals an independent recomputation; screenshot on a throwaway account |
+| EV-04-06 | [phase-04/EV-04-06_identity-authenticity-tests.txt](phase-04/EV-04-06_identity-authenticity-tests.txt) | 2026-10-05 | CM-T086 | ADR-015 acceptance; binding, fingerprint, signature and signed re-wrap tests |
+| EV-04-07 | [phase-04/EV-04-07_crypto-tests-and-coverage.txt](phase-04/EV-04-07_crypto-tests-and-coverage.txt) | 2026-10-05 | CM-T023, CM-T024 | Known-answer, invariant and fail-closed tests of `packages/crypto` with coverage |
+| EV-04-08 | [phase-04/EV-04-08_vault-api-security-suites.txt](phase-04/EV-04-08_vault-api-security-suites.txt) | 2026-10-05 | CM-T025 to CM-T028 | Vault API suites, CSRF and route inventory |
+| EV-04-09 | [phase-04/EV-04-09_negative-controls.txt](phase-04/EV-04-09_negative-controls.txt) | 2026-10-05 | CM-T023 to CM-T028 | 27 deliberate defects, each caught; sources restored byte for byte |
+| EV-04-10 | [phase-04/EV-04-10_browser-tests.txt](phase-04/EV-04-10_browser-tests.txt) | 2026-10-05 | CM-T025 to CM-T028 | Playwright in Chromium, Firefox and WebKit, including cross-engine unlock |
+| EV-04-11 | [phase-04/EV-04-11_totp-context-migration.txt](phase-04/EV-04-11_totp-context-migration.txt) | 2026-10-05 | CM-T023 | Phase 3 TOTP ciphertext opens with the shared context builder (CD-22) |
+| EV-04-12 | [phase-04/EV-04-12_supply-chain.txt](phase-04/EV-04-12_supply-chain.txt) | 2026-10-05 | CM-T024 | Dependency audit, SBOM and secret scan with the new dependencies |
+| EV-04-13 | Pending | | CM-T023 to CM-T028 | CI run of the Phase 4 pull request |
+| EV-04-14 | [phase-04/EV-04-14_sf-04-01-regression.txt](phase-04/EV-04-14_sf-04-01-regression.txt) | 2026-10-05 | SF-04-01 | Security finding: regression test fails before the fix and passes after it |

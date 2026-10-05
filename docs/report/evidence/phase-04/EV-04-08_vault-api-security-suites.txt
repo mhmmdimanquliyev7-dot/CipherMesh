@@ -1,0 +1,73 @@
+EV-04-08: Vault API security suites (CM-T025 to CM-T028)
+Captured: 2026-10-05T17:12:16Z on branch feature/CM-T023-cryptographic-vault (Phase 4)
+Redaction: no passwords, passphrases, tokens or private keys appear below (synthetic accounts, random secrets).
+
+Real API on loopback, real Argon2id at the production parameters, throwaway PostgreSQL database as cm_api.
+
+$ pnpm test:vault --reporter=verbose
+ ✓ |vault| tests/vault/setup.test.ts > vault setup (POST /api/vault) > requires a session and a recent step-up 1981ms
+ ✓ |vault| tests/vault/setup.test.ts > vault setup (POST /api/vault) > stores only public keys, ciphertext and non-secret KDF metadata (database row inspected) 1408ms
+ ✓ |vault| tests/vault/reset-and-directory.test.ts > vault reset (POST /api/vault/reset) > replaces the identity, retires the old one without its private keys, and ends the other sessions 3718ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > keeps the identity, replaces salt and ciphertexts; only the new passphrase opens the vault 5180ms
+ ✓ |vault| tests/vault/leakage.test.ts > vault flows leave no secret or ciphertext in logs and events > setup, passphrase change, reset and lookup 5525ms
+ ✓ |vault| tests/vault/setup.test.ts > vault setup (POST /api/vault) > returns the record to its owner, and only the passphrase opens it, in the browser 2615ms
+ ✓ |vault| tests/vault/reset-and-directory.test.ts > vault reset (POST /api/vault/reset) > requires the strict step-up window (5 minutes) and names the current identity 3710ms
+ ✓ |vault| tests/vault/setup.test.ts > vault setup (POST /api/vault) > a user without a vault gets 404 VAULT_NOT_FOUND, never someone else's record 1676ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > requires a recent step-up 3330ms
+ ✓ |vault| tests/vault/setup.test.ts > vault setup (POST /api/vault) > refuses a second vault for the same account 2012ms
+ ✓ |vault| tests/vault/setup.test.ts > vault setup (POST /api/vault) > rejects any field that could carry a secret (strict schemas, INV-01) 1048ms
+ ✓ |vault| tests/vault/reset-and-directory.test.ts > public-key directory (POST /api/directory/lookup) > returns only public identity data that the browser can verify and fingerprint itself 4247ms
+ ✓ |vault| tests/vault/setup.test.ts > vault setup (POST /api/vault) > rejects an identity that fails verification, with the same checks the browsers run 2249ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > refuses a request that was modified after signing, or signed by another identity 4843ms
+ ✓ |vault| tests/vault/setup.test.ts > vault setup (POST /api/vault) > rejects KDF parameters below the floor or above the ceiling, and non-canonical encodings 1200ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > a replayed or stale request is refused, so an old change can never be applied again 2158ms
+ ✓ |vault| tests/vault/setup.test.ts > vault setup (POST /api/vault) > the uploaded public identity verifies in the browser exactly as on the server 1422ms
+ ✓ |vault| tests/vault/reset-and-directory.test.ts > public-key directory (POST /api/directory/lookup) > requires an own vault, and answers 404 alike for unknown, vault-less and disabled accounts 4404ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > refuses weaker parameters and a reused salt before checking the signature 1854ms
+ ✓ |vault| tests/vault/reset-and-directory.test.ts > public-key directory (POST /api/directory/lookup) > is rate-limited per user and records the throttling 1529ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > upgrades the parameters of a vault with the same passphrase (ADR-010) 2676ms
+ ✓ |vault| tests/vault/reset-and-directory.test.ts > object-level authorization (BOLA/IDOR, OL-10) > no request field, query or header can select another user's vault 2858ms
+ ✓ |vault| tests/vault/rewrap.test.ts > vault passphrase change (POST /api/vault/rewrap) > a user without a vault gets 404 2266ms
+ Test Files  4 passed (4)
+      Tests  23 passed (23)
+
+$ vitest run tests/auth/csrf.test.ts tests/security/route-inventory.test.ts (vault and directory cases shown)
+ ✓ |security| tests/security/route-inventory.test.ts > route inventory > the vault and directory routes exist only as reviewed, all authenticated (Phase 4) 5ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault: cross-site HTML form post (url-encoded) is rejected before the handler 16ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault: cross-site form post (multipart) is rejected before the handler 15ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault: cross-site form post (text/plain) is rejected before the handler 2ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault: foreign-origin fetch with JSON and the custom header is rejected before the handler 2ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault: same-site (sibling subdomain) request is rejected before the handler 2ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault: Origin: null (form under no-referrer, sandboxed frame) is rejected before the handler 8ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault: neither Sec-Fetch-Site nor Origin is rejected before the handler 17ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault: same origin but without the custom header is rejected before the handler 16ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault: same origin with the header but a form content type is rejected before the handler 3ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/rewrap: cross-site HTML form post (url-encoded) is rejected before the handler 11ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/rewrap: cross-site form post (multipart) is rejected before the handler 2ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/rewrap: cross-site form post (text/plain) is rejected before the handler 14ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/rewrap: foreign-origin fetch with JSON and the custom header is rejected before the handler 15ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/rewrap: same-site (sibling subdomain) request is rejected before the handler 2ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/rewrap: Origin: null (form under no-referrer, sandboxed frame) is rejected before the handler 13ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/rewrap: neither Sec-Fetch-Site nor Origin is rejected before the handler 3ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/rewrap: same origin but without the custom header is rejected before the handler 11ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/rewrap: same origin with the header but a form content type is rejected before the handler 14ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/reset: cross-site HTML form post (url-encoded) is rejected before the handler 17ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/reset: cross-site form post (multipart) is rejected before the handler 15ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/reset: cross-site form post (text/plain) is rejected before the handler 15ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/reset: foreign-origin fetch with JSON and the custom header is rejected before the handler 3ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/reset: same-site (sibling subdomain) request is rejected before the handler 13ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/reset: Origin: null (form under no-referrer, sandboxed frame) is rejected before the handler 16ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/reset: neither Sec-Fetch-Site nor Origin is rejected before the handler 13ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/reset: same origin but without the custom header is rejected before the handler 16ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /vault/reset: same origin with the header but a form content type is rejected before the handler 17ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /directory/lookup: cross-site HTML form post (url-encoded) is rejected before the handler 14ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /directory/lookup: cross-site form post (multipart) is rejected before the handler 4ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /directory/lookup: cross-site form post (text/plain) is rejected before the handler 10ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /directory/lookup: foreign-origin fetch with JSON and the custom header is rejected before the handler 3ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /directory/lookup: same-site (sibling subdomain) request is rejected before the handler 12ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /directory/lookup: Origin: null (form under no-referrer, sandboxed frame) is rejected before the handler 3ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /directory/lookup: neither Sec-Fetch-Site nor Origin is rejected before the handler 14ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /directory/lookup: same origin but without the custom header is rejected before the handler 14ms
+ ✓ |auth| tests/auth/csrf.test.ts > CSRF defences on every state-changing authentication route > POST /directory/lookup: same origin with the header but a form content type is rejected before the handler 16ms
+ Test Files  2 passed (2)
+      Tests  146 passed (146)

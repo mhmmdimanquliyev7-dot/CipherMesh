@@ -1,0 +1,13 @@
+EV-04-05: Identity fingerprint shown to its owner (CP-17 as revised by ADR-015)
+Captured: 2026-10-05T17:10:30.148Z on branch feature/CM-T023-cryptographic-vault (Phase 4, uncommitted working tree)
+Environment: built static export and built API behind tests/e2e/static-server.mjs (HTTPS, generated CSP),
+local PostgreSQL 17, Chromium from Playwright 1.63. Synthetic account (example.test).
+Redaction: the Vault Passphrase and the account password are random and replaced by <redacted>;
+ciphertexts and public keys are shortened. Nothing below is secret.
+
+Displayed in the vault page (16 groups of 4): 4113 040b efc9 0fdf c2b5 2f70 cafc 8ef2 0833 6367 fac5 bbfb 348c a718 25ac a4f2
+Recomputed here with Node.js, SHA-256 over the canonical statement {"ctx":"cm.identity.fingerprint",
+  "encryptionKeySpki", "signingKeySpki", "suite":"CM1", "v":1} built from the uploaded public keys:
+  4113040befc90fdfc2b52f70cafc8ef208336367fac5bbfb348ca71825aca4f2
+Equal: true
+Screenshot: EV-04-05_fingerprint.png (throwaway account).
