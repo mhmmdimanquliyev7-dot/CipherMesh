@@ -1,10 +1,10 @@
 # Phase 5 Traceability
 
-Status: in progress. Prompt 07A implemented CM-T029 and Prompt 07B implemented CM-T030 and CM-T031, both on 2026-10-06 on the Phase 5 branch; CM-T032 is not started. Covers CM-T029 to CM-T032 in [jira-backlog.md](jira-backlog.md) (checked against the current backlog before the work started). No item is DONE: DONE requires SECURITY REVIEW and TESTING in Jira and the full Definition of Done (CLAUDE.md section 14), including CI on the pull request, which Prompt 07C opens.
+Status: implemented on 2026-10-06 (Prompts 07A to 07C): CM-T029 to CM-T032 are implemented on the Phase 5 branch and verified locally; the pull request, its CI and the merge are recorded in the handoff ([current-state.md](current-state.md)). Covers CM-T029 to CM-T032 in [jira-backlog.md](jira-backlog.md) (checked against the current backlog before the work started). No item is DONE: DONE requires SECURITY REVIEW and TESTING in Jira and the full Definition of Done (CLAUDE.md section 14).
 
-Branch: `feature/CM-T029-secure-rooms-rbac`, created from the updated `main` (`5c1ed32`: Phases 0 to 4 through pull requests #1, #7, #8 and #10, plus the handoff updates of #9 and #12). No pull request yet. The phase is split over three sessions: Prompt 07A (CM-T029), Prompt 07B (CM-T030, CM-T031) and Prompt 07C (CM-T032, final gates, evidence, pull request).
+Branch: `feature/CM-T029-secure-rooms-rbac`, created from the updated `main` (`5c1ed32`: Phases 0 to 4 through pull requests #1, #7, #8 and #10, plus the handoff updates of #9 and #12). The phase was split over three sessions: Prompt 07A (CM-T029), Prompt 07B (CM-T030, CM-T031) and Prompt 07C (CM-T032, final gates, evidence, pull request).
 
-Normative sources: [../security/authorization-model.md](../security/authorization-model.md) sections 1 to 8 (section 9 records the implementation), [../security/security-policy-profiles.md](../security/security-policy-profiles.md) section 6, [../architecture/data-model.md](../architecture/data-model.md) 4.6 and 4.7. No schema change and no migration in Phase 5 so far: the existing `rooms` and `room_members` tables, their partial unique indexes and CHECK constraints, and the `cm_api` and `cm_worker` grants were sufficient. Prompt 07B added the self-service action SS-06 to the authorization model (section 4).
+Normative sources: [../security/authorization-model.md](../security/authorization-model.md) sections 1 to 8 (section 9 records the implementation), [../security/security-policy-profiles.md](../security/security-policy-profiles.md) section 6, [../architecture/data-model.md](../architecture/data-model.md) 4.6 and 4.7. No schema change and no migration in Phase 5 so far: the existing `rooms` and `room_members` tables, their partial unique indexes and CHECK constraints, and the `cm_api` and `cm_worker` grants were sufficient. Prompt 07B added the self-service action SS-06 to the authorization model (section 4). Prompt 07C added no schema change either; its one dependency change is the `source-map-js` lockfile refresh (section 10, EV-05-04).
 
 ## 1. Work items
 
@@ -31,7 +31,9 @@ Each row reads: requirement, then implementation, then test, then evidence.
 | | Ownership transfer to an ADMIN with step-up (AZ-05); the one-OWNER invariant cannot be broken through any endpoint | `POST /rooms/{roomId}/members/{userId}/transfer-ownership`; demote then promote under the room lock, both conditional; partial unique index as backstop; former OWNER becomes ADMIN | `membership-admin.test.ts`, `membership-concurrency.test.ts`; NC-05-13 to NC-05-15 | | Met |
 | | Member removal (AZ-09, requested for Prompt 07B; DF-10) | `POST /rooms/{roomId}/members/{userId}/remove`: REMOVED, envelopes deleted, epoch incremented, REKEY_REQUIRED in one transaction (INV-07) | `membership-admin.test.ts`, `membership-concurrency.test.ts` | | Met. The rekey itself is Phase 11 (L-44) |
 | PA-03 room consequence (authentication-security.md, "Phase 5") | Disabling an account suspends its memberships and sets those rooms to REKEY_REQUIRED | In the disable transaction: memberships SUSPENDED (ACCOUNT_DISABLED), envelopes deleted, rooms REKEY_REQUIRED with MEMBER_SUSPENDED; re-enabling restores no membership (AZ-14, Phase 6) | `account-disable.test.ts` (including a race with room creation); NC-05-16 | | Met |
-| CM-T032 BOLA and IDOR suite | | Not started | | EV-05-02, EV-05-03 | Prompt 07C |
+| CM-T032 BOLA and IDOR suite | A reusable harness that creates two rooms with separate members and calls every room-scoped endpoint with identifiers from the other room | `tests/authz/bola.test.ts` (49 tests): two rooms, members in every role and state, people in two rooms with different roles, a PLATFORM_ADMIN, drives every case of `tests/helpers/bola-cases.ts` | `bola.test.ts`; NC-05-18 to NC-05-21 | EV-05-02, EV-05-03 | Met |
+| | Every route in the registry is covered; all return 404 without side effects | Nine routes (seven room routes and the two self-service routes) with attack classes A to H; cross-room and outsider attacks give the generic 404, identical for a real and an invented room, and every denied mutation leaves rooms and memberships byte-for-byte unchanged. Where a role is refused by the matrix inside its own room (403), nothing about another room is revealed | `bola.test.ts` (classes A, B, C, G) | EV-05-02 | Met |
+| | The suite fails when a new route has no coverage; runs in CI | `tests/security/bola-inventory.test.ts` compares the reviewed table with the production registry in both directions; both files run in `pnpm test` and so in CI | `bola-inventory.test.ts`; NC-05-22 | EV-05-02 | Met |
 
 ## 2. Security review of the CM-T029 change
 
@@ -137,13 +139,63 @@ Full gates of CLAUDE.md section 10, run on 2026-10-06 against the local PostgreS
 Problems met while verifying, none hidden by weakening a test:
 - **Connection limit.** One full run failed with `too many connections for role "cm_api"`: the new authz files each open an API pool and several clients, and the role is limited to 40 connections by design. The `authz` project now runs its files one at a time (`fileParallelism: false`); the peak during a full run is 24 of 40. The role limit was not changed.
 - **Key-generation timeout.** `packages/crypto/src/identity.test.ts` timed out once at its 5-second default when two RSA-3072 key pairs were generated under load. The two tests that generate two pairs now have an explicit 30-second limit; no assertion changed, and `packages/crypto` is otherwise untouched.
-- **Intermittent crypto test.** In one of seven full runs, `packages/crypto/src/vault.test.ts` "refuses a second derivation while one is running" failed (the second call was not refused). It passed 8 of 8 times in isolation and in the next full run. Its busy flag is set only when the derivation starts, so the test depends on scheduling under load. The code and the test are unchanged by Phase 5; it is recorded for the owner and left alone, because making it deterministic belongs in a crypto change.
+- **Intermittent crypto test.** `packages/crypto/src/vault.test.ts` "refuses a second derivation while one is running" failed in two of about ten full runs (once in Prompt 07B, once in Prompt 07C) and passed in the next full run each time; alone it passed 16 of 16 times, 8 of them under artificial CPU load. The vault code, the KDF code and the test are byte-identical to `main`, so Phase 5 did not cause it. `unlockVault` awaits WebCrypto verification before the derivation sets its module-level busy flag, so whether the second concurrent call is refused depends on how the two calls are scheduled; it is recorded for the owner and left alone, because making it deterministic belongs in a crypto change with its own review.
 - **E2E.** A first run with the default worker count ran out of memory (known on this machine); a second failed one registration with "Unexpected response from the server" in the first test of the run, which did not reproduce in the next full run (cause not established; the third run passed all 58). The E2E runs use one worker locally; CI keeps its default.
 - **Negative controls.** Two full runs reported the five Phase 4 browser controls as "build failed" because I had loaded `NODE_ENV=development` from `.env`, which `next build` rejects. That was my invocation, not the code: with `NODE_ENV` unset the run passes.
 
-## 9. Open items for Prompt 07C
+## 9. Security review of the CM-T032 change and of Phase 5 as a whole (Prompt 07C)
 
-- CM-T032: the BOLA suite over every room route (nine routes, reviewed list in `route-inventory.test.ts`), failing when a route has no coverage.
-- The full Phase 5 evidence (EV-05-01 to EV-05-03), the complete negative-control run, the pull request and its CI.
-- Carry-over limitations: L-42 (profile gates on access), L-43 (rooms without key versions until CM-T033), L-44 (rooms locked until the rekey exists; reinstatement through AZ-14), L-45 (reused room IDs, no room quota).
-- Phase 6 must make invitation acceptance lock the invitee's user row like room creation, so a disable cannot miss a membership it creates.
+Reviewed against T-04, T-05, T-06, T-21, T-28 and T-37, reading the final room routes, service, store, authorizer and registry:
+
+| Check | Outcome |
+|---|---|
+| Room and user ID confusion | Path parameters are validated as UUIDv4 and named by schema; the caller is the session user; target lookups take the room ID and the user ID together |
+| Broad queries filtered in memory | None: every read filters by room and the caller's ACTIVE membership in the query; list pages come from the query |
+| Target fetched without the room | The gate loader and the locked re-check both select by room and user; the decision rejects a row whose room differs (three layers); the BOLA suite and NC-05-19 prove all three must fail together for a cross-room change |
+| PLATFORM_ADMIN bypass | The platform role is not an input anywhere in the room path; proven at the outside (suite) and by NC-05-21 |
+| OWNER and ADMIN confusion | Authority is per room: an ADMIN of one room is a VIEWER in another and an OWNER is a MEMBER, proven by the people in two rooms |
+| Stale membership, TOCTOU | Every change re-runs the decision under the room lock on locked rows; forced races in the concurrency suite; NC-05-13 |
+| Deleted-room and suspension access | DELETING and DELETED rooms refuse their own OWNER; SUSPENDED, REMOVED and LEFT members get the same 404 as strangers |
+| Differentiated unauthorized errors | Outsiders, nonexistent rooms, former members, DELETING rooms and cross-room targets all answer with the same 404 body; NC-05-18 shows the suite detects a differing answer. A member refused by role gets 403, which discloses only their own room's rule |
+| Over-projection and logging | Strict response schemas, no email or membership ID in member lists, no room name in any event or refusal |
+| Registry declarations | Nine routes, each with a matrix action, checked at startup; the reviewed lists and the inventory fail on drift |
+| Writes before authorization | None: every write is after the locked re-authorization, and creation after its own checks |
+
+No new finding in Prompt 07C. The suite passed on its first full run against the code of Prompt 07B; its value is shown by the controls, which fail it when any layer is removed. Known and documented: L-45 (a reused room ID answers 409), and timing differences are not tested.
+
+## 10. Dependency audit remediation (Prompt 07C)
+
+Prompt 07B could not pass `pnpm audit:deps`: one high advisory on `source-map-js` below 1.2.2 (GHSA-68fv-2mgg-jv7q), reached only through the web build toolchain, present on `main` and unrelated to rooms. Every dependent declares `^1.2.1`, so a lockfile-only `pnpm update source-map-js --recursive` moved the single resolved version to 1.2.2 (published 2026-09-30, past the three-day release-age rule). `package.json` and `pnpm-workspace.yaml` are unchanged, no override or allowlist was added, and the audit threshold is unchanged. The lockfile diff is seven lines. Frozen install, audit, build, the full test suite, E2E in three engines and the SBOM were run on the result. Evidence: EV-05-04.
+
+## 11. Decisions recorded in Prompt 07C
+
+| Item | Decision | Reason |
+|---|---|---|
+| Place of the BOLA suite | `tests/authz/bola.test.ts` and `tests/security/bola-inventory.test.ts`, not a file in the `security` project | The attack suite needs the database global setup of the `authz` project; the inventory needs none and runs in `security` |
+| Layered controls | The harness accepts several files per defect | The room checks repeat on purpose; a defect that must reach the outside has to defeat all layers |
+| Dependency fix | Lockfile refresh, no override | The parents' ranges already accept the patched version |
+| Local E2E | One worker | Parallel browsers run out of memory on this machine; the three engines all run |
+| Evidence IDs | EV-05-01 to EV-05-03 as in the evidence plan, EV-05-04 and EV-05-05 added | Phase 4 added further IDs in the same way; EV-05-03, optional in the plan, is the local negative-control run |
+
+## 12. Verification in Prompt 07C
+
+Gates of CLAUDE.md section 10 on the final code (2026-10-06), details in EV-05-05:
+
+| Gate | Result |
+|---|---|
+| `pnpm install --frozen-lockfile`, format, lint, typecheck | Pass |
+| `pnpm test` | Pass: 1516 tests in 66 files (07B: 1462 in 64; CM-T032 adds 49 and 5) |
+| `pnpm build`, `pnpm smoke:api` | Pass |
+| `pnpm test:e2e` (Chromium, Firefox, WebKit, one worker) | 58 passed, 2 skipped by design |
+| `pnpm security:negative-controls` | 49 of 49 caught (44 before; NC-05-18 to NC-05-22 added), both baselines pass, 28 sources restored byte for byte |
+| `pnpm audit:deps` | Pass: no known vulnerabilities |
+| `pnpm sbom:generate` | Generated; `source-map-js@1.2.2` only |
+| `pnpm scan:secrets` (full history) | 44 commits scanned, no leaks |
+
+The two intermittent tests of 07B did not fail in these runs.
+
+## 13. Remaining after Phase 5
+
+- L-42 (profile gates on every room request, CM-T046 and CM-T047), L-43 (rooms without a key version until CM-T033), L-44 (rekey, reinstatement), L-45 (reused room ID, no quota). See [../security/limitations.md](../security/limitations.md).
+- Phase 6 must make invitation acceptance lock the invitee's user row like room creation, so an account disable cannot miss a membership it creates.
+- Room cryptography is not part of Phase 5: no room key, envelope, commitment, signed statement, rekey or Room Safety Code exists. Prompt 08 starts the room-key work from the updated `main`.

@@ -1,0 +1,38 @@
+EV-05-04: Dependency advisory source-map-js (GHSA-68fv-2mgg-jv7q) and its remediation
+Captured: 2026-10-06T12:12:44Z on branch feature/CM-T029-secure-rooms-rbac (Phase 5)
+Redaction: package names, versions and integrity hashes of public npm packages only.
+
+Finding (Prompt 07B, `pnpm audit:deps`): high severity, source-map-js >=1.0.0 <1.2.2 (event-loop denial of service through indexed
+source-map section offsets), reached through the web build toolchain: apps/web > next > postcss, apps/web > @tailwindcss/postcss
+(> @tailwindcss/node, postcss). 12 dependency paths, one resolved version (1.2.1). It is a build-time dependency (the static export
+is built by it; it is not part of the API or of the shipped JavaScript), and it was present on main before Phase 5: no Phase 5 change
+touched package.json or the lockfile before this fix. That it is build-time is the reason it was not an emergency, not a reason to leave
+it: the audit gate stays mandatory.
+
+Analysis: every dependent (postcss 8.5.23 and 8.5.28, @tailwindcss/node 4.3.3) declares "source-map-js": "^1.2.1", which accepts 1.2.2.
+1.2.2 was published 2026-09-30, older than the three days of minimumReleaseAge. No override was needed.
+
+Remediation (preference 1, normal resolution through the existing graph): `pnpm update source-map-js --recursive`. package.json and
+pnpm-workspace.yaml are unchanged; the whole lockfile diff against main is these lines:
+-  source-map-js@1.2.1:
+-    resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
++  source-map-js@1.2.2:
++    resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
+-      source-map-js: 1.2.1
++      source-map-js: 1.2.2
+-      source-map-js: 1.2.1
++      source-map-js: 1.2.2
+-      source-map-js: 1.2.1
++      source-map-js: 1.2.2
+-      source-map-js: 1.2.1
++      source-map-js: 1.2.2
+-  source-map-js@1.2.1: {}
++  source-map-js@1.2.2: {}
+
+
+Verification:
+  pnpm install --frozen-lockfile        passes
+  pnpm audit:deps                       "No known vulnerabilities found" (before: 1 high)
+  pnpm build / pnpm test:e2e            pass (EV-05-05); the web client is built with source-map-js 1.2.2
+  pnpm sbom:generate                    the CycloneDX SBOM lists source-map-js@1.2.2 only
+No audit threshold, allowlist or release-age setting was changed.

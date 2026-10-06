@@ -156,7 +156,7 @@ Denials are logged with the request ID and reason code, and recorded as audit ev
 
 ## 9. Implementation (Phase 5, CM-T029 to CM-T031)
 
-Status: the central authorization module, the shared matrix and the route-registry enforcement (CM-T029), and the room lifecycle and membership administration routes (CM-T030, CM-T031, section 9.6) are implemented. The BOLA suite over every room route (CM-T032) is still to come. Sections 1 to 8 stay normative; this section records how the code realizes them.
+Status: the central authorization module, the shared matrix and the route-registry enforcement (CM-T029), and the room lifecycle and membership administration routes (CM-T030, CM-T031, section 9.6) are implemented. The BOLA and IDOR suite over every room route (CM-T032, `tests/authz/bola.test.ts`, tied to the registry by `tests/security/bola-inventory.test.ts`) proves OL-01 and OL-02 from the outside. Sections 1 to 8 stay normative; this section records how the code realizes them.
 
 ### 9.1 Where the rules live
 

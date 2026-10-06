@@ -54,7 +54,7 @@ Status values: **Implemented by design** (designed in Phase 0, built in the list
 | 7.1 to 7.14 | Physical controls | Provider | Data-centre security belongs to the cloud provider | Provider documentation |
 | 8.1 | User endpoint devices | Partial | Vault auto-lock, non-extractable keys held only in memory, no key persistence, tested in three browser engines (built in Phase 4); device security is the user's (L-01, L-38) | EV-04-04, EV-04-10 |
 | 8.2 | Privileged access rights | Implemented by design | PLATFORM_ADMIN limits, SSH keys, database roles (four least-privilege roles and a tested grant matrix built in Phase 2, [database-security.md](database-security.md)) | EV-02-03, EV-19-01 |
-| 8.3 | Information access restriction | Implemented by design | RBAC, object-level rules, encryption as second layer | EV-05-02 |
+| 8.3 | Information access restriction | Implemented by design | RBAC, object-level rules, encryption as second layer. Object-level rules (OL-01, OL-02) are proven for every room route by the BOLA and IDOR suite built in Phase 5 (CM-T032) | EV-05-02 |
 | 8.4 | Access to source code | Implemented by design | GitHub permissions, protected `main` | EV-01-02 |
 | 8.5 | Secure authentication | Implemented by design | TOTP MFA, opaque server-side sessions with rotation and revocation, login backoff without lockout, CSRF defences including login CSRF, step-up (built in Phase 3). Phase 4: vault setup and passphrase change need a recent step-up, a vault reset a strict one, and a reset ends all other sessions | EV-03-03 to EV-03-09, EV-04-08 |
 | 8.7 | Protection against malware | Partial | Forced attachment downloads, no inline rendering, CSP; no scanning of encrypted files (L-11) | EV-08-02 |

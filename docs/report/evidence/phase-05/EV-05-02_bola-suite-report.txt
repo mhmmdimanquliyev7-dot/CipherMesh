@@ -1,0 +1,70 @@
+EV-05-02: BOLA and IDOR suite report (CM-T032)
+Captured: 2026-10-06T12:12:44Z on branch feature/CM-T029-secure-rooms-rbac (Phase 5)
+Redaction: test names only; two rooms with separate synthetic members; no passwords, tokens or keys appear below.
+
+Every production room route and the self-service routes are attacked with identifiers from another room, by every kind of caller, against
+the real API and PostgreSQL. Classes: A existing other room, B nonexistent room (non-disclosure), C cross-room target member, D role variants
+(including people in two rooms with different roles and PLATFORM_ADMIN without membership), E membership states (SUSPENDED, REMOVED, LEFT),
+F room states (DELETING, DELETED, REKEY_REQUIRED), G denied mutations leave rooms and memberships byte-for-byte unchanged, H client-supplied
+identity (body, query, headers). The routes are listed in tests/helpers/bola-cases.ts and tied to the registry by the inventory test.
+
+$ vitest run --project security tests/security/bola-inventory.test.ts --reporter=verbose
+ ✓ |security| tests/security/bola-inventory.test.ts > bola inventory > covers every production room route, and only those
+ ✓ |security| tests/security/bola-inventory.test.ts > bola inventory > declares every route once, with no duplicate case
+ ✓ |security| tests/security/bola-inventory.test.ts > bola inventory > agrees with the registry about which routes are room routes
+ ✓ |security| tests/security/bola-inventory.test.ts > bola inventory > gives every room route the object-level classes, and every mutation the unchanged-state class
+ ✓ |security| tests/security/bola-inventory.test.ts > bola inventory > marks the routes the matrix protects with a step-up, so attackers are confirmed before they attack
+
+$ vitest run --project authz tests/authz/bola.test.ts --reporter=verbose
+ ✓ |authz| tests/authz/bola.test.ts > A, B and G: a caller who is not in room B gets nothing, and cannot tell it from an invented room > GET /rooms/:roomId
+ ✓ |authz| tests/authz/bola.test.ts > A, B and G: a caller who is not in room B gets nothing, and cannot tell it from an invented room > GET /rooms/:roomId/members
+ ✓ |authz| tests/authz/bola.test.ts > A, B and G: a caller who is not in room B gets nothing, and cannot tell it from an invented room > POST /rooms/:roomId/rename
+ ✓ |authz| tests/authz/bola.test.ts > A, B and G: a caller who is not in room B gets nothing, and cannot tell it from an invented room > POST /rooms/:roomId/delete
+ ✓ |authz| tests/authz/bola.test.ts > A, B and G: a caller who is not in room B gets nothing, and cannot tell it from an invented room > POST /rooms/:roomId/members/:userId/role
+ ✓ |authz| tests/authz/bola.test.ts > A, B and G: a caller who is not in room B gets nothing, and cannot tell it from an invented room > POST /rooms/:roomId/members/:userId/remove
+ ✓ |authz| tests/authz/bola.test.ts > A, B and G: a caller who is not in room B gets nothing, and cannot tell it from an invented room > POST /rooms/:roomId/members/:userId/transfer-ownership
+ ✓ |authz| tests/authz/bola.test.ts > C: addressed room A with a target member of room B > POST /rooms/:roomId/members/:userId/role refuses a member of room B before changing anything
+ ✓ |authz| tests/authz/bola.test.ts > C: addressed room A with a target member of room B > POST /rooms/:roomId/members/:userId/remove refuses a member of room B before changing anything
+ ✓ |authz| tests/authz/bola.test.ts > C: addressed room A with a target member of room B > POST /rooms/:roomId/members/:userId/transfer-ownership refuses a member of room B before changing anything
+ ✓ |authz| tests/authz/bola.test.ts > C: addressed room A with a target member of room B > the same attack with the target inside room A is the legitimate path (control)
+ ✓ |authz| tests/authz/bola.test.ts > D: a role in one room gives no authority in another > an ADMIN of room A is only a VIEWER in room B
+ ✓ |authz| tests/authz/bola.test.ts > D: a role in one room gives no authority in another > an OWNER of room C is only a MEMBER in room B: no deletion, transfer or administration there
+ ✓ |authz| tests/authz/bola.test.ts > D: a role in one room gives no authority in another > lists each room with the role the person has in that room
+ ✓ |authz| tests/authz/bola.test.ts > D: a role in one room gives no authority in another > a member list never shows another room's members
+ ✓ |authz| tests/authz/bola.test.ts > E: SUSPENDED, REMOVED and LEFT members have no authority in their own former room > GET /rooms/:roomId
+ ✓ |authz| tests/authz/bola.test.ts > E: SUSPENDED, REMOVED and LEFT members have no authority in their own former room > GET /rooms/:roomId/members
+ ✓ |authz| tests/authz/bola.test.ts > E: SUSPENDED, REMOVED and LEFT members have no authority in their own former room > POST /rooms/:roomId/rename
+ ✓ |authz| tests/authz/bola.test.ts > E: SUSPENDED, REMOVED and LEFT members have no authority in their own former room > POST /rooms/:roomId/delete
+ ✓ |authz| tests/authz/bola.test.ts > E: SUSPENDED, REMOVED and LEFT members have no authority in their own former room > POST /rooms/:roomId/members/:userId/role
+ ✓ |authz| tests/authz/bola.test.ts > E: SUSPENDED, REMOVED and LEFT members have no authority in their own former room > POST /rooms/:roomId/members/:userId/remove
+ ✓ |authz| tests/authz/bola.test.ts > E: SUSPENDED, REMOVED and LEFT members have no authority in their own former room > POST /rooms/:roomId/members/:userId/transfer-ownership
+ ✓ |authz| tests/authz/bola.test.ts > F: DELETING and DELETED rooms refuse everyone; REKEY_REQUIRED does not widen access > GET /rooms/:roomId on a DELETING or DELETED room is a 404 for its own OWNER, and changes nothing
+ ✓ |authz| tests/authz/bola.test.ts > F: DELETING and DELETED rooms refuse everyone; REKEY_REQUIRED does not widen access > GET /rooms/:roomId/members on a DELETING or DELETED room is a 404 for its own OWNER, and changes nothing
+ ✓ |authz| tests/authz/bola.test.ts > F: DELETING and DELETED rooms refuse everyone; REKEY_REQUIRED does not widen access > POST /rooms/:roomId/rename on a DELETING or DELETED room is a 404 for its own OWNER, and changes nothing
+ ✓ |authz| tests/authz/bola.test.ts > F: DELETING and DELETED rooms refuse everyone; REKEY_REQUIRED does not widen access > POST /rooms/:roomId/delete on a DELETING or DELETED room is a 404 for its own OWNER, and changes nothing
+ ✓ |authz| tests/authz/bola.test.ts > F: DELETING and DELETED rooms refuse everyone; REKEY_REQUIRED does not widen access > POST /rooms/:roomId/members/:userId/role on a DELETING or DELETED room is a 404 for its own OWNER, and changes nothing
+ ✓ |authz| tests/authz/bola.test.ts > F: DELETING and DELETED rooms refuse everyone; REKEY_REQUIRED does not widen access > POST /rooms/:roomId/members/:userId/remove on a DELETING or DELETED room is a 404 for its own OWNER, and changes nothing
+ ✓ |authz| tests/authz/bola.test.ts > F: DELETING and DELETED rooms refuse everyone; REKEY_REQUIRED does not widen access > POST /rooms/:roomId/members/:userId/transfer-ownership on a DELETING or DELETED room is a 404 for its own OWNER, and changes nothing
+ ✓ |authz| tests/authz/bola.test.ts > F: DELETING and DELETED rooms refuse everyone; REKEY_REQUIRED does not widen access > a locked room (REKEY_REQUIRED) is still invisible to outsiders and PLATFORM_ADMIN
+ ✓ |authz| tests/authz/bola.test.ts > F: DELETING and DELETED rooms refuse everyone; REKEY_REQUIRED does not widen access > a locked room still serves its members (the write lock is for content, Phase 7 onward)
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/rename rejects forged identity, role and room fields even from an authorized caller
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/delete rejects forged identity, role and room fields even from an authorized caller
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/members/:userId/role rejects forged identity, role and room fields even from an authorized caller
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/members/:userId/remove rejects forged identity, role and room fields even from an authorized caller
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/members/:userId/transfer-ownership rejects forged identity, role and room fields even from an authorized caller
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms rejects forged identity, role and room fields even from an authorized caller
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > GET /rooms/:roomId rejects identity, room and role query parameters
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > GET /rooms/:roomId/members rejects identity, room and role query parameters
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > GET /rooms rejects identity, room and role query parameters
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > GET /rooms/:roomId ignores identity and role headers
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > GET /rooms/:roomId/members ignores identity and role headers
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/rename ignores identity and role headers
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/delete ignores identity and role headers
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/members/:userId/role ignores identity and role headers
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/members/:userId/remove ignores identity and role headers
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > POST /rooms/:roomId/members/:userId/transfer-ownership ignores identity and role headers
+ ✓ |authz| tests/authz/bola.test.ts > H: nothing the client sends can name the caller, the room owner or a role > the room list belongs to the session user: a cursor naming room B reveals nothing of it
+ ✓ |authz| tests/authz/bola.test.ts > L-45: creating a room with a known ID answers 409 (documented limitation, not a membership leak) > reveals only that the ID was used, takes nothing over and changes nothing
+
+The documented room-ID reuse answer of POST /rooms (409, L-45) is asserted in the last group as a limitation, not as a membership leak.
+Races between a decision and a change are forced in tests/authz/membership-concurrency.test.ts (EV-05-01).

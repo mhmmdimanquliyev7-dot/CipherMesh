@@ -1,15 +1,15 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-06, end of Prompt 07B (Phase 5, CM-T030 and CM-T031). The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-06, end of Prompt 07C (Phase 5 complete locally: CM-T029 to CM-T032). The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
 | Item | State |
 |---|---|
 | Completed | Phase 4 (CM-T086, CM-T023 to CM-T028), merged into `main` through pull request #10. Traceability: [phase-04-traceability.md](phase-04-traceability.md) |
-| In progress | Phase 5, Secure Rooms and RBAC (CM-T029 to CM-T032). **Prompt 07A done** (CM-T029, central authorization module and shared matrix) and **Prompt 07B done** (CM-T030 room lifecycle, CM-T031 membership administration and ownership transfer, and the PA-03 suspension of memberships), all committed on the Phase 5 branch. **CM-T032 (BOLA suite) is pending.** No pull request. Traceability: [phase-05-traceability.md](phase-05-traceability.md) |
-| Phase 5 branch | `feature/CM-T029-secure-rooms-rbac`, created from `main` at `5c1ed32`. Prompt 07A head `7190092`; Prompt 07B implementation commit `09ade03`, followed by the handoff commit (`git log` shows the head). Local only; not pushed |
-| Next | **Prompt 07C: CM-T032** (the BOLA and IDOR suite over every room route), the final Phase 5 security and evidence gate (EV-05-01 to EV-05-03, the full-history secret scan, the dependency-audit decision below) and the pull request. It continues on `feature/CM-T029-secure-rooms-rbac`, **not from `main`**. Do not start without explicit approval |
+| Phase 5 | Secure Rooms and RBAC (CM-T029 to CM-T032): **implemented** on the Phase 5 branch and verified locally with every gate of CLAUDE.md section 10: Prompt 07A (CM-T029 central authorization and matrix), Prompt 07B (CM-T030 room lifecycle, CM-T031 membership administration and ownership transfer, PA-03 suspension of memberships) and Prompt 07C (CM-T032 BOLA and IDOR suite, the `source-map-js` audit fix, evidence EV-05-01 to EV-05-05). The pull request, its CI run and the merge are recorded in the line below once they exist. Traceability: [phase-05-traceability.md](phase-05-traceability.md) |
+| Phase 5 pull request | Opened from `feature/CM-T029-secure-rooms-rbac` (created from `main` at `5c1ed32`) to `main`; merged with a normal merge commit only after CI and the secret checks pass. If this row still says "opened", check `gh pr list` and `git log` for the number and the merge commit; a docs pull request after the merge records them here |
+| Next | **Prompt 08: Phase 6, Cryptographic Membership** (CM-T033 to CM-T036, CM-T085): room key version 1 at creation, invitations with envelopes, OWNER approval, acceptance, client unwrap and commitment check, the Room Safety Code, signed room statements (ADR-015). It starts from the updated `main` after the Phase 5 merge, never from the Phase 5 branch. Do not start without explicit approval |
 | Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 4 (`5c1ed32`) |
 
 ## 2. Architecture implemented so far
@@ -39,7 +39,7 @@ Snapshot: 2026-10-06, end of Prompt 07B (Phase 5, CM-T030 and CM-T031). The sour
 - `packages/crypto`: AES-256-GCM with internal IVs, RSA-OAEP (32-byte values only), ECDSA, HKDF, SHA-256, RFC 8785, the context catalogue, identity verification shared with the API, vault format version 1 ([vault.md](../crypto/vault.md)). Coverage gate `pnpm test:coverage:crypto`.
 - Browser Argon2id `argon2id` 1.0.1 (LIB-03) in a Web Worker; vault setup, unlock in memory, auto-lock, signed passphrase change, reset, directory lookup. API routes: `GET /vault`, `POST /vault`, `POST /vault/rewrap`, `POST /vault/reset`, `POST /directory/lookup`.
 
-## 6. Room authorization and rooms (Prompts 07A and 07B, CM-T029 to CM-T031)
+## 6. Room authorization and rooms (Phase 5, CM-T029 to CM-T032)
 
 | Part | Location |
 |---|---|
@@ -60,11 +60,11 @@ Behaviour to know:
 - Removal and account suspension (PA-03) set the room REKEY_REQUIRED in the same transaction that ends the member's access and deletes their envelopes (INV-07). Re-enabling an account restores no membership (AZ-14, Phase 6, L-44). Nothing creates keys or claims a rekey.
 - After a transfer the former OWNER is an ADMIN. Deleting a room makes it DELETING (404 for everyone); `pnpm worker:retention` makes it DELETED only when no envelope or content row is left.
 - Every membership change locks the room row, then the memberships, and re-checks authorization on that state; account suspension locks rooms in ID order. A transaction over five seconds fails closed.
-- New routes: add them to the reviewed list; every room route needs coverage in the BOLA suite (CM-T032).
+- New routes: add them to the reviewed lists (`tests/security/route-inventory.test.ts`) and to the BOLA table (`tests/helpers/bola-cases.ts`); `tests/security/bola-inventory.test.ts` fails until both agree with the registry, and `tests/authz/bola.test.ts` then attacks the route.
 
-Not implemented: the BOLA suite (CM-T032), invitations, leaving a room (AZ-11, with the rekey machinery), profile changes (AZ-03), the policy gates (PC-03 and the rest, L-42) and everything of Phase 6 onward. No room cryptography exists.
+Not implemented: invitations, leaving a room (AZ-11, with the rekey machinery), profile changes (AZ-03), the policy gates (PC-03 and the rest, L-42) and everything of Phase 6 onward. No room cryptography exists.
 
-Findings: R-05-01 (fixed in `bef4570`): undecodable percent-encoding in a path parameter reached the error handler as an unhandled 500; it is now the generic 404. Prompt 07B produced no new security finding and added limitations L-42 to L-45.
+Findings: R-05-01 (fixed in `bef4570`): undecodable percent-encoding in a path parameter reached the error handler as an unhandled 500; it is now the generic 404. Prompts 07B and 07C produced no new security finding; 07B added limitations L-42 to L-45. CM-T032 (`tests/authz/bola.test.ts`, 49 tests, with the table `tests/helpers/bola-cases.ts`) attacks every production room route with identifiers from another room; its controls NC-05-18 to NC-05-22 prove it fails when any layer is removed.
 
 ## 7. Invariants every session must preserve
 
@@ -75,26 +75,27 @@ All of CLAUDE.md section 6 (INV-01 to INV-19). For Phase 5 especially:
 - **INV-09:** no unchained rows in `audit_events`.
 - Never weaken tests, grants, cookies or authorization to make something pass.
 
-## 8. Documents Prompt 07C must read
+## 8. Documents Prompt 08 must read
 
-- CLAUDE.md; this file; [phase-05-traceability.md](phase-05-traceability.md); `docs/management/jira-backlog.md` (CM-T032) and `docs/report/evidence-plan.md` (EV-05-01 to EV-05-03).
-- `docs/security/authorization-model.md` (sections 5, 8 and 9), `docs/security/security-testing-plan.md` (`bola`, `route-inventory`, section 3.4), `docs/threat-model/threat-model.md` T-05, T-06 and section 11, `docs/security/limitations.md` (L-42 to L-45).
-- `apps/api/src/routes/rooms.ts`, `apps/api/src/rooms/service.ts`, `tests/helpers/rooms.ts` (fixtures, `whileLocked`), `tests/authz/`.
+- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 6); `docs/management/jira-backlog.md` (CM-T033 to CM-T036, CM-T085).
+- `docs/crypto/` (cryptographic-architecture, key-hierarchy, key-lifecycle, crypto-decisions, vault), ADR-007, ADR-012, ADR-013, ADR-015 (section 4: signed room statements), `docs/architecture/data-model.md` (4.9, 4.10 and section 8), `docs/architecture/data-flow.md` (DF-05, DF-06).
+- `docs/security/authorization-model.md` (sections 3, 5 and 9), `docs/security/limitations.md` (L-42 to L-45), `docs/threat-model/threat-model.md` (T-25, T-29, T-36 and section 11), [phase-05-traceability.md](phase-05-traceability.md) section 13.
 
 ## 9. Test counts
 
-Full gates of Prompt 07B (2026-10-06, local PostgreSQL), details in phase-05-traceability.md section 8:
+Gates of Prompt 07C on the final Phase 5 code (2026-10-06, local PostgreSQL), recorded in EV-05-05 and phase-05-traceability.md section 12:
 
 | Gate | Result |
 |---|---|
-| `pnpm test` | 1462 tests in 64 files (Phase 4: 772 in 53). Authz project: 82 tests in 6 files, run serially |
+| `pnpm test` | 1516 tests in 66 files (Phase 4: 772 in 53). The `authz` project has 131 tests in 7 files, run serially; `bola.test.ts` 49, `bola-inventory.test.ts` 5 |
 | `pnpm test:e2e` (three engines, one worker) | 58 passed, 2 skipped by design |
-| `pnpm security:negative-controls` | 44 of 44 caught (ten Phase 3, seventeen Phase 4, seventeen Phase 5), baselines pass. Run with `NODE_ENV` unset: `.env` sets `development`, which breaks `next build` |
-| `pnpm test:coverage:authz` | 97.3% statements, 98.3% branches (Prompt 07A) |
+| `pnpm security:negative-controls` | 49 of 49 caught (ten Phase 3, seventeen Phase 4, twenty-two Phase 5), both baselines pass. Run with `NODE_ENV` unset: `.env` sets `development`, which breaks `next build` |
+| `pnpm test:coverage:authz` | 97.3% statements, 98.3% branches |
 | `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, format, lint, typecheck | Pass |
-| `pnpm audit:deps` | **Fails** on `source-map-js` below 1.2.2 (high, build-time, transitive of `next`, `postcss` and Tailwind; the same on `main`). Patched 1.2.2 is available. Needs a decision before the Phase 5 pull request |
+| `pnpm audit:deps` | **Pass**: no known vulnerabilities. The `source-map-js` advisory was closed by a lockfile-only refresh to 1.2.2 (EV-05-04) |
+| `pnpm scan:secrets` (full history) | 44 commits scanned, no leaks |
 
-Intermittent: `packages/crypto/src/vault.test.ts` "refuses a second derivation while one is running" failed once in seven full runs under load (8 of 8 passes in isolation; unchanged by Phase 5; timing-dependent). Local notes: the database suites need the local PostgreSQL container (Docker Desktop stopped twice during Phase 5; restart it and wait for healthy). Run E2E and the negative controls one at a time, E2E with `--workers=1` (parallel browsers ran out of memory). The `cm_api` connection limit of 40 is shared by all projects; the peak in a full run is 24.
+Local notes: the database suites need the local PostgreSQL container (Docker Desktop stopped several times during Phase 5; restart it and wait for healthy). Run E2E and the negative controls one at a time, E2E with `--workers=1` (parallel browsers ran out of memory). Start the negative controls with `NODE_ENV` unset and only `DATABASE_URL` exported. The `cm_api` connection limit of 40 is shared by all projects; the `authz` project runs its files serially (peak in a full run: 24). Two crypto tests are timing-sensitive under load and not security defects: `vault.test.ts` "refuses a second derivation while one is running" (failed in two of about ten full runs (never alone: 16 of 16 passes alone, 8 of them under artificial CPU load; the code and the test are byte-identical to `main`; it depends on the scheduling of the two calls before the derivation starts) and `identity.test.ts` (now with a 30-second limit).
 
 ## 10. Known limitations and residual risks
 
@@ -109,8 +110,7 @@ Intermittent: `packages/crypto/src/vault.test.ts` "refuses a second derivation w
 
 | Decision | Status |
 |---|---|
-| Dependency advisory `source-map-js` (build-time) | Prompt 07C or the project owner: a pnpm override to 1.2.2 changes the web build toolchain and needs review and an E2E run |
-| Invitation acceptance and the user-row lock | Phase 6: acceptance must lock the invitee's user row like room creation, so an account disable cannot miss a membership it creates |
+| Invitation acceptance and the user-row lock | Prompt 08 (Phase 6): acceptance must lock the invitee's user row like room creation, so an account disable cannot miss a membership it creates |
 | OCD-01 / ADR-007: RSA-OAEP-3072 versus HPKE | Before Phase 6: an envelope created in one engine must open in another |
 | PC-16 scope for AZ-07, AZ-14 and AZ-26 | When they are implemented (Phases 6 and 9) |
 | ADR-015 section 4: exact room-statement formats and columns | Phase 6 and Phase 11 |
@@ -121,13 +121,13 @@ Intermittent: `packages/crypto/src/vault.test.ts` "refuses a second derivation w
 
 - Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including both coverage steps) as required checks, then capture EV-01-01 to EV-01-03.
 - Dependabot pull requests #2 to #6 remain open (#2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24).
-- Jira: import the backlog; move CM-T006 to CM-T031 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01 and R-05-01 as `security-finding` items (both fixed in their phase branches). Nothing is DONE yet.
-- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 5. EV-05-01 to EV-05-03 are captured in Prompt 07C.
+- Jira: import the backlog; move CM-T006 to CM-T032 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01 and R-05-01 as `security-finding` items (both fixed in their phase branches). Nothing is DONE yet.
+- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 5. EV-05-01 to EV-05-05 are in `docs/report/evidence/phase-05/` (the CI run is added after the pull request).
 
-## 13. Phase 5 must NOT implement (Prompt 07C included)
+## 13. Not implemented yet
 
-- Room key material, envelopes, signed room statements, rekey or the Room Safety Code (Phase 6 onward).
+- Room key material, key envelopes, commitments, signed room statements, rekey and the Room Safety Code (Phase 6 onward). No room cryptography exists: rooms are an authorization and membership structure only (L-43).
 - File, note or secret encryption; object storage (Phases 7 to 9).
 - The security policy engine (Phase 10), the audit hash chain (Phase 12), the Crypto Inspector or the Security Dashboard (Phases 13 and 14).
 - Deployment, Nginx or cloud resources (Phase 17 onward).
-- Any server-side handling of the Vault Passphrase or private keys.
+- Any server-side handling of the Vault Passphrase or private keys, ever.

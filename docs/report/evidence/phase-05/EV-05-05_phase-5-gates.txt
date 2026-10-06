@@ -1,0 +1,35 @@
+EV-05-05: Phase 5 verification gates (CLAUDE.md section 10)
+Captured: 2026-10-06T12:12:44Z on branch feature/CM-T029-secure-rooms-rbac (Phase 5)
+Redaction: counts and exit codes only.
+Machine note: this Windows machine runs out of memory with parallel browsers, so Playwright ran with one worker (all three engines ran).
+The local database is the development PostgreSQL container; CI uses a throwaway service container.
+
+pnpm install --frozen-lockfile        exit 0
+pnpm format:check                     exit 0
+pnpm lint                             exit 0
+pnpm typecheck                        exit 0
+pnpm test                             exit 0   Test Files 66 passed (66); Tests 1516 passed (1516)
+pnpm build                            exit 0
+pnpm smoke:api                        exit 0
+  PASS GET /api/health -> 200 {"status":"ok"}
+  PASS GET /api/ready -> 503 {"status":"not-ready"}
+  PASS GET /api/nothing-here -> 404 {"error":{"code":"NOT_FOUND","message":"Resource not found","requestId":"eac0df29-f71e-454a-89d9-91910931aebf"}}
+  SKIP graceful shutdown check: not observable on Windows
+  PASS the API log contains no database password
+  PASS GET /api/health -> 200 {"status":"ok"}
+  PASS GET /api/ready -> 200 {"status":"ready"}
+  PASS GET /api/nothing-here -> 404 {"error":{"code":"NOT_FOUND","message":"Resource not found","requestId":"26d477b2-98e5-4e1b-b131-afe311d048e7"}}
+  SKIP graceful shutdown check: not observable on Windows
+  PASS the API log contains no database password
+  Smoke test passed against the built API bundle.
+pnpm test:e2e --workers=1             exit 0   2 skipped / 58 passed (2.7m)
+pnpm security:negative-controls       exit 0   49 of 49 caught (EV-05-03)
+pnpm audit:deps                       exit 0   No known vulnerabilities found (EV-05-04)
+pnpm sbom:generate                    exit 0
+pnpm scan:secrets (full history)      exit 0   44 commits scanned, no leaks found
+pnpm scan:secrets --staged            run before each commit
+
+Known intermittent tests, unchanged by Phase 5 and not security defects: packages/crypto/src/vault.test.ts "refuses a second derivation
+while one is running" failed in two of about ten full runs (passes 16 of 16 alone, 8 of them under artificial CPU load; code and test are
+byte-identical to main); packages/crypto/src/identity.test.ts timed out once at the 5-second default when generating two RSA-3072 key
+pairs (the two tests now have an explicit 30-second limit). The final gate runs above passed.

@@ -19,7 +19,13 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-/** @typedef {{ id: string, defect: string, file: string, edits: [string, string][], tests: string[], e2e?: { spec: string, title: string } }} Control */
+/**
+ * `also` lists further files changed by the same defect. The room checks are repeated on purpose
+ * (gate, locked re-check, store query), so a defect that must defeat an object-level test has to
+ * defeat every layer at once (Phase 5, CM-T032).
+ * @typedef {{ file: string, edits: [string, string][] }} Part
+ * @typedef {{ id: string, defect: string, file: string, edits: [string, string][], also?: Part[], tests: string[], e2e?: { spec: string, title: string } }} Control
+ */
 
 /** @type {Control[]} */
 const CONTROLS = [
@@ -493,6 +499,127 @@ const CONTROLS = [
     ],
     tests: ['tests/authz/rooms-lifecycle.test.ts'],
   },
+  // ----------------------------------------------------- Phase 5: BOLA and IDOR suite (CM-T032)
+  // The room checks repeat on purpose (gate, locked re-check, store query). Each control below
+  // removes every layer a request would meet, so the BOLA suite is the test that must catch it.
+  {
+    id: 'NC-05-18',
+    defect:
+      'Existence oracle: a target member found in another room is refused differently (403) from an invented one (404)',
+    file: 'apps/api/src/authorization/rooms.ts',
+    edits: [['  RESOURCE_OUTSIDE_ROOM: 404,', '  RESOURCE_OUTSIDE_ROOM: 403,']],
+    also: [
+      {
+        file: 'apps/api/src/db/room-access-store.ts',
+        edits: [
+          [
+            "        where: { roomId, userId, status: includeSuspended ? { in: ['ACTIVE', 'SUSPENDED'] } : 'ACTIVE' },",
+            "        where: { userId, status: includeSuspended ? { in: ['ACTIVE', 'SUSPENDED'] } : 'ACTIVE' },",
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/authz/bola.test.ts'],
+  },
+  {
+    id: 'NC-05-19',
+    defect: 'A target member of another room is accepted and changed (target lookup, lock and room check all unscoped)',
+    file: 'apps/api/src/db/room-access-store.ts',
+    edits: [
+      [
+        "        where: { roomId, userId, status: includeSuspended ? { in: ['ACTIVE', 'SUSPENDED'] } : 'ACTIVE' },",
+        "        where: { userId, status: includeSuspended ? { in: ['ACTIVE', 'SUSPENDED'] } : 'ACTIVE' },",
+      ],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/db/room-store.ts',
+        edits: [
+          [
+            "         WHERE room_id = ${roomId}::uuid AND user_id = ${userId}::uuid AND status IN ('ACTIVE', 'SUSPENDED')",
+            "         WHERE (room_id = ${roomId}::uuid OR TRUE) AND user_id = ${userId}::uuid AND status IN ('ACTIVE', 'SUSPENDED')",
+          ],
+        ],
+      },
+      {
+        file: 'packages/shared/src/authorization.ts',
+        edits: [["  if (resource.roomId !== input.roomId) return deny('RESOURCE_OUTSIDE_ROOM');", '']],
+      },
+    ],
+    tests: ['tests/authz/bola.test.ts'],
+  },
+  {
+    id: 'NC-05-20',
+    defect:
+      'A membership in room A authorizes room B (membership lookup, lock, mismatch check and room read all unscoped)',
+    file: 'apps/api/src/db/room-access-store.ts',
+    edits: [
+      [
+        "        where: { roomId, userId, status: 'ACTIVE', room: { status: 'ACTIVE' } },",
+        "        where: { userId, status: 'ACTIVE', room: { status: 'ACTIVE' } },",
+      ],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/db/room-store.ts',
+        edits: [
+          [
+            "         WHERE room_id = ${roomId}::uuid AND user_id = ${userId}::uuid AND status IN ('ACTIVE', 'SUSPENDED')",
+            "         WHERE (room_id = ${roomId}::uuid OR TRUE) AND user_id = ${userId}::uuid AND status IN ('ACTIVE', 'SUSPENDED')",
+          ],
+          [
+            "        where: { roomId, userId, status: 'ACTIVE', room: { status: 'ACTIVE' } },\n        select: {\n          role: true,\n          room: {",
+            "        where: { userId, status: 'ACTIVE', room: { status: 'ACTIVE' } },\n        select: {\n          role: true,\n          room: {",
+          ],
+        ],
+      },
+      {
+        file: 'packages/shared/src/authorization.ts',
+        edits: [
+          [
+            '  if (membership.roomId !== input.roomId || membership.userId !== input.actorUserId) {',
+            '  if (membership.userId !== input.actorUserId) {',
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/authz/bola.test.ts'],
+  },
+  {
+    id: 'NC-05-21',
+    defect: 'PLATFORM_ADMIN is treated as an ADMIN member of every room (gate and locked re-check)',
+    file: 'apps/api/src/authorization/rooms.ts',
+    edits: [
+      [
+        '      const record = await deps.store.findActiveMembership(roomId, actor.userId);',
+        "      const found = await deps.store.findActiveMembership(roomId, actor.userId);\n      const record = found ?? (actor.user.platformRole === 'PLATFORM_ADMIN' ? { membershipId: roomId, roomId, userId: actor.userId, role: 'ADMIN' as const, status: 'ACTIVE' as const, room: { status: 'ACTIVE' as const, keyState: 'ACTIVE' as const, securityProfile: 'STANDARD' as const } } : null);",
+      ],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/rooms/service.ts',
+        edits: [
+          [
+            '    const actorMembership = room === null ? null : await tx.lockMembership(access.roomId, actor.userId);',
+            "    const lockedMembership = room === null ? null : await tx.lockMembership(access.roomId, actor.userId);\n    const actorMembership = lockedMembership ?? (room !== null && actor.user.platformRole === 'PLATFORM_ADMIN' ? { membershipId: access.roomId, roomId: access.roomId, userId: actor.userId, role: 'ADMIN' as const, status: 'ACTIVE' as const } : null);",
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/authz/bola.test.ts'],
+  },
+  {
+    id: 'NC-05-22',
+    defect: 'A room route ships without a reviewed BOLA case (the inventory must refuse it)',
+    file: 'apps/api/src/routes/rooms.ts',
+    edits: [
+      [
+        "  return [\n    defineRoute({\n      method: 'POST',\n      path: '/rooms',",
+        "  return [\n    defineRoute({\n      method: 'GET',\n      path: '/rooms/:roomId/ping',\n      action: 'AZ-01-ROOM-PING',\n      access: { kind: 'room' },\n      params: roomParamsSchema,\n      query: emptyQuerySchema,\n      body: undefined,\n      response: roomDeletedResponseSchema,\n      handler: () => ({ status: 200, body: { status: 'deleting' as const } }),\n    }),\n    defineRoute({\n      method: 'POST',\n      path: '/rooms',",
+      ],
+    ],
+    tests: ['tests/security/bola-inventory.test.ts'],
+  },
 ];
 
 /** @param {string[]} files */
@@ -500,10 +627,16 @@ const vitest = (files) =>
   spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...files], { encoding: 'utf8' });
 
 const VITEST_ONLY = process.argv.includes('--vitest-only');
+// `--show-failures` prints the failing test names of every Vitest control to stderr.
+const SHOW_FAILURES = process.argv.includes('--show-failures');
 // `--only=NC-05` runs the controls whose ID starts with the prefix, for example one phase's.
 const ONLY = process.argv.find((arg) => arg.startsWith('--only='))?.slice('--only='.length);
+// `--only=NC-05-18,NC-05-19` takes several comma-separated ID prefixes.
+const ONLY_PREFIXES = ONLY?.split(',').filter((p) => p !== '');
 const controls = CONTROLS.filter(
-  (c) => (!VITEST_ONLY || c.e2e === undefined) && (ONLY === undefined || c.id.startsWith(ONLY)),
+  (c) =>
+    (!VITEST_ONLY || c.e2e === undefined) &&
+    (ONLY_PREFIXES === undefined || ONLY_PREFIXES.some((p) => c.id.startsWith(p))),
 );
 if (controls.length === 0) throw new Error(`No negative control matches ${ONLY ?? 'the options'}`);
 
@@ -528,7 +661,9 @@ const playwright = (e2e) =>
 /** @param {string} file */
 const sha256 = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
 /** @type {Map<string, string>} */
-const checksums = new Map(controls.map((c) => [c.file, sha256(c.file)]));
+/** @param {Control} c @returns {Part[]} */
+const partsOf = (c) => [{ file: c.file, edits: c.edits }, ...(c.also ?? [])];
+const checksums = new Map(controls.flatMap((c) => partsOf(c).map((part) => [part.file, sha256(part.file)])));
 
 /** Original contents of files currently mutated, restored on every exit path. */
 /** @type {Map<string, string>} */
@@ -545,20 +680,36 @@ process.on('exit', restoreAll);
 
 const results = [];
 for (const control of controls) {
-  const original = readFileSync(control.file, 'utf8');
-  originals.set(control.file, original);
-  let mutated = original;
-  for (const [find, replace] of control.edits) {
-    if (mutated.split(find).length !== 2) {
-      restoreAll();
-      throw new Error(`${control.id}: anchor not found exactly once in ${control.file}`);
+  /** @type {Map<string, string>} */
+  const mutations = new Map();
+  for (const part of partsOf(control)) {
+    const original = readFileSync(part.file, 'utf8');
+    originals.set(part.file, original);
+    let mutated = original;
+    for (const [find, replace] of part.edits) {
+      if (mutated.split(find).length !== 2) {
+        restoreAll();
+        throw new Error(`${control.id}: anchor not found exactly once in ${part.file}`);
+      }
+      mutated = mutated.replace(find, replace);
     }
-    mutated = mutated.replace(find, replace);
+    mutations.set(part.file, mutated);
   }
   try {
-    writeFileSync(control.file, mutated);
+    for (const [file, mutated] of mutations) writeFileSync(file, mutated);
     if (control.e2e === undefined) {
-      results.push({ ...control, caught: vitest(control.tests).status !== 0, note: '' });
+      const run = vitest(control.tests);
+      if (SHOW_FAILURES) {
+        // The names of the tests that failed, to confirm the intended assertion caught the defect.
+        const names = `${run.stdout}${run.stderr}`
+          .split(/\r?\n/)
+          .filter((l) => /^\s*FAIL /.test(l))
+          .slice(0, 4);
+        console.error(
+          `${control.id}: ${names.length === 0 ? 'no FAIL lines' : names.map((l) => l.trim().slice(0, 170)).join(' | ')}`,
+        );
+      }
+      results.push({ ...control, caught: run.status !== 0, note: '' });
     } else if (buildWeb() !== 0) {
       // A defect that does not even build was not caught by a test: it counts as missed.
       results.push({ ...control, caught: false, note: '(build failed)' });
@@ -566,8 +717,10 @@ for (const control of controls) {
       results.push({ ...control, caught: playwright(control.e2e).status !== 0, note: '' });
     }
   } finally {
-    writeFileSync(control.file, original);
-    originals.delete(control.file);
+    for (const file of mutations.keys()) {
+      writeFileSync(file, originals.get(file) ?? '');
+      originals.delete(file);
+    }
   }
 }
 
