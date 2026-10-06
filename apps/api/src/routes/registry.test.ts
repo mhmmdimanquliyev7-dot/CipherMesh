@@ -119,7 +119,7 @@ describe('route registry: authorization declarations (CM-T029)', () => {
     ['a public route that declares a matrix action', route({ action: 'SS-01-PROBE' }), /public route cannot/],
     ['an authenticated route without a matrix action', authenticated({ action: 'TEST-PROBE' }), /must declare/],
     ['an unknown room action', roomRoute({ action: 'AZ-31-PROBE' }), /AZ-31 is not in the authorization matrix/],
-    ['an unknown self-service action', authenticated({ action: 'SS-06-PROBE' }), /SS-06 is not in/],
+    ['an unknown self-service action', authenticated({ action: 'SS-07-PROBE' }), /SS-07 is not in/],
     ['an unknown platform action', authenticated({ action: 'PA-00-PROBE' }), /PA-00 is not in/],
     ['a room action on an authenticated route', authenticated({ action: 'AZ-01-PROBE' }), /not a self-service/],
     ['the explicit deny PA-05 as an action', authenticated({ action: 'PA-05-PROBE' }), /not a self-service/],

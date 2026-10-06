@@ -112,20 +112,48 @@ const scopeOf = (record: RoomMembershipRecord): RoomMembershipScope => ({
   room: { keyState: record.room.keyState, securityProfile: record.room.securityProfile },
 });
 
+/** Records a denial (action and reason only) and returns the response to throw. */
+export function roomDenial(
+  events: SecurityEventSink,
+  request: { readonly actorUserId: string; readonly requestId: string; readonly action: RoomActionId },
+  reason: RoomDenial,
+): HttpError {
+  events.record({
+    name: 'ROOM_ACCESS_DENIED',
+    outcome: 'DENIED',
+    actorUserId: request.actorUserId,
+    requestId: request.requestId,
+    details: { action: request.action, reason },
+  });
+  return roomDenialError(reason);
+}
+
+/**
+ * Re-runs the central decision on state the caller has locked inside its own transaction. The
+ * gate's decision describes the start of the request; a membership, role or ownership change
+ * must not rely on it after a concurrent change of the actor's role, the target's role or the
+ * room's state (CM-T031). Denies with the same responses and events as the gate.
+ */
+export function reauthorizeRoomAction(
+  events: SecurityEventSink,
+  request: { readonly actorUserId: string; readonly requestId: string },
+  input: RoomDecisionInput,
+): RoomRole {
+  const decision = decideRoomAction(input);
+  if (decision.allowed) return decision.role;
+  throw roomDenial(events, { ...request, action: input.action }, decision.reason);
+}
+
 export function createRoomAuthorizer(deps: {
   readonly store: RoomAccessStore;
   readonly events: SecurityEventSink;
 }): RoomAuthorizer {
-  const denied = (request: RoomAuthorizationRequest, reason: RoomDenial): HttpError => {
-    deps.events.record({
-      name: 'ROOM_ACCESS_DENIED',
-      outcome: 'DENIED',
-      actorUserId: request.actor.userId,
-      requestId: request.requestId,
-      details: { action: request.action, reason },
-    });
-    return roomDenialError(reason);
-  };
+  const denied = (request: RoomAuthorizationRequest, reason: RoomDenial): HttpError =>
+    roomDenial(
+      deps.events,
+      { actorUserId: request.actor.userId, requestId: request.requestId, action: request.action },
+      reason,
+    );
 
   return {
     async authorize(request) {

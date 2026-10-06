@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Browser, errorCode, newIdentity, signedInUser, startAuthApi, type AuthTestApi } from '../helpers/auth';
 import { TEST_ORIGIN } from '../helpers/api';
@@ -11,6 +12,10 @@ beforeAll(async () => {
   api = await startAuthApi();
 });
 afterAll(() => api.close());
+
+// Identifiers for the parameterized room routes; the gate rejects before they are looked at.
+const PROBE_ROOM = randomUUID();
+const PROBE_MEMBER = randomUUID();
 
 const STATE_CHANGING = [
   '/auth/register',
@@ -29,6 +34,13 @@ const STATE_CHANGING = [
   '/vault/rewrap',
   '/vault/reset',
   '/directory/lookup',
+  // Rooms (Phase 5): the same gate, before routing, room authorization or any handler.
+  '/rooms',
+  `/rooms/${PROBE_ROOM}/rename`,
+  `/rooms/${PROBE_ROOM}/delete`,
+  `/rooms/${PROBE_ROOM}/members/${PROBE_MEMBER}/role`,
+  `/rooms/${PROBE_ROOM}/members/${PROBE_MEMBER}/remove`,
+  `/rooms/${PROBE_ROOM}/members/${PROBE_MEMBER}/transfer-ownership`,
 ];
 
 interface Attack {

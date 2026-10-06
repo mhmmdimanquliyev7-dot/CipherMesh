@@ -150,10 +150,10 @@ zod 4 compiles object parsers with `new Function`, and when the first object sch
 | `pnpm test:e2e` | Playwright against the built export and the built API over HTTPS on one origin (`tests/e2e/static-server.mjs`: throwaway self-signed certificate from OpenSSL, generated headers, `/api` reverse proxy with one forwarding hop). Needs `DATABASE_URL` |
 | `pnpm test:auth` | Authentication security suites against the real API and a throwaway database |
 | `pnpm test:vault` | Vault and directory suites against the real API, real Argon2id and a throwaway database (Phase 4) |
-| `pnpm test:authz` | Room authorization suites against the real API and a throwaway database: membership lookup and the central authorizer through test-only room routes (Phase 5) |
+| `pnpm test:authz` | Room authorization, lifecycle and membership suites against the real API and a throwaway database: the membership lookup, the central authorizer, room routes, role changes, removal, ownership transfer, forced races and account suspension (Phase 5) |
 | `pnpm test:coverage:crypto` | Coverage of `packages/crypto`; fails below 90% statements, branches, functions or lines (Phase 4, run in CI) |
 | `pnpm test:coverage:authz` | Coverage of the room authorization decision (`packages/shared/src/authorization.ts`) with the same thresholds (Phase 5, run in CI) |
-| `pnpm security:negative-controls` | 37 deliberate defects (ten from Phase 3, seventeen from Phase 4, ten from Phase 5), each of which must make the security suites fail; the five browser controls rebuild the web client and run Playwright. `--vitest-only` skips those, `--only=<prefix>` (for example `--only=NC-05`) runs a subset. Every touched file is compared with its original by SHA-256 afterwards |
+| `pnpm security:negative-controls` | 44 deliberate defects (ten from Phase 3, seventeen from Phase 4, seventeen from Phase 5), each of which must make the security suites fail; the five browser controls rebuild the web client and run Playwright. `--vitest-only` skips those, `--only=<prefix>` (for example `--only=NC-05`) runs a subset. Every touched file is compared with its original by SHA-256 afterwards |
 | `pnpm bench:argon2` | Argon2id benchmark and RFC 9106 check (CP-05) |
 | `pnpm bench:vault` | Browser benchmark of the vault in Chromium, Firefox and WebKit: the real crypto code under the production CSP (CP-04, crypto-decisions section 8) |
 | `node scripts/crypto/embed-argon2id-wasm.mjs` | Regenerates the embedded Argon2id WebAssembly after an update of the pinned `argon2id` package |

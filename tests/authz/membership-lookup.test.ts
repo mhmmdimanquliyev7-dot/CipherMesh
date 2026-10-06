@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { SecretValue } from '../../apps/api/src/config/secret';
 import { createDatabase, type Database } from '../../apps/api/src/db/client';
 import { createRoomAccessStore, type RoomAccessStore } from '../../apps/api/src/db/room-access-store';
+import { roomDataAccess } from '../../apps/api/src/db/room-store';
 import { createLogger } from '../../apps/api/src/logging/logger';
 import { loadDatabaseTestEnv, testDatabase } from '../helpers/database';
 import { insertMember, insertRoomWithoutKeys, insertUser } from '../helpers/db-fixtures';
@@ -126,5 +127,38 @@ describe('room membership lookup (OL-01)', () => {
       [membershipId],
     );
     expect(await store.findActiveMembership(roomId, user)).toBeNull();
+  });
+});
+
+// CM-T031: the target lookups of membership actions. Both must be scoped to the addressed room in
+// the query (OL-02); the decision re-checks the room of what they return.
+describe('target member lookups (OL-02)', () => {
+  it('finds the target for a resource loader only inside the addressed room', async () => {
+    const roomA = await insertRoomWithoutKeys(db, await insertUser(db));
+    const roomB = await insertRoomWithoutKeys(db, await insertUser(db));
+    const user = await insertUser(db);
+    await insertMember(db, roomB, user, { role: 'ADMIN' });
+    expect(await store.findTargetMember(roomB, user, false)).toEqual({ roomId: roomB, role: 'ADMIN' });
+    expect(await store.findTargetMember(roomA, user, false)).toBeNull();
+    expect(await store.findTargetMember(roomA, user, true)).toBeNull();
+    const suspended = await insertUser(db);
+    await insertMember(db, roomA, suspended, { role: 'MEMBER', status: 'SUSPENDED' });
+    expect(await store.findTargetMember(roomA, suspended, false)).toBeNull();
+    expect(await store.findTargetMember(roomA, suspended, true)).toEqual({ roomId: roomA, role: 'MEMBER' });
+    expect(await store.findTargetMember(roomA, 'not-a-uuid', true)).toBeNull();
+  });
+
+  it('locks a membership inside a transaction only inside the addressed room, and reports its own room', async () => {
+    const roomA = await insertRoomWithoutKeys(db, await insertUser(db));
+    const roomB = await insertRoomWithoutKeys(db, await insertUser(db));
+    const user = await insertUser(db);
+    await insertMember(db, roomB, user, { role: 'VIEWER' });
+    const { transaction } = roomDataAccess(database.prisma);
+    const [inA, inB] = await transaction(async (rooms) => [
+      await rooms.lockMembership(roomA, user),
+      await rooms.lockMembership(roomB, user),
+    ]);
+    expect(inA).toBeNull();
+    expect(inB).toMatchObject({ roomId: roomB, userId: user, role: 'VIEWER', status: 'ACTIVE' });
   });
 });

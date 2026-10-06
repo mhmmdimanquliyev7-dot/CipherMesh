@@ -83,7 +83,15 @@ describe('room matrix catalogue', () => {
       'SS-03',
       'SS-04',
       'SS-05',
+      'SS-06',
     ]);
+    expect(describeMatrixAction('SS-06')).toEqual({
+      id: 'SS-06',
+      scope: 'self',
+      stepUpAlways: false,
+      needsResource: false,
+      inherited: false,
+    });
   });
 
   it('is deeply frozen, so no code path can widen a permission at runtime', () => {

@@ -54,6 +54,10 @@ export default defineConfig({
         test: {
           name: 'authz',
           include: ['tests/authz/**/*.test.ts'],
+          // One file at a time: each file starts an API with its own pool and several clients as
+          // cm_api, whose connection limit (40, database-security.md) is shared with the other
+          // projects. Run in parallel they exceeded it.
+          fileParallelism: false,
           globalSetup: ['tests/database/global-setup.ts'],
           testTimeout: 60_000,
           hookTimeout: 120_000,

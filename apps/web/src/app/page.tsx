@@ -9,8 +9,7 @@ interface Capability {
 // Planned capabilities and the roadmap phase that delivers each. Nothing here is
 // available yet, and the page says so rather than implying protection that does not exist.
 const CAPABILITIES: readonly Capability[] = [
-  { name: 'Vault: personal key pair protected by your Vault Passphrase', phase: 'Phase 4' },
-  { name: 'Secure Rooms with role-based access', phase: 'Phase 5' },
+  { name: 'Invitations with room keys delivered to each member', phase: 'Phase 6' },
   { name: 'Client-side encrypted files, notes and one-time secrets', phase: 'Phases 7 to 9' },
   { name: 'Room key rotation and the Room Safety Code', phase: 'Phases 6 and 11' },
   { name: 'Tamper-evident audit ledger', phase: 'Phase 12' },
@@ -24,8 +23,9 @@ export default function HomePage() {
         <h1 className="text-3xl font-semibold tracking-tight">{PRODUCT_TAGLINE}</h1>
         <p className="max-w-3xl text-slate-300">
           CipherMesh will encrypt room content in your browser before it is uploaded, so the server stores ciphertext
-          and wrapped keys rather than readable content. This build provides accounts, sessions and multi-factor
-          authentication. Rooms and encryption features are not available yet.
+          and wrapped keys rather than readable content. This build provides accounts, sessions, multi-factor
+          authentication, the vault with your personal key pair, and rooms with roles. Rooms hold no content yet: the
+          encryption features are not available yet.
         </p>
         <div className="flex gap-4 text-sm">
           <Link className="text-sky-400 underline" href="/login">

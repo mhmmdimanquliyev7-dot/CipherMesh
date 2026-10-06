@@ -155,6 +155,9 @@ const ACCOUNT_MATRIX = {
   'SS-03': { title: 'View, accept or decline own invitations', scope: 'self' },
   'SS-04': { title: 'Create a room', scope: 'self' },
   'SS-05': { title: 'Look up a user by exact email to invite', scope: 'self' },
+  // Added in Phase 5 (CM-T030): listing one's rooms is a query over the caller's own memberships,
+  // not an action inside one room, so no AZ action can authorize it (OL-08).
+  'SS-06': { title: 'List own rooms', scope: 'self' },
 } satisfies Record<string, AccountActionDefinition>;
 
 export type AccountActionId = keyof typeof ACCOUNT_MATRIX;

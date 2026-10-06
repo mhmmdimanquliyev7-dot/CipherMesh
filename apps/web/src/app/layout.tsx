@@ -24,6 +24,9 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
             </Link>
             <nav className="flex items-center gap-4 text-sm">
               <VaultIndicator />
+              <Link href="/rooms" className="text-slate-300 hover:text-white">
+                Rooms
+              </Link>
               <Link href="/vault" className="text-slate-300 hover:text-white">
                 Vault
               </Link>

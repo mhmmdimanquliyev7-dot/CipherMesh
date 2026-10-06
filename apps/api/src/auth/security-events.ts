@@ -44,6 +44,17 @@ export const SECURITY_EVENTS = [
   // Room authorization (Phase 5): every denied room-scoped request, with the action ID and the
   // reason code only. No room name and no request field (authorization model section 7).
   'ROOM_ACCESS_DENIED',
+  // Room lifecycle and membership administration (Phase 5, PC-13 BASELINE events; names from
+  // ADR-013 where it defines them). Details carry the room ID and roles or reason codes, never
+  // the room name, which members may have filled with sensitive text despite the warning (T-28).
+  'ROOM_CREATED',
+  'ROOM_RENAMED',
+  'ROOM_DELETED',
+  'MEMBER_ROLE_CHANGED',
+  'MEMBER_REMOVED',
+  'MEMBER_SUSPENDED',
+  'OWNERSHIP_TRANSFERRED',
+  'REKEY_REQUIRED',
 ] as const;
 export type SecurityEventName = (typeof SECURITY_EVENTS)[number];
 

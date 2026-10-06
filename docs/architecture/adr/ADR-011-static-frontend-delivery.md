@@ -1,6 +1,6 @@
 # ADR-011: Static Next.js export served by Nginx
 
-- Status: **Accepted** for the static export and strict CSP (verified in Phase 1, 2026-10-02). The routing pattern for identifiers is confirmed with the first identifier route in Phase 5
+- Status: **Accepted** for the static export and strict CSP (verified in Phase 1, 2026-10-02). The routing pattern for identifiers was confirmed with the first identifier route in Phase 5 (2026-10-06)
 - Date: 2026-09-28
 - Related: [deployment-architecture.md](../../cloud/deployment-architecture.md), [trust-boundaries.md](../trust-boundaries.md) TB-03, T-12, T-19, T-24, L-02
 
@@ -35,4 +35,4 @@ Accepted for the static export and its strict CSP. Confirming evidence from Phas
 - `apps/web/scripts/generate-csp.mjs` hashes the inline scripts. The resulting policy has no `'unsafe-inline'` and no `'unsafe-eval'`, and the build fails if inline styles appear.
 - Playwright loads the export under that policy in Chromium, Firefox and WebKit with zero CSP violations (`tests/e2e/web-shell.spec.ts`). A negative control with the hashes removed makes the test fail.
 
-Still open: the identifier routing pattern for deep links and reloads is confirmed when the first identifier route is built (Phase 5). If it fails, this ADR is revised.
+Identifier routing, confirmed in Phase 5 (CM-T030): a room is one static page, `/rooms/room`, with the room ID in the query string (`/rooms/room?id=<UUIDv4>`). The page reads the parameter with `useSearchParams` inside a Suspense boundary, validates it as a UUIDv4 before use and treats anything else like an unknown room. `tests/e2e/rooms.spec.ts` opens the page through the list, after a reload and by a direct visit, in Chromium, Firefox and WebKit, with zero CSP violations. The E2E server serves `rooms/room.html` for that path and ignores the query string, which never reaches a server-side renderer; the Nginx configuration (Phase 17) must map paths the same way, for example with `try_files $uri $uri.html`. The ID is not a secret (OL-09); it identifies the room the API then authorizes.

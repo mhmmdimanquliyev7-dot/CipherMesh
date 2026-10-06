@@ -418,6 +418,81 @@ const CONTROLS = [
     ],
     tests: ['tests/security/malformed-requests.test.ts'],
   },
+  // ---------------------------------------- Phase 5: rooms and membership administration (CM-T030/031)
+  {
+    id: 'NC-05-11',
+    defect: 'The target member of a membership action is looked up outside the addressed room',
+    file: 'apps/api/src/db/room-access-store.ts',
+    edits: [
+      [
+        "        where: { roomId, userId, status: includeSuspended ? { in: ['ACTIVE', 'SUSPENDED'] } : 'ACTIVE' },",
+        "        where: { userId, status: includeSuspended ? { in: ['ACTIVE', 'SUSPENDED'] } : 'ACTIVE' },",
+      ],
+    ],
+    tests: ['tests/authz/membership-lookup.test.ts'],
+  },
+  {
+    id: 'NC-05-12',
+    defect: 'The membership locked inside a transaction is not limited to the addressed room',
+    file: 'apps/api/src/db/room-store.ts',
+    edits: [
+      [
+        "         WHERE room_id = ${roomId}::uuid AND user_id = ${userId}::uuid AND status IN ('ACTIVE', 'SUSPENDED')",
+        "         WHERE (room_id = ${roomId}::uuid OR TRUE) AND user_id = ${userId}::uuid AND status IN ('ACTIVE', 'SUSPENDED')",
+      ],
+    ],
+    tests: ['tests/authz/membership-lookup.test.ts'],
+  },
+  {
+    id: 'NC-05-13',
+    defect: 'Membership changes skip the re-authorization on locked state (stale gate decision)',
+    file: 'apps/api/src/rooms/service.ts',
+    edits: [['    reauthorizeRoomAction(events, request, {', '    ((..._args) => undefined)(events, request, {']],
+    tests: ['tests/authz/membership-concurrency.test.ts'],
+  },
+  {
+    id: 'NC-05-14',
+    defect: 'Ownership validation bypassed: an ADMIN may transfer ownership (AZ-05 is OWNER-only)',
+    file: 'packages/shared/src/authorization.ts',
+    edits: [
+      [
+        "  'AZ-05': { title: 'Transfer ownership to an ADMIN', rules: row(targets('ADMIN'), N, N, N), stepUp: 'always' },",
+        "  'AZ-05': { title: 'Transfer ownership to an ADMIN', rules: row(targets('ADMIN'), targets('ADMIN'), N, N), stepUp: 'always' },",
+      ],
+    ],
+    tests: ['tests/authz/membership-admin.test.ts'],
+  },
+  {
+    id: 'NC-05-15',
+    defect: 'One-OWNER invariant broken: a transfer demotes the OWNER without promoting the target',
+    file: 'apps/api/src/db/room-store.ts',
+    edits: [["        data: { role: 'OWNER' },", "        data: { role: 'ADMIN' },"]],
+    tests: ['tests/authz/membership-admin.test.ts'],
+  },
+  {
+    id: 'NC-05-16',
+    defect: 'Disabling an account no longer suspends its room memberships (PA-03)',
+    file: 'apps/api/src/auth/admin.ts',
+    edits: [
+      [
+        '        const suspended = await rooms.suspendMemberships(userId, actor.userId, now);',
+        '        const suspended = [];',
+      ],
+    ],
+    tests: ['tests/authz/account-disable.test.ts'],
+  },
+  {
+    id: 'NC-05-17',
+    defect: 'The room list is not limited to the caller memberships (OL-08)',
+    file: 'apps/api/src/db/room-store.ts',
+    edits: [
+      [
+        "        where: {\n          userId,\n          status: 'ACTIVE',\n          room: { status: 'ACTIVE' },\n",
+        "        where: {\n          status: 'ACTIVE',\n          room: { status: 'ACTIVE' },\n",
+      ],
+    ],
+    tests: ['tests/authz/rooms-lifecycle.test.ts'],
+  },
 ];
 
 /** @param {string[]} files */

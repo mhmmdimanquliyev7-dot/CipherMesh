@@ -58,6 +58,23 @@ export function createRoomAccessStore(db: Db) {
         room: { status: row.room.status, keyState: row.room.keyState, securityProfile: row.room.securityProfile },
       };
     },
+
+    /**
+     * The target member of a membership action, found by room ID AND user ID in the query
+     * (OL-02): a member of another room is not found. ACTIVE only, or ACTIVE and SUSPENDED for a
+     * removal. Feeds the resource loaders of AZ-05, AZ-09 and AZ-10.
+     */
+    async findTargetMember(
+      roomId: string,
+      userId: string,
+      includeSuspended: boolean,
+    ): Promise<{ readonly roomId: string; readonly role: RoomRole } | null> {
+      if (!isUuidV4(roomId) || !isUuidV4(userId)) return null;
+      return db.roomMember.findFirst({
+        where: { roomId, userId, status: includeSuspended ? { in: ['ACTIVE', 'SUSPENDED'] } : 'ACTIVE' },
+        select: { roomId: true, role: true },
+      });
+    },
   };
 }
 

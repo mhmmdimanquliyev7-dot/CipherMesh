@@ -84,6 +84,7 @@ Legend: **Y** allowed, **N** denied, **own** only on items the caller created. P
 | SS-03 | View, accept or decline own invitations | The invitee | |
 | SS-04 | Create a room | Any user with an ACTIVE vault | Must meet the chosen profile's access requirements |
 | SS-05 | Look up a user by exact email to invite | Any user with an ACTIVE vault | Rate-limited, returns only ID, display name, account creation date, key ID, public key and fingerprint; the email is shown as unverified (T-35) |
+| SS-06 | List own rooms | The user | Only ACTIVE rooms in which the caller has an ACTIVE membership, filtered by membership in the query and paginated (OL-08); each entry carries the caller's own role. Added in Phase 5 (CM-T030): the list is a query over the caller's own memberships, so no action inside one room (AZ-01) covers it |
 
 ## 5. Object-level authorization rules
 
@@ -153,9 +154,9 @@ Denials are logged with the request ID and reason code, and recorded as audit ev
 - **Platform admin tests:** PLATFORM_ADMIN receives 404 for every room-scoped endpoint of rooms they are not a member of.
 - **Rekey authorization tests:** MEMBERs and VIEWERs cannot start rekeys; only the starter can finalize; a removed member's requests fail at OL-01; client-supplied recipient lists are ignored.
 
-## 9. Implementation (Phase 5, CM-T029)
+## 9. Implementation (Phase 5, CM-T029 to CM-T031)
 
-Status: the central authorization module, the shared matrix and the route-registry enforcement are implemented. No production room route exists yet: room creation, listing, renaming and deletion (CM-T030) and membership administration (CM-T031) add them, and the BOLA suite (CM-T032) covers them. Sections 1 to 8 stay normative; this section records how the code realizes them.
+Status: the central authorization module, the shared matrix and the route-registry enforcement (CM-T029), and the room lifecycle and membership administration routes (CM-T030, CM-T031, section 9.6) are implemented. The BOLA suite over every room route (CM-T032) is still to come. Sections 1 to 8 stay normative; this section records how the code realizes them.
 
 ### 9.1 Where the rules live
 
@@ -207,7 +208,31 @@ SUSPENDED, REMOVED and LEFT memberships and DELETING or DELETED rooms behave as 
 
 The decision describes the database state at the start of the request; nothing is cached between requests. A handler that changes membership, roles or ownership must re-check the stored state inside its own transaction (a conditional update or a row lock), so a concurrent change cannot slip between the check and the write.
 
-### 9.5 Open items for CM-T030 and CM-T031
+### 9.5 Decisions recorded with CM-T030 and CM-T031
 
-- Listing one's own rooms has no action in section 3 or 4. The listing route needs a reviewed matrix entry before it can be registered.
-- PA-03 says that disabling an account sets its memberships to SUSPENDED and their rooms to REKEY_REQUIRED. Disabled accounts already lose every session, so they cannot reach a room; the membership change itself is membership administration and is still to be implemented.
+- **SS-06, listing one's own rooms**, was added to section 4. The list is a query over the caller's own memberships, not an action inside one room, so AZ-01 cannot authorize it, and an unscoped collection must not borrow a room action.
+- **PA-03's room consequence** is implemented: disabling an account suspends its memberships and locks their rooms in the same transaction (section 9.6).
+- **The former OWNER becomes an ADMIN** after a transfer (AZ-05). Section 2.1 says only that ownership moves to an ADMIN; ADMIN keeps the former owner in the room with the next lower role, and lets them leave later (AZ-11), which an OWNER cannot.
+- **A PLATFORM_ADMIN account may create a room** like any user with an ACTIVE vault (SS-04). Section 2.2 forbids using the platform role to reach other people's rooms; creating one's own room grants nothing in anyone else's.
+- **Removing a SUSPENDED member** is allowed with the same role ceilings, and it runs the full member-loss transaction like any removal.
+
+### 9.6 Room lifecycle and membership administration (CM-T030, CM-T031)
+
+| Route | Action | Notes |
+|---|---|---|
+| `POST /rooms` | SS-04 | Body: client-chosen room ID (UUIDv4, DF-05), name, profile. Needs an ACTIVE account (checked under a lock on the user row), an ACTIVE vault (`403 VAULT_SETUP_REQUIRED`), and the profile's access requirements: an MFA-verified session for CONFIDENTIAL and RESTRICTED (PC-01, `403 MFA_REQUIRED`) and a password sign-in within 12, 4 or 1 hours (PC-02, `401 REAUTH_REQUIRED`). Writes the room (policy version 1) and the OWNER membership in one transaction; no key version, envelope or commitment (CM-T033). An ID that was ever used gives `409 ROOM_ID_UNAVAILABLE` (L-45) |
+| `GET /rooms` | SS-06 | ACTIVE memberships in ACTIVE rooms, filtered in the query, newest first, pages of at most 50 with a keyset cursor (OL-08) |
+| `GET /rooms/{roomId}`, `GET /rooms/{roomId}/members` | AZ-01 | Room metadata and the caller's role; ACTIVE and SUSPENDED members with display name, role, status and join time (pages of at most 100). Both queries are constrained by the caller's ACTIVE membership again |
+| `POST /rooms/{roomId}/rename` | AZ-02 | Name: NFKC, trimmed, 1 to 100 characters, no control or bidirectional-override characters. The UI warns that names are not encrypted (T-28) |
+| `POST /rooms/{roomId}/delete` | AZ-04, step-up | The room becomes DELETING and refuses every request at once. The worker job (`pnpm worker:retention`, as `cm_worker`) makes it DELETED only when no envelope, file, note or secret row is left, so a later phase that adds content cannot end with a DELETED room still holding ciphertext |
+| `POST /rooms/{roomId}/members/{userId}/role` | AZ-10 | Body: ADMIN, MEMBER or VIEWER; OWNER is not representable. Target: ACTIVE member of this room. Increments the membership epoch; an unchanged role is a no-op |
+| `POST /rooms/{roomId}/members/{userId}/remove` | AZ-09 | Target: ACTIVE or SUSPENDED member of this room. One transaction: status REMOVED, the target's envelopes deleted, epoch incremented, room REKEY_REQUIRED with MEMBER_REMOVED (INV-07, DF-10). Answers `rekeyRequired: true` |
+| `POST /rooms/{roomId}/members/{userId}/transfer-ownership` | AZ-05, step-up | Target: ACTIVE ADMIN of this room. The OWNER becomes ADMIN first, then the target becomes OWNER, so the partial unique index (one ACTIVE OWNER per room) holds at every statement. Increments the epoch |
+
+**Account disabling (PA-03, key-lifecycle R3).** The disable transaction sets the account DISABLED and revokes its sessions, then suspends every ACTIVE membership (`removal_reason` ACCOUNT_DISABLED, role kept for reinstatement), deletes the user's envelopes in those rooms and sets each affected ACTIVE room to REKEY_REQUIRED with MEMBER_SUSPENDED. Repeating it suspends whatever is still ACTIVE. Re-enabling restores the login only: memberships stay SUSPENDED until an OWNER or ADMIN re-shares keys (AZ-14, Phase 6), as section 2.1 and data-model 4.7 specify (L-44).
+
+**REKEY_REQUIRED.** Removal and suspension only record the state, reasons and epoch the rekey state machine needs (ADR-013); nothing creates a key version or claims a rekey. REKEY_REQUIRED blocks content writes and invitations (PC-16, enforced from the first such route); membership administration and reads continue.
+
+**Concurrency.** Every room change locks the room row first, then the memberships it reads, and runs the decision again on that locked state (`reauthorizeRoomAction`), so the gate's decision never outlives a concurrent change; writes are conditional on the checked role and status. Account suspension locks the affected rooms in ID order before their memberships, the same order, so the two kinds of transaction cannot deadlock; it also updates the user row before reading memberships, so a concurrent room creation by that user either finishes first and is suspended, or sees the disabled account. An interactive transaction that runs longer than five seconds, for example while waiting for a lock, is rolled back and the request fails closed (500). `tests/authz/membership-concurrency.test.ts` forces each race by holding the room lock until both requests wait.
+
+**Events.** `ROOM_CREATED`, `ROOM_RENAMED`, `ROOM_DELETED`, `MEMBER_ROLE_CHANGED`, `MEMBER_REMOVED`, `MEMBER_SUSPENDED`, `OWNERSHIP_TRANSFERRED` and `REKEY_REQUIRED` (only when a room leaves ACTIVE), after the transaction commits. Details carry the room ID, roles, reason codes and counts, never the room name (T-28); they go to the application log until the Phase 12 ledger (L-33).

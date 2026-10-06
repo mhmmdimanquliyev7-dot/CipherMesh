@@ -60,10 +60,18 @@ describe('route inventory', () => {
     }
   });
 
-  it('room routes exist only as reviewed (CM-T030 and CM-T031 add them with BOLA coverage, CM-T032)', () => {
+  it('room routes exist only as reviewed (CM-T030, CM-T031; every one gets BOLA coverage in CM-T032)', () => {
     const { routes } = productionApp();
     const room = routes.filter((r) => r.access === 'room').map((r) => `${r.method} ${r.path} ${r.action}`);
-    expect(room).toEqual([]);
+    expect(room).toEqual([
+      'GET /rooms/:roomId AZ-01-ROOM-READ',
+      'GET /rooms/:roomId/members AZ-01-MEMBER-LIST',
+      'POST /rooms/:roomId/rename AZ-02-ROOM-RENAME',
+      'POST /rooms/:roomId/delete AZ-04-ROOM-DELETE',
+      'POST /rooms/:roomId/members/:userId/role AZ-10-MEMBER-ROLE',
+      'POST /rooms/:roomId/members/:userId/remove AZ-09-MEMBER-REMOVE',
+      'POST /rooms/:roomId/members/:userId/transfer-ownership AZ-05-OWNERSHIP-TRANSFER',
+    ]);
   });
 
   it('the allowlists contain exactly the reviewed public routes', () => {
@@ -89,7 +97,23 @@ describe('route inventory', () => {
   it('no GET route is an authentication action that changes state', () => {
     const { routes } = productionApp();
     const gets = routes.filter((r) => r.method === 'GET').map((r) => r.path);
-    expect(gets).toEqual(['/health', '/ready', '/auth/session', '/auth/sessions', '/vault']);
+    expect(gets).toEqual([
+      '/health',
+      '/ready',
+      '/auth/session',
+      '/auth/sessions',
+      '/vault',
+      // Phase 5: reads only (SS-06, AZ-01); every room change is a POST through the CSRF gate.
+      '/rooms',
+      '/rooms/:roomId',
+      '/rooms/:roomId/members',
+    ]);
+  });
+
+  it('the room self-service routes exist only as reviewed (CM-T030)', () => {
+    const { routes } = productionApp();
+    const own = routes.filter((r) => r.path === '/rooms').map((r) => `${r.method} ${r.path} ${r.action} ${r.access}`);
+    expect(own).toEqual(['POST /rooms SS-04-ROOM-CREATE authenticated', 'GET /rooms SS-06-ROOM-LIST authenticated']);
   });
 
   it('the vault and directory routes exist only as reviewed, all authenticated (Phase 4)', () => {

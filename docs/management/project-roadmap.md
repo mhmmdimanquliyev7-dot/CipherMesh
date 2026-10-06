@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)); Phase 4 implemented (2026-10-05, [phase-04-traceability.md](phase-04-traceability.md)), approved and merged into `main` through pull request #10. Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
+Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)); Phase 4 implemented (2026-10-05, [phase-04-traceability.md](phase-04-traceability.md)), approved and merged into `main` through pull request #10. Phase 5 in progress (CM-T029 to CM-T031 implemented on its branch, CM-T032 pending, [phase-05-traceability.md](phase-05-traceability.md)). Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
 
 ## 1. Principles
 

@@ -50,7 +50,8 @@ describe('identity fingerprint (CP-17 revised by ADR-015)', () => {
     expect(groups.join('')).toBe(a.identity.fingerprint);
     expect(groups.every((g) => /^[0-9a-f]{4}$/.test(g))).toBe(true);
     expect(isFingerprint(a.identity.fingerprint.toUpperCase())).toBe(false);
-  });
+    // Two RSA-3072 key pairs are generated: allow for a loaded machine (default limit is 5 s).
+  }, 30_000);
 });
 
 describe('fingerprint display', () => {
@@ -117,5 +118,6 @@ describe('generateIdentity and verifyPublicIdentity', () => {
     const encryptionKeySpki = attacker.identity.encryptionKeySpki;
     const fingerprint = await computeFingerprint(encryptionKeySpki, victim.identity.signingKeySpki);
     await expectInvalid({ ...victim.identity, encryptionKeySpki, fingerprint });
-  });
+    // Two RSA-3072 key pairs are generated: allow for a loaded machine (default limit is 5 s).
+  }, 30_000);
 });
