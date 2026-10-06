@@ -172,6 +172,13 @@ describe('MFA login step', () => {
     const { identity, secret } = await userWithMfa(api);
     // The confirmation consumed an earlier step; move on so that "now - 1 step" is unused.
     api.clock.advance(30_000);
+    // Every attempt logs in first (Argon2id) before it computes its code from the clock, so the seven
+    // attempts take a few seconds. The replay checks assume they all fall into one 30-second TOTP
+    // step: a step boundary between two "same step" attempts makes the second a new step, which the
+    // server rightly accepts (this test failed intermittently in CI for that reason). Start just
+    // after a boundary, so the sequence has nearly the whole step.
+    const intoStep = api.clock.now().getTime() % 30_000;
+    if (intoStep > 2_000) api.clock.advance(30_000 - intoStep + 1_000);
     const attempt = async (offset: number) => {
       const browser = new Browser(api);
       await browser.login(identity);

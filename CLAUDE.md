@@ -22,8 +22,8 @@ It is one project that must show real depth in three subjects. Security depth ma
 - **Phase 2 (Database and Prisma): implemented and merged into `main` through pull request #7; the project owner continued to Phase 3.** Traceability: `docs/management/phase-02-traceability.md`. Database controls: `docs/security/database-security.md`.
 - **Phase 3 (Authentication): implemented and merged into `main` through pull request #8; the project owner continued to Phase 4.** Traceability: `docs/management/phase-03-traceability.md`. Controls: `docs/security/authentication-security.md`.
 - **Phase 4 (Cryptographic Identity and Vault): implemented, approved by the project owner and merged into `main` through pull request #10 (merge commit `9e13259`).** ADR-015 (OCD-12) was accepted before implementation. Traceability: `docs/management/phase-04-traceability.md`. Specification: `docs/crypto/vault.md`.
-- **Phase 5 (Secure Rooms and RBAC): implemented** on `feature/CM-T029-secure-rooms-rbac` (created from `main` at `5c1ed32`): CM-T029 central authorization and matrix, CM-T030 room lifecycle, CM-T031 membership administration and ownership transfer, CM-T032 BOLA and IDOR suite, with every gate of section 10 passing. The pull request, its CI run and the merge are recorded in `docs/management/current-state.md`. Traceability: `docs/management/phase-05-traceability.md`. Controls: `docs/security/authorization-model.md` section 9.
-- Next phase: **Phase 6 (Cryptographic Membership)**, Prompt 08. Do not start it without explicit approval. Its branch starts from the updated `main` after the Phase 5 merge.
+- **Phase 5 (Secure Rooms and RBAC): implemented, verified and merged into `main` through pull request #13 (merge commit `bd4d2f6`).** CM-T029 central authorization and matrix, CM-T030 room lifecycle, CM-T031 membership administration and ownership transfer, CM-T032 BOLA and IDOR suite. No room cryptography exists yet. Traceability: `docs/management/phase-05-traceability.md`. Controls: `docs/security/authorization-model.md` section 9.
+- Next phase: **Phase 6 (Cryptographic Membership)**, Prompt 08. Do not start it without explicit approval. Its branch starts from the updated `main`.
 - Work is phase-gated. Finish one phase, report, and wait for approval before starting the next.
 - Phase details: `docs/management/project-roadmap.md`. Backlog: `docs/management/jira-backlog.md`.
 
@@ -198,7 +198,7 @@ Boundary rules: `apps/web` must not import `apps/api`. `packages/crypto` must no
 
 ## 12. Git workflow
 
-- The repository was initialized locally in Phase 0.5 with a baseline commit on `main`. Its GitHub remote is `mhmmdimanquliyev7-dot/CipherMesh`, where a ruleset protects `main`. Phases 1 to 4 arrived through pull requests #1, #7, #8 and #10 with merge commits. New branches start from the updated `main`.
+- The repository was initialized locally in Phase 0.5 with a baseline commit on `main`. Its GitHub remote is `mhmmdimanquliyev7-dot/CipherMesh`, where a ruleset protects `main`. Phases 1 to 5 arrived through pull requests #1, #7, #8, #10 and #13 with merge commits. New branches start from the updated `main`.
 - `main` is protected. Changes arrive only through pull requests with passing CI. No direct commits and no force pushes.
 - Branch names: `feature/CM-<n>-short-description`, `fix/CM-<n>-...`, `security/CM-<n>-...`, `docs/CM-<n>-...`, `infra/CM-<n>-...`.
 - Commit messages use Conventional Commits with the Jira key, for example `feat(api): add session revocation endpoint (CM-17)`.
