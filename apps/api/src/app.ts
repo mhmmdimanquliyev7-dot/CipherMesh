@@ -9,8 +9,10 @@ import { logSecurityEventSink, type SecurityEventSink } from './auth/security-ev
 import { createAuthService, defaultRateLimits, type AuthRateLimits, type AuthService } from './auth/service';
 import { resolveSession } from './auth/sessions';
 import { TotpSecretBox } from './auth/totp-secret-box';
+import { createRoomAuthorizer } from './authorization/rooms';
 import type { AppConfig } from './config/env';
 import { authDataAccess } from './db/auth-store';
+import { createRoomAccessStore } from './db/room-access-store';
 import { vaultDataAccess } from './db/vault-store';
 import type { Database } from './db/client';
 import { requireJsonBody } from './http/content-type';
@@ -97,6 +99,9 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
     authenticate: (token) => resolveSession(data.store, token, clock()),
     now: clock,
   };
+  // Central room authorization (CM-T029): every room route is checked against the membership
+  // stored for the session user and the shared matrix before its handler runs.
+  const rooms = createRoomAuthorizer({ store: createRoomAccessStore(database.prisma), events });
 
   const app = express();
   app.disable('x-powered-by');
@@ -124,6 +129,7 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],
     authenticator,
+    rooms,
   );
   app.use(API_PREFIX, router);
 

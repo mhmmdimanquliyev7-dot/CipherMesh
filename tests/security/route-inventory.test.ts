@@ -1,3 +1,4 @@
+import { describeMatrixAction } from '@ciphermesh/shared';
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../../apps/api/src/app';
@@ -44,8 +45,25 @@ describe('route inventory', () => {
     expect(publicRoutes).toEqual(EXPECTED_PUBLIC);
     const others = routes.filter((r) => r.access !== 'public');
     expect(others.length).toBeGreaterThan(10);
-    expect(others.every((r) => r.access === 'authenticated')).toBe(true);
+    expect(others.every((r) => r.access === 'authenticated' || r.access === 'room')).toBe(true);
     expect(routes.every((r) => /^[A-Z]/.test(r.action))).toBe(true);
+  });
+
+  it('declares a matrix action for every route behind authentication, consistent with its access (CM-T029)', () => {
+    const { routes } = productionApp();
+    for (const route of routes) {
+      const declared = describeMatrixAction(/^(?:AZ|PA|SS)-\d{2}/.exec(route.action)?.[0] ?? '');
+      const label = `${route.method} ${route.path} ${route.action}`;
+      if (route.access === 'public') expect(declared, label).toBeUndefined();
+      else if (route.access === 'room') expect(declared?.scope, label).toBe('room');
+      else expect(['self', 'platform'], label).toContain(declared?.scope);
+    }
+  });
+
+  it('room routes exist only as reviewed (CM-T030 and CM-T031 add them with BOLA coverage, CM-T032)', () => {
+    const { routes } = productionApp();
+    const room = routes.filter((r) => r.access === 'room').map((r) => `${r.method} ${r.path} ${r.action}`);
+    expect(room).toEqual([]);
   });
 
   it('the allowlists contain exactly the reviewed public routes', () => {

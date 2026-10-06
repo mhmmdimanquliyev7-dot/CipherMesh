@@ -1,7 +1,7 @@
 import type { Logger } from '../logging/logger';
 
 /**
- * Authentication and vault security events (Phase 3, extended in Phase 4).
+ * Authentication, vault and room authorization security events (Phase 3, extended in Phases 4 and 5).
  *
  * Every security-relevant authentication action goes through this single module with a name from
  * a fixed catalogue and allowlisted detail fields. In Phase 3 the sink is the structured
@@ -41,6 +41,9 @@ export const SECURITY_EVENTS = [
   'VAULT_RESET',
   'VAULT_REJECTED',
   'DIRECTORY_LOOKUP_THROTTLED',
+  // Room authorization (Phase 5): every denied room-scoped request, with the action ID and the
+  // reason code only. No room name and no request field (authorization model section 7).
+  'ROOM_ACCESS_DENIED',
 ] as const;
 export type SecurityEventName = (typeof SECURITY_EVENTS)[number];
 
