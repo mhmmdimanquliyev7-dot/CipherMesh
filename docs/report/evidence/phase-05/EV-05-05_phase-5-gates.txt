@@ -29,7 +29,8 @@ pnpm sbom:generate                    exit 0
 pnpm scan:secrets (full history)      exit 0   44 commits scanned, no leaks found
 pnpm scan:secrets --staged            run before each commit
 
-Known intermittent tests, unchanged by Phase 5 and not security defects: packages/crypto/src/vault.test.ts "refuses a second derivation
-while one is running" failed in two of about ten full runs (passes 16 of 16 alone, 8 of them under artificial CPU load; code and test are
-byte-identical to main); packages/crypto/src/identity.test.ts timed out once at the 5-second default when generating two RSA-3072 key
-pairs (the two tests now have an explicit 30-second limit). The final gate runs above passed.
+Known intermittent tests, not security defects: packages/crypto/src/vault.test.ts "refuses a second derivation while one is running" failed
+in about three of about twelve full runs, once in CI on main after the merge (the rerun of that commit passed): the test assumed that the
+first of two concurrent calls reaches the derivation first. It is now deterministic (the first derivation is held until released) and still
+fails when the busy guard is removed. packages/crypto/src/identity.test.ts timed out once at the 5-second default when generating two
+RSA-3072 key pairs (the two tests now have an explicit 30-second limit). The final gate runs above passed.

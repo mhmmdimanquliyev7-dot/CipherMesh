@@ -1,0 +1,18 @@
+EV-05-06: CI run of the Phase 5 pull request (#13)
+Captured: 2026-10-06T12:31Z from GitHub Actions (gh run view). No secrets: the database role passwords and authentication keys of the
+run are random per run and masked by the workflow.
+
+run: https://github.com/mhmmdimanquliyev7-dot/CipherMesh/actions/runs/37462944884
+head: ae3ea9cf0aabfb8afd320d45a12dbb4e5d4619c2 (feature/CM-T029-secure-rooms-rbac, pull_request)
+started: 2026-10-06T12:23:49Z  finished: 2026-10-06T12:29:43Z  conclusion: success
+job: Dependency audit: success (9 steps; "Fail on high or critical advisories" passed with source-map-js 1.2.2)
+job: Secret scan (gitleaks, full history): success (5 steps)
+job: Lint, types, tests, build, E2E: success (27 steps, 5m50s): install with the frozen lockfile, format check, lint, typecheck, schema
+  validation, roles and migrations from zero, drift check, seed, unit, integration, security, database, auth, vault and authz tests,
+  the coverage gates of packages/crypto and of the room authorization decision, build, smoke test of the built API, SBOM, E2E in
+  Chromium, Firefox and WebKit
+check: GitGuardian Security Checks: success (no incident)
+
+Merge: pull request #13 merged on 2026-10-06T12:30:06Z with a normal merge commit, bd4d2f637498bd5df014038cc15dc317c99debf7
+(parents 5c1ed32 and ae3ea9c); no squash, no rebase, no force push.
+post-merge run on main (merge commit bd4d2f6): run 37463694323, attempt 1 failed in the intermittent packages/crypto vault test (see the note below), attempt 2 of the same commit passed every job (rerun of the failed job, 2026-10-06T12:38Z)
