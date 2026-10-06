@@ -1,15 +1,15 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-06, end of Prompt 07A (Phase 5, CM-T029). The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-06, end of Prompt 07B (Phase 5, CM-T030 and CM-T031). The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
 | Item | State |
 |---|---|
 | Completed | Phase 4 (CM-T086, CM-T023 to CM-T028), merged into `main` through pull request #10. Traceability: [phase-04-traceability.md](phase-04-traceability.md) |
-| In progress | Phase 5, Secure Rooms and RBAC (CM-T029 to CM-T032). **Prompt 07A done:** CM-T029, the central authorization module and shared matrix, implemented and committed on the Phase 5 branch. No pull request yet. Traceability: [phase-05-traceability.md](phase-05-traceability.md) |
-| Phase 5 branch | `feature/CM-T029-secure-rooms-rbac`, created from `main` at `5c1ed32`. Head before this handoff commit: `9da20dd`. Local only; not pushed |
-| Next | **Prompt 07B: CM-T030 and CM-T031** (room creation, listing, renaming and deletion; membership administration; ownership transfer). It continues on `feature/CM-T029-secure-rooms-rbac`, **not from `main`**. Then Prompt 07C: CM-T032 (BOLA suite), the full gates, evidence and the pull request. Do not start without explicit approval |
+| In progress | Phase 5, Secure Rooms and RBAC (CM-T029 to CM-T032). **Prompt 07A done** (CM-T029, central authorization module and shared matrix) and **Prompt 07B done** (CM-T030 room lifecycle, CM-T031 membership administration and ownership transfer, and the PA-03 suspension of memberships), all committed on the Phase 5 branch. **CM-T032 (BOLA suite) is pending.** No pull request. Traceability: [phase-05-traceability.md](phase-05-traceability.md) |
+| Phase 5 branch | `feature/CM-T029-secure-rooms-rbac`, created from `main` at `5c1ed32`. Prompt 07A head `7190092`; Prompt 07B implementation commit `09ade03`, followed by the handoff commit (`git log` shows the head). Local only; not pushed |
+| Next | **Prompt 07C: CM-T032** (the BOLA and IDOR suite over every room route), the final Phase 5 security and evidence gate (EV-05-01 to EV-05-03, the full-history secret scan, the dependency-audit decision below) and the pull request. It continues on `feature/CM-T029-secure-rooms-rbac`, **not from `main`**. Do not start without explicit approval |
 | Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 4 (`5c1ed32`) |
 
 ## 2. Architecture implemented so far
@@ -39,28 +39,32 @@ Snapshot: 2026-10-06, end of Prompt 07A (Phase 5, CM-T029). The source of truth 
 - `packages/crypto`: AES-256-GCM with internal IVs, RSA-OAEP (32-byte values only), ECDSA, HKDF, SHA-256, RFC 8785, the context catalogue, identity verification shared with the API, vault format version 1 ([vault.md](../crypto/vault.md)). Coverage gate `pnpm test:coverage:crypto`.
 - Browser Argon2id `argon2id` 1.0.1 (LIB-03) in a Web Worker; vault setup, unlock in memory, auto-lock, signed passphrase change, reset, directory lookup. API routes: `GET /vault`, `POST /vault`, `POST /vault/rewrap`, `POST /vault/reset`, `POST /directory/lookup`.
 
-## 6. Room authorization (Prompt 07A, CM-T029)
+## 6. Room authorization and rooms (Prompts 07A and 07B, CM-T029 to CM-T031)
 
 | Part | Location |
 |---|---|
-| Role and action matrix (AZ-01 to AZ-30, PA-01 to PA-05, SS-01 to SS-05), frozen data | `packages/shared/src/authorization.ts` (`ROOM_ACTIONS`, `ACCOUNT_ACTIONS`) |
-| Central decision, pure and fail-closed | `decideRoomAction` in the same file. Inputs: the membership from the database, room state, target facts. The platform role is not an input (PA-05) |
-| Membership lookup boundary | `apps/api/src/db/room-access-store.ts`: `findActiveMembership(roomId, userId)`, one query filtered by room, user, ACTIVE membership and ACTIVE room; projection without room name or key material; usable with a transaction client |
-| Central authorizer | `apps/api/src/authorization/rooms.ts`: membership, decision, target loader only after the role permits, generic 404 or 403, `ROOM_ACCESS_DENIED` event (action and reason only) |
-| Route-registry integration | `apps/api/src/routes/registry.ts`: `access: { kind: 'room', requires?, resource? }`, AZ action, path `/rooms/:roomId/...`, `params` schema, `roomOf(ctx)` in handlers. Startup refuses inconsistent declarations, paths that name a room without room access, missing step-ups (AZ-04, AZ-05, PA-03, PA-04) and missing or superfluous resource loaders |
-| Design record | [authorization-model.md](../security/authorization-model.md) section 9; testing plan section 3.4 |
+| Role and action matrix (AZ-01 to AZ-30, PA-01 to PA-05, SS-01 to SS-06), frozen data; room constants (profiles, PC-01 and PC-02 values, page sizes) | `packages/shared/src/authorization.ts`, `packages/shared/src/rooms.ts` |
+| Central decision, pure and fail-closed | `decideRoomAction`. The platform role is not an input (PA-05) |
+| Membership lookup and target lookup | `apps/api/src/db/room-access-store.ts`: `findActiveMembership(roomId, userId)`, `findTargetMember(roomId, userId, includeSuspended)`, both filtered by room in the query |
+| Central authorizer, in-transaction re-authorization | `apps/api/src/authorization/rooms.ts`: `createRoomAuthorizer` (the gate), `reauthorizeRoomAction` (the same decision on locked state), generic 404 or 403, `ROOM_ACCESS_DENIED` |
+| Room data access | `apps/api/src/db/room-store.ts`: membership-scoped reads, `lockRoom`, `lockMembership`, conditional writes, `removeMember`, `suspendMemberships`, `transferOwnership`; `room-cleanup.ts` (worker) |
+| Room service and routes | `apps/api/src/rooms/service.ts`, `apps/api/src/routes/rooms.ts`; schemas in `packages/validation/src/rooms.ts` |
+| Route registry | `apps/api/src/routes/registry.ts` (declarations, `roomOf(ctx)`, `params` schemas) |
+| Web client | `apps/web/src/app/rooms/page.tsx` (list, create), `apps/web/src/app/rooms/room/page.tsx` (`/rooms/room?id=`, members, rename, delete, ownership), `apps/web/src/rooms/` (matrix-derived controls, messages) |
+| Design record | [authorization-model.md](../security/authorization-model.md) sections 9.5 and 9.6; testing plan section 3.4 |
 
-Rules for Prompt 07B:
-- Register every room route through the registry with a room action; read the role only from `roomOf(ctx)`; never check membership in a handler. Target-dependent actions (AZ-05, AZ-09, AZ-10) declare a `resource` loader that loads the target by identifier and room ID, for example with `findActiveMembership(room.roomId, targetUserId)`.
-- Writes that change membership, roles or ownership re-check the stored actor and target state inside their transaction (conditional update or row lock): the gate decision describes the start of the request.
-- Add every new production room route to the reviewed list in `tests/security/route-inventory.test.ts` (currently empty).
-- `tests/helpers/db-fixtures.ts` has `insertRoomWithoutKeys`; `startAuthApi({ routes })` accepts test-only routes.
+Routes (9, reviewed list in `tests/security/route-inventory.test.ts`): `POST /rooms` (SS-04), `GET /rooms` (SS-06), `GET /rooms/{roomId}` and `/members` (AZ-01), `POST /rooms/{roomId}/rename` (AZ-02), `/delete` (AZ-04, step-up), `/members/{userId}/role` (AZ-10), `/members/{userId}/remove` (AZ-09), `/members/{userId}/transfer-ownership` (AZ-05, step-up).
 
-Not implemented in Prompt 07A: any production room route, room CRUD, membership administration, ownership transfer, the BOLA suite, and anything of Phase 6 (no room keys, envelopes, signed statements, rekey or Room Safety Code).
+Behaviour to know:
+- Creation needs an ACTIVE account and vault; CONFIDENTIAL and RESTRICTED need an MFA-verified session (PC-01) and a recent password sign-in (PC-02, 4 and 1 hours). The room has no key version or envelope (L-43).
+- Removal and account suspension (PA-03) set the room REKEY_REQUIRED in the same transaction that ends the member's access and deletes their envelopes (INV-07). Re-enabling an account restores no membership (AZ-14, Phase 6, L-44). Nothing creates keys or claims a rekey.
+- After a transfer the former OWNER is an ADMIN. Deleting a room makes it DELETING (404 for everyone); `pnpm worker:retention` makes it DELETED only when no envelope or content row is left.
+- Every membership change locks the room row, then the memberships, and re-checks authorization on that state; account suspension locks rooms in ID order. A transaction over five seconds fails closed.
+- New routes: add them to the reviewed list; every room route needs coverage in the BOLA suite (CM-T032).
 
-Open items: room listing has no matrix action yet (model section 9.5); PA-03 membership suspension on account disable is still to be implemented (authentication-security.md promises it for Phase 5); the PC-16 key-state lock belongs to CM-T047, but INV-07 applies to the first invitation or content-write route (Phase 6); ADR-011 identifier routing is confirmed with the first room page.
+Not implemented: the BOLA suite (CM-T032), invitations, leaving a room (AZ-11, with the rekey machinery), profile changes (AZ-03), the policy gates (PC-03 and the rest, L-42) and everything of Phase 6 onward. No room cryptography exists.
 
-Finding R-05-01 (fixed, commit `bef4570`): undecodable percent-encoding in a path parameter reached the error handler as an unhandled 500; it is now the generic 404 (regression test, NC-05-10).
+Findings: R-05-01 (fixed in `bef4570`): undecodable percent-encoding in a path parameter reached the error handler as an unhandled 500; it is now the generic 404. Prompt 07B produced no new security finding and added limitations L-42 to L-45.
 
 ## 7. Invariants every session must preserve
 
@@ -71,27 +75,26 @@ All of CLAUDE.md section 6 (INV-01 to INV-19). For Phase 5 especially:
 - **INV-09:** no unchained rows in `audit_events`.
 - Never weaken tests, grants, cookies or authorization to make something pass.
 
-## 8. Documents Prompt 07B must read
+## 8. Documents Prompt 07C must read
 
-- CLAUDE.md; this file; [phase-05-traceability.md](phase-05-traceability.md); `docs/management/jira-backlog.md` (CM-T030, CM-T031).
-- `docs/security/authorization-model.md` (sections 3 to 7 and 9), `docs/security/security-policy-profiles.md` (sections 4 and 6); `docs/architecture/data-model.md` 4.6 and 4.7 and section 5 (room deletion); `docs/architecture/data-flow.md` DF-05; ADR-011, ADR-013.
-- `docs/threat-model/threat-model.md` T-04 to T-06, T-21, T-28 and section 11; `docs/security/limitations.md`.
+- CLAUDE.md; this file; [phase-05-traceability.md](phase-05-traceability.md); `docs/management/jira-backlog.md` (CM-T032) and `docs/report/evidence-plan.md` (EV-05-01 to EV-05-03).
+- `docs/security/authorization-model.md` (sections 5, 8 and 9), `docs/security/security-testing-plan.md` (`bola`, `route-inventory`, section 3.4), `docs/threat-model/threat-model.md` T-05, T-06 and section 11, `docs/security/limitations.md` (L-42 to L-45).
+- `apps/api/src/routes/rooms.ts`, `apps/api/src/rooms/service.ts`, `tests/helpers/rooms.ts` (fixtures, `whileLocked`), `tests/authz/`.
 
 ## 9. Test counts
 
-Last full local runs (2026-10-05, end of Phase 4): `pnpm test` 772 tests in 53 files; `pnpm test:e2e` 54 (52 run, 2 skipped by design); `pnpm security:negative-controls` 27 of 27.
+Full gates of Prompt 07B (2026-10-06, local PostgreSQL), details in phase-05-traceability.md section 8:
 
-Prompt 07A added 554 tests and ten negative controls. Its targeted runs (2026-10-06):
-
-| Run | Result |
+| Gate | Result |
 |---|---|
-| unit: `packages/shared`, `apps/api/src` | 660 passed (decision 428, registry 49, denial mapping 15) |
-| security, integration, authz projects | 166 passed (authz-matrix 44, route-inventory 8, malformed-requests 9, membership lookup 8, room access 14) |
-| auth: step-up, admin, csrf, logging | 158 passed |
-| `pnpm test:coverage:authz` | 97.3% statements, 98.3% branches |
-| `negative-controls --only=NC-05` | 10 of 10 caught, baseline passes |
+| `pnpm test` | 1462 tests in 64 files (Phase 4: 772 in 53). Authz project: 82 tests in 6 files, run serially |
+| `pnpm test:e2e` (three engines, one worker) | 58 passed, 2 skipped by design |
+| `pnpm security:negative-controls` | 44 of 44 caught (ten Phase 3, seventeen Phase 4, seventeen Phase 5), baselines pass. Run with `NODE_ENV` unset: `.env` sets `development`, which breaks `next build` |
+| `pnpm test:coverage:authz` | 97.3% statements, 98.3% branches (Prompt 07A) |
+| `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, format, lint, typecheck | Pass |
+| `pnpm audit:deps` | **Fails** on `source-map-js` below 1.2.2 (high, build-time, transitive of `next`, `postcss` and Tailwind; the same on `main`). Patched 1.2.2 is available. Needs a decision before the Phase 5 pull request |
 
-The complete `pnpm test` (projected 1,326 tests), Playwright, the full negative-control run (37), SBOM, audit and the full-history secret scan were not run in Prompt 07A, by instruction; they belong to Prompt 07C. The database suites need the local PostgreSQL container (Docker Desktop); during 07A it stopped once and was restarted. With many other containers running, a parallel E2E run once crashed browser processes for lack of memory (Phase 4); it passed when run alone.
+Intermittent: `packages/crypto/src/vault.test.ts` "refuses a second derivation while one is running" failed once in seven full runs under load (8 of 8 passes in isolation; unchanged by Phase 5; timing-dependent). Local notes: the database suites need the local PostgreSQL container (Docker Desktop stopped twice during Phase 5; restart it and wait for healthy). Run E2E and the negative controls one at a time, E2E with `--workers=1` (parallel browsers ran out of memory). The `cm_api` connection limit of 40 is shared by all projects; the peak in a full run is 24.
 
 ## 10. Known limitations and residual risks
 
@@ -99,13 +102,15 @@ The complete `pnpm test` (projected 1,326 tests), Playwright, the full negative-
 - T-36 stays open until Phase 6 implements the signed key-version verification (L-23).
 - Audit hash chain absent; table owner can bypass append-only (L-26); authentication, vault and room authorization events only in the log (L-33).
 - Targeted login delay (L-30); in-memory rate limits per process (L-32); no Nginx yet; no TOTP key rotation tooling (L-31); TOTP is phishable (L-34); registration reveals taken emails (L-35); emails unverified (L-21).
+- Phase 5: profile gates not yet checked on every room request (L-42); rooms have no key version until CM-T033 (L-43); a room that loses a member stays REKEY_REQUIRED until the rekey exists, and a re-enabled account gets no membership back (L-44); a reused room ID is refused with 409, and there is no room quota (L-45).
 - Full list: `docs/security/limitations.md`.
 
 ## 11. Deferred decisions
 
 | Decision | Status |
 |---|---|
-| Matrix action for listing one's own rooms | Prompt 07B, with a reviewed change to the authorization model |
+| Dependency advisory `source-map-js` (build-time) | Prompt 07C or the project owner: a pnpm override to 1.2.2 changes the web build toolchain and needs review and an E2E run |
+| Invitation acceptance and the user-row lock | Phase 6: acceptance must lock the invitee's user row like room creation, so an account disable cannot miss a membership it creates |
 | OCD-01 / ADR-007: RSA-OAEP-3072 versus HPKE | Before Phase 6: an envelope created in one engine must open in another |
 | PC-16 scope for AZ-07, AZ-14 and AZ-26 | When they are implemented (Phases 6 and 9) |
 | ADR-015 section 4: exact room-statement formats and columns | Phase 6 and Phase 11 |
@@ -116,10 +121,10 @@ The complete `pnpm test` (projected 1,326 tests), Playwright, the full negative-
 
 - Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including both coverage steps) as required checks, then capture EV-01-01 to EV-01-03.
 - Dependabot pull requests #2 to #6 remain open (#2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24).
-- Jira: import the backlog; move CM-T006 to CM-T029 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01 and R-05-01 as `security-finding` items (both fixed in their phase branches). Nothing is DONE yet.
+- Jira: import the backlog; move CM-T006 to CM-T031 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01 and R-05-01 as `security-finding` items (both fixed in their phase branches). Nothing is DONE yet.
 - Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 5. EV-05-01 to EV-05-03 are captured in Prompt 07C.
 
-## 13. Phase 5 must NOT implement
+## 13. Phase 5 must NOT implement (Prompt 07C included)
 
 - Room key material, envelopes, signed room statements, rekey or the Room Safety Code (Phase 6 onward).
 - File, note or secret encryption; object storage (Phases 7 to 9).
