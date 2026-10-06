@@ -236,12 +236,40 @@ describe('vault unlock (DF-04, CM-T026)', () => {
   });
 
   it('refuses a second derivation while one is running', async () => {
-    const first = unlockVault({ record: stored, userId: USER, passphrase: PASSPHRASE, runner });
-    await expectCode(
-      unlockVault({ record: stored, userId: USER, passphrase: PASSPHRASE, runner }),
-      CryptoErrorCode.KDF_BUSY,
+    // Both calls verify the record with WebCrypto before their derivation starts, and those steps
+    // finish in no guaranteed order, so either call can be the one that derives first. The runner
+    // therefore holds whichever derivation starts first until it is released: the other call must
+    // be refused while it is held, with no timing assumption (this test failed intermittently when
+    // it assumed that the first call always wins the race).
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const held: KdfRunner = {
+      run: async (request) => {
+        await gate;
+        return runner.run(request);
+      },
+    };
+    const calls = [
+      unlockVault({ record: stored, userId: USER, passphrase: PASSPHRASE, runner: held }),
+      unlockVault({ record: stored, userId: USER, passphrase: PASSPHRASE, runner: held }),
+    ];
+    // Neither call can finish before the release, so the first outcome is the refusal.
+    const refusal = await Promise.race(
+      calls.map((call) =>
+        call.then(
+          () => 'opened' as const,
+          (error: unknown) => error,
+        ),
+      ),
     );
-    await expect(first).resolves.toBeDefined();
+    expect(isCryptoError(refusal), String(refusal)).toBe(true);
+    expect((refusal as { code: string }).code).toBe(CryptoErrorCode.KDF_BUSY);
+    release();
+    const outcomes = await Promise.allSettled(calls);
+    expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes.filter((o) => o.status === 'rejected')).toHaveLength(1);
   });
 }, 120_000);
 
