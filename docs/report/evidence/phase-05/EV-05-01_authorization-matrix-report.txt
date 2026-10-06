@@ -1,0 +1,40 @@
+EV-05-01: Authorization matrix test report (CM-T029, with CM-T030 and CM-T031)
+Captured: 2026-10-06T12:12:44Z on branch feature/CM-T029-secure-rooms-rbac (Phase 5)
+Redaction: test names and counts only; synthetic accounts with random secrets; no passwords, tokens or keys appear below.
+
+The enforced matrix (packages/shared/src/authorization.ts) is compared cell by cell with the tables of docs/security/authorization-model.md
+by tests/security/authz-matrix.test.ts. The decision function is tested through every action, role and kind of fact. The authorizer, the
+membership lookup, the route registry and the production room routes run against the real API and PostgreSQL as cm_api.
+
+$ vitest run --project unit packages/shared/src/authorization.test.ts apps/api/src/authorization apps/api/src/routes/registry.test.ts
+492 of 492 passed
+  shared/src/authorization.test.ts: 428 passed
+  src/authorization/rooms.test.ts: 15 passed
+  src/routes/registry.test.ts: 49 passed
+
+$ vitest run --project security (authz-matrix, route-inventory, bola-inventory, profile-requirements)
+63 of 63 passed
+  tests/security/authz-matrix.test.ts: 45 passed
+  tests/security/bola-inventory.test.ts: 5 passed
+  tests/security/profile-requirements.test.ts: 4 passed
+  tests/security/route-inventory.test.ts: 9 passed
+
+$ vitest run --project authz
+131 of 131 passed
+  tests/authz/account-disable.test.ts: 6 passed
+  tests/authz/bola.test.ts: 49 passed
+  tests/authz/membership-admin.test.ts: 16 passed
+  tests/authz/membership-concurrency.test.ts: 6 passed
+  tests/authz/membership-lookup.test.ts: 10 passed
+  tests/authz/room-access.test.ts: 14 passed
+  tests/authz/rooms-lifecycle.test.ts: 30 passed
+
+$ pnpm test:coverage:authz   (decision module, threshold 90% statements, branches, functions and lines)
+$ vitest run --project unit packages/shared/src/authorization --coverage.enabled --coverage.include=packages/shared/src/authorization.ts
+Statements   : 97.26% ( 71/73 )
+Branches     : 98.3% ( 58/59 )
+Functions    : 100% ( 13/13 )
+Lines        : 96.61% ( 57/59 )
+File              | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+ authorization.ts |   97.26 |     98.3 |     100 |   96.61 | 318-319           
+The uncovered lines are the unreachable fallback for an unknown rule kind.

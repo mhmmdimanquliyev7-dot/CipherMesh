@@ -33,6 +33,9 @@ export const ErrorCode = {
   INVALID_VAULT_FORMAT: 'INVALID_VAULT_FORMAT',
   IDENTITY_REJECTED: 'IDENTITY_REJECTED',
   VAULT_SIGNATURE_INVALID: 'VAULT_SIGNATURE_INVALID',
+  // Rooms (Phase 5). Room IDs are chosen by the creating browser because they enter the room's
+  // cryptographic contexts from Phase 6 on (DF-05); an ID that was ever used is refused.
+  ROOM_ID_UNAVAILABLE: 'ROOM_ID_UNAVAILABLE',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

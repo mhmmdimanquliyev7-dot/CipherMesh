@@ -1,3 +1,4 @@
+import { describeMatrixAction } from '@ciphermesh/shared';
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../../apps/api/src/app';
@@ -44,8 +45,33 @@ describe('route inventory', () => {
     expect(publicRoutes).toEqual(EXPECTED_PUBLIC);
     const others = routes.filter((r) => r.access !== 'public');
     expect(others.length).toBeGreaterThan(10);
-    expect(others.every((r) => r.access === 'authenticated')).toBe(true);
+    expect(others.every((r) => r.access === 'authenticated' || r.access === 'room')).toBe(true);
     expect(routes.every((r) => /^[A-Z]/.test(r.action))).toBe(true);
+  });
+
+  it('declares a matrix action for every route behind authentication, consistent with its access (CM-T029)', () => {
+    const { routes } = productionApp();
+    for (const route of routes) {
+      const declared = describeMatrixAction(/^(?:AZ|PA|SS)-\d{2}/.exec(route.action)?.[0] ?? '');
+      const label = `${route.method} ${route.path} ${route.action}`;
+      if (route.access === 'public') expect(declared, label).toBeUndefined();
+      else if (route.access === 'room') expect(declared?.scope, label).toBe('room');
+      else expect(['self', 'platform'], label).toContain(declared?.scope);
+    }
+  });
+
+  it('room routes exist only as reviewed (CM-T030, CM-T031; every one gets BOLA coverage in CM-T032)', () => {
+    const { routes } = productionApp();
+    const room = routes.filter((r) => r.access === 'room').map((r) => `${r.method} ${r.path} ${r.action}`);
+    expect(room).toEqual([
+      'GET /rooms/:roomId AZ-01-ROOM-READ',
+      'GET /rooms/:roomId/members AZ-01-MEMBER-LIST',
+      'POST /rooms/:roomId/rename AZ-02-ROOM-RENAME',
+      'POST /rooms/:roomId/delete AZ-04-ROOM-DELETE',
+      'POST /rooms/:roomId/members/:userId/role AZ-10-MEMBER-ROLE',
+      'POST /rooms/:roomId/members/:userId/remove AZ-09-MEMBER-REMOVE',
+      'POST /rooms/:roomId/members/:userId/transfer-ownership AZ-05-OWNERSHIP-TRANSFER',
+    ]);
   });
 
   it('the allowlists contain exactly the reviewed public routes', () => {
@@ -71,7 +97,23 @@ describe('route inventory', () => {
   it('no GET route is an authentication action that changes state', () => {
     const { routes } = productionApp();
     const gets = routes.filter((r) => r.method === 'GET').map((r) => r.path);
-    expect(gets).toEqual(['/health', '/ready', '/auth/session', '/auth/sessions', '/vault']);
+    expect(gets).toEqual([
+      '/health',
+      '/ready',
+      '/auth/session',
+      '/auth/sessions',
+      '/vault',
+      // Phase 5: reads only (SS-06, AZ-01); every room change is a POST through the CSRF gate.
+      '/rooms',
+      '/rooms/:roomId',
+      '/rooms/:roomId/members',
+    ]);
+  });
+
+  it('the room self-service routes exist only as reviewed (CM-T030)', () => {
+    const { routes } = productionApp();
+    const own = routes.filter((r) => r.path === '/rooms').map((r) => `${r.method} ${r.path} ${r.action} ${r.access}`);
+    expect(own).toEqual(['POST /rooms SS-04-ROOM-CREATE authenticated', 'GET /rooms SS-06-ROOM-LIST authenticated']);
   });
 
   it('the vault and directory routes exist only as reviewed, all authenticated (Phase 4)', () => {

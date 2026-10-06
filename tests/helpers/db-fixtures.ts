@@ -120,6 +120,28 @@ export async function insertRoom(client: pg.Client, ownerId?: string): Promise<R
   return { roomId, ownerId: owner, ownerKeyId };
 }
 
+/**
+ * A room with its OWNER membership and nothing else: no key version, envelope or identity, as
+ * rooms exist in Phase 5 before cryptographic membership (Phase 6). Any user can own several.
+ */
+export async function insertRoomWithoutKeys(
+  client: pg.Client,
+  ownerId: string,
+  overrides: Record<string, unknown> = {},
+): Promise<string> {
+  const roomId = randomUUID();
+  await insert(client, 'rooms', {
+    id: roomId,
+    name: 'Synthetic room',
+    security_profile: 'STANDARD',
+    policy_version: 1,
+    created_by_id: ownerId,
+    ...overrides,
+  });
+  await insert(client, 'room_members', { room_id: roomId, user_id: ownerId, role: 'OWNER', first_key_version: 1 });
+  return roomId;
+}
+
 export async function insertMember(
   client: pg.Client,
   roomId: string,

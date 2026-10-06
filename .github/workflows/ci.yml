@@ -89,6 +89,8 @@ jobs:
         run: pnpm test
       - name: Coverage of packages/crypto (at least 90% statements and branches, CLAUDE.md section 10)
         run: pnpm test:coverage:crypto
+      - name: Coverage of the room authorization decision (at least 90% statements and branches, CM-T029)
+        run: pnpm test:coverage:authz
       - name: Build
         run: pnpm build
       - name: Smoke test of the built API (fail-closed readiness, real database, graceful shutdown)

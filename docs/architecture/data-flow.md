@@ -224,6 +224,8 @@ sequenceDiagram
   B->>B: import RKM_1 as non-extractable HKDF key, derive RWK_1, zero RKM_1 bytes
 ```
 
+Phase 5 (CM-T030) implements the room part of this flow without key material: the browser chooses the room ID and posts it with the name and profile, and the API checks the account, the vault and the profile's entry requirements (PC-01, PC-02), then writes the room and the OWNER membership in one transaction. The commitment, the envelope and key version 1 join the request with CM-T033 (L-43).
+
 ## DF-06 Invitation, approval and acceptance
 
 ```mermaid

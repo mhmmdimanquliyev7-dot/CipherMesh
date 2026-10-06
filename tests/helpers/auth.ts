@@ -5,6 +5,7 @@ import { inject } from 'vitest';
 import { SAME_ORIGIN_HEADERS, startTestApi, type TestApi } from './api';
 import { loadDatabaseTestEnv, testDatabase } from './database';
 import type { SecurityEvent } from '../../apps/api/src/auth/security-events';
+import type { AnyRoute } from '../../apps/api/src/routes/registry';
 
 // Helpers for the authentication suites (tests/auth). Every test talks to the real API over HTTP
 // with real Argon2id, real sessions in PostgreSQL and the least-privilege cm_api role. Nothing in
@@ -24,13 +25,18 @@ export interface AuthTestApi extends TestApi {
   readonly events: SecurityEvent[];
 }
 
-export async function startAuthApi(): Promise<AuthTestApi> {
+/** `routes`: test-only routes, mounted through the registry like production routes (never in production). */
+export async function startAuthApi(options: { routes?: readonly AnyRoute[] } = {}): Promise<AuthTestApi> {
   loadDatabaseTestEnv();
   const clock = new TestClock();
   const events: SecurityEvent[] = [];
   const api = await startTestApi({
     databaseUrl: testDatabase(inject('databaseName')).url('api'),
-    testing: { clock: clock.now, events: { record: (event) => events.push(event) } },
+    testing: {
+      clock: clock.now,
+      events: { record: (event) => events.push(event) },
+      ...(options.routes === undefined ? {} : { routes: options.routes }),
+    },
   });
   return { ...api, clock, events };
 }

@@ -77,3 +77,15 @@ Captured on `feature/CM-T023-cryptographic-vault` (from `main` at `f86a2ce`) aga
 | EV-04-12 | [phase-04/EV-04-12_supply-chain.txt](phase-04/EV-04-12_supply-chain.txt) | 2026-10-05 | CM-T024 | Dependency audit, SBOM and secret scan with the new dependencies |
 | EV-04-13 | [phase-04/EV-04-13_ci-run.txt](phase-04/EV-04-13_ci-run.txt) | 2026-10-05 | CM-T023 to CM-T028 | CI run of pull request #10: every job passed (772 Vitest tests, coverage gate, E2E in three engines, audit, gitleaks) |
 | EV-04-14 | [phase-04/EV-04-14_sf-04-01-regression.txt](phase-04/EV-04-14_sf-04-01-regression.txt) | 2026-10-05 | SF-04-01 | Security finding: regression test fails before the fix and passes after it |
+
+## Phase 5
+
+Captured on `feature/CM-T029-secure-rooms-rbac` (from `main` at `5c1ed32`) against the real API and the local development PostgreSQL as the least-privilege API role, with synthetic accounts only. No password, token or key appears in any file.
+
+| ID | File | Date | Work item | What it shows |
+|---|---|---|---|---|
+| EV-05-01 | [phase-05/EV-05-01_authorization-matrix-report.txt](phase-05/EV-05-01_authorization-matrix-report.txt) | 2026-10-06 | CM-T029 to CM-T031 | Authorization matrix test report: the decision through every action and role, the matrix compared cell by cell with the authorization model, the registry, the room routes against PostgreSQL, 97.3% coverage |
+| EV-05-02 | [phase-05/EV-05-02_bola-suite-report.txt](phase-05/EV-05-02_bola-suite-report.txt) | 2026-10-06 | CM-T032 | BOLA and IDOR suite report: every production room route attacked with identifiers from another room; non-disclosure, cross-room targets, role and state variants, unchanged-state checks |
+| EV-05-03 | [phase-05/EV-05-03_negative-controls.txt](phase-05/EV-05-03_negative-controls.txt) | 2026-10-06 | CM-T029 to CM-T032 | All 49 negative controls caught, including the Phase 5 defects that remove the room checks; the optional "failing suite without a room check" as a local run |
+| EV-05-04 | [phase-05/EV-05-04_supply-chain.txt](phase-05/EV-05-04_supply-chain.txt) | 2026-10-06 | CM-T029 to CM-T032 | The `source-map-js` advisory and its lockfile-only remediation to 1.2.2; audit clean |
+| EV-05-05 | [phase-05/EV-05-05_phase-5-gates.txt](phase-05/EV-05-05_phase-5-gates.txt) | 2026-10-06 | CM-T029 to CM-T032 | Every gate of CLAUDE.md section 10: 1516 Vitest tests, E2E in three engines, build, smoke, audit, SBOM, full-history secret scan |

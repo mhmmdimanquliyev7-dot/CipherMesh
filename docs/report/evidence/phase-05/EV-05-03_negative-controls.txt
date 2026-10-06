@@ -1,0 +1,66 @@
+EV-05-03: Negative controls (deliberate defects must make the security tests fail)
+Captured: 2026-10-06T12:12:44Z on branch feature/CM-T029-secure-rooms-rbac (Phase 5)
+Each control writes one defect into one or more source files, runs the tests that must catch it (browser controls rebuild the static
+export and run Playwright in Chromium), and restores every file. Afterwards the unmodified code must pass, the export is rebuilt from the
+unmodified sources, and every touched file is compared with its original by SHA-256. This is the local demonstration the evidence plan
+calls "a failing suite without a room check"; nothing was committed in a weakened state.
+Phase 5 added NC-05-01 to NC-05-22. NC-05-18 to NC-05-21 remove every layer a request meets (gate, locked re-check, store query) and run
+against the BOLA files alone; --show-failures confirmed they fail in the intended attack classes (C for NC-05-18 and NC-05-19, A, B and G
+for NC-05-20 and NC-05-21). NC-05-22 ships a room route without a BOLA case and the inventory test refuses it.
+Redaction: no passwords, passphrases, tokens or keys appear below.
+
+$ pnpm security:negative-controls   (run with NODE_ENV unset; DATABASE_URL exported)
+| ID | Deliberate defect | Detected by | Result |
+|---|---|---|---|
+| NC-03-01 | CSRF same-origin verification removed | tests/auth/csrf.test.ts | CAUGHT (tests failed) |
+| NC-03-02 | Recovery codes made reusable | tests/auth/recovery.test.ts | CAUGHT (tests failed) |
+| NC-03-03 | MFA step removed from login | tests/auth/mfa.test.ts | CAUGHT (tests failed) |
+| NC-03-04 | TOTP time-step replay allowed | tests/auth/mfa.test.ts | CAUGHT (tests failed) |
+| NC-03-05 | Password field no longer redacted in logs | apps/api/src/logging/redact.test.ts | CAUGHT (tests failed) |
+| NC-03-06 | Route mounted outside the route registry | tests/security/route-inventory.test.ts | CAUGHT (tests failed) |
+| NC-03-07 | Session cookie readable by page scripts (HttpOnly removed) | apps/api/src/auth/primitives.test.ts, tests/auth/login.test.ts | CAUGHT (tests failed) |
+| NC-03-08 | Step-up gate always satisfied | tests/auth/step-up.test.ts | CAUGHT (tests failed) |
+| NC-03-09 | Disabled accounts keep their sessions | tests/auth/session.test.ts | CAUGHT (tests failed) |
+| NC-03-10 | Unknown accounts skip the dummy Argon2id verification (timing enumeration) | tests/auth/login.test.ts | CAUGHT (tests failed) |
+| NC-04-01 | Vault private-key AAD removed (wrapped keys no longer bound to their context) | packages/crypto/src/primitives.test.ts | CAUGHT (tests failed) |
+| NC-04-02 | Fixed AES-GCM nonce (IV reuse under one key) | packages/crypto/src/primitives.test.ts, packages/crypto/src/vault.test.ts | CAUGHT (tests failed) |
+| NC-04-03 | Directory response exposes wrapped private-key data | tests/vault/reset-and-directory.test.ts | CAUGHT (tests failed) |
+| NC-04-04 | Vault ownership bypassed (any ACTIVE vault returned) | tests/vault/reset-and-directory.test.ts, tests/vault/setup.test.ts | CAUGHT (tests failed) |
+| NC-04-05 | Fingerprint computed over the encryption key only | packages/crypto/src/identity.test.ts | CAUGHT (tests failed) |
+| NC-04-06 | Unsupported vault format version accepted (downgrade) | packages/crypto/src/vault.test.ts | CAUGHT (tests failed) |
+| NC-04-07 | Server accepts a vault re-wrap without verifying its signature | tests/vault/rewrap.test.ts | CAUGHT (tests failed) |
+| NC-04-08 | Argon2id floor and ceiling not enforced | packages/crypto/src/argon2id.test.ts | CAUGHT (tests failed) |
+| NC-04-09 | Unlocked private keys left extractable | packages/crypto/src/vault.test.ts | CAUGHT (tests failed) |
+| NC-04-10 | Canonical JSON without member sorting (RFC 8785 broken) | packages/crypto/src/canonical.test.ts | CAUGHT (tests failed) |
+| NC-04-11 | RSA-OAEP wrapper accepts values of any size (INV-17) | packages/crypto/src/rsa-oaep.test.ts | CAUGHT (tests failed) |
+| NC-04-12 | Vault Passphrase persisted in localStorage at unlock | tests/e2e/vault.spec.ts "setup, lock, unlock and passphrase change" (Chromium) | CAUGHT (tests failed) |
+| NC-04-13 | Vault Passphrase sent to the API at setup | tests/e2e/vault.spec.ts "setup, lock, unlock and passphrase change" (Chromium) | CAUGHT (tests failed) |
+| NC-04-14 | Inactivity auto-lock disabled | tests/e2e/vault.spec.ts "the vault locks after 15 minutes" (Chromium) | CAUGHT (tests failed) |
+| NC-04-15 | CSP allows native form submission again (form-action 'self', SF-04-01) | apps/web/scripts/csp-lib.test.ts | CAUGHT (tests failed) |
+| NC-04-16 | Submit buttons enabled before hydration (SF-04-01) | tests/e2e/web-shell.spec.ts "a form submitted before the client runs" (Chromium) | CAUGHT (tests failed) |
+| NC-04-17 | A failed background refresh replaces the unlocked vault by an error view (R-04-01) | tests/e2e/vault.spec.ts "a failed background refresh keeps the vault under the auto-lock" (Chromium) | CAUGHT (tests failed) |
+| NC-05-01 | The registry trusts the path and skips the membership check (everyone is OWNER) | tests/authz/room-access.test.ts | CAUGHT (tests failed) |
+| NC-05-02 | The room decision grants access without a membership | packages/shared/src/authorization.test.ts | CAUGHT (tests failed) |
+| NC-05-03 | The membership lookup is not scoped to the addressed room (cross-room BOLA) | tests/authz/membership-lookup.test.ts | CAUGHT (tests failed) |
+| NC-05-04 | The membership lookup accepts SUSPENDED, REMOVED and LEFT memberships | tests/authz/membership-lookup.test.ts | CAUGHT (tests failed) |
+| NC-05-05 | PLATFORM_ADMIN is treated as a room ADMIN without a membership | tests/authz/room-access.test.ts | CAUGHT (tests failed) |
+| NC-05-06 | Matrix cell widened: an ADMIN may delete the room (AZ-04 is OWNER-only) | tests/security/authz-matrix.test.ts, packages/shared/src/authorization.test.ts | CAUGHT (tests failed) |
+| NC-05-07 | Role ceilings checked loosely: one permitted role is enough (an ADMIN can create an ADMIN) | packages/shared/src/authorization.test.ts, tests/authz/room-access.test.ts | CAUGHT (tests failed) |
+| NC-05-08 | A room action is accepted on a route without room access (no membership check) | apps/api/src/routes/registry.test.ts | CAUGHT (tests failed) |
+| NC-05-09 | A path below /rooms/:roomId may be declared without room access | apps/api/src/routes/registry.test.ts | CAUGHT (tests failed) |
+| NC-05-10 | Undecodable path parameters become unhandled 500 errors again (R-05-01) | tests/security/malformed-requests.test.ts | CAUGHT (tests failed) |
+| NC-05-11 | The target member of a membership action is looked up outside the addressed room | tests/authz/membership-lookup.test.ts | CAUGHT (tests failed) |
+| NC-05-12 | The membership locked inside a transaction is not limited to the addressed room | tests/authz/membership-lookup.test.ts | CAUGHT (tests failed) |
+| NC-05-13 | Membership changes skip the re-authorization on locked state (stale gate decision) | tests/authz/membership-concurrency.test.ts | CAUGHT (tests failed) |
+| NC-05-14 | Ownership validation bypassed: an ADMIN may transfer ownership (AZ-05 is OWNER-only) | tests/authz/membership-admin.test.ts | CAUGHT (tests failed) |
+| NC-05-15 | One-OWNER invariant broken: a transfer demotes the OWNER without promoting the target | tests/authz/membership-admin.test.ts | CAUGHT (tests failed) |
+| NC-05-16 | Disabling an account no longer suspends its room memberships (PA-03) | tests/authz/account-disable.test.ts | CAUGHT (tests failed) |
+| NC-05-17 | The room list is not limited to the caller memberships (OL-08) | tests/authz/rooms-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-05-18 | Existence oracle: a target member found in another room is refused differently (403) from an invented one (404) | tests/authz/bola.test.ts | CAUGHT (tests failed) |
+| NC-05-19 | A target member of another room is accepted and changed (target lookup, lock and room check all unscoped) | tests/authz/bola.test.ts | CAUGHT (tests failed) |
+| NC-05-20 | A membership in room A authorizes room B (membership lookup, lock, mismatch check and room read all unscoped) | tests/authz/bola.test.ts | CAUGHT (tests failed) |
+| NC-05-21 | PLATFORM_ADMIN is treated as an ADMIN member of every room (gate and locked re-check) | tests/authz/bola.test.ts | CAUGHT (tests failed) |
+| NC-05-22 | A room route ships without a reviewed BOLA case (the inventory must refuse it) | tests/security/bola-inventory.test.ts | CAUGHT (tests failed) |
+Baseline on unmodified code (Vitest): PASS
+Baseline on unmodified code (rebuilt export, Playwright): PASS
+Sources restored byte for byte (SHA-256, 28 files): YES

@@ -1,12 +1,29 @@
+import { emptyQuerySchema, uuidV4Schema, z } from '@ciphermesh/validation';
 import { request } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { defineRoute } from '../../apps/api/src/routes/registry';
 import { SAME_ORIGIN_HEADERS, startTestApi, type TestApi } from '../helpers/api';
 
 // Hostile request shapes (T-14, T-15, T-26): the API answers with a generic error,
 // never crashes, never decompresses, and never leaks internals.
+
+// A test-only route with a path parameter: Express decodes parameters while matching, before
+// any handler or authentication runs (Phase 5 review finding R-05-01).
+const parameterRoute = defineRoute({
+  method: 'GET',
+  path: '/rooms/:roomId/malformed-probe',
+  action: 'AZ-01-MALFORMED-PROBE',
+  access: { kind: 'room' },
+  params: z.strictObject({ roomId: uuidV4Schema }),
+  query: emptyQuerySchema,
+  body: undefined,
+  response: z.strictObject({}),
+  handler: () => ({ status: 200, body: {} }),
+});
+
 let api: TestApi;
 beforeAll(async () => {
-  api = await startTestApi();
+  api = await startTestApi({ testing: { routes: [parameterRoute] } });
 });
 afterAll(() => api.close());
 
@@ -39,6 +56,16 @@ describe('malformed requests', () => {
     expect(response.status).toBe(404);
     expect(response.text).toContain('"code":"NOT_FOUND"');
   });
+
+  it.each(['/api/rooms/%E0%A4%A/malformed-probe', '/api/rooms/%ZZ/malformed-probe', '/api/rooms/%/malformed-probe'])(
+    '%s (an undecodable path parameter) gets the generic 404, never a 500',
+    async (path) => {
+      const response = await raw(path);
+      expect(response.status).toBe(404);
+      expect(response.text).toContain('"code":"NOT_FOUND"');
+      expect(response.text).not.toContain('decode');
+    },
+  );
 
   it('rejects oversized URLs before routing', async () => {
     const response = await raw(`/api/${'a'.repeat(20_000)}`);

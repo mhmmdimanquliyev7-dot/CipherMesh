@@ -9,8 +9,11 @@ import { logSecurityEventSink, type SecurityEventSink } from './auth/security-ev
 import { createAuthService, defaultRateLimits, type AuthRateLimits, type AuthService } from './auth/service';
 import { resolveSession } from './auth/sessions';
 import { TotpSecretBox } from './auth/totp-secret-box';
+import { createRoomAuthorizer } from './authorization/rooms';
 import type { AppConfig } from './config/env';
 import { authDataAccess } from './db/auth-store';
+import { createRoomAccessStore } from './db/room-access-store';
+import { accountDataAccess, roomDataAccess } from './db/room-store';
 import { vaultDataAccess } from './db/vault-store';
 import type { Database } from './db/client';
 import { requireJsonBody } from './http/content-type';
@@ -30,7 +33,9 @@ import {
   type RegisteredRoute,
 } from './routes/registry';
 import { createReadinessProbe, PUBLIC_ROUTE_ALLOWLIST, systemRoutes } from './routes/system';
+import { roomRoutes } from './routes/rooms';
 import { vaultRoutes } from './routes/vault';
+import { createRoomService } from './rooms/service';
 import { createVaultService, defaultVaultRateLimits, type VaultRateLimits, type VaultService } from './vault/service';
 
 export interface AppDependencies {
@@ -84,7 +89,8 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
     clock,
     limits: testing?.rateLimits ?? defaultRateLimits(() => clock().getTime()),
   });
-  const admin = createAdminService({ transaction: data.transaction, events, clock });
+  // Disabling an account also suspends its room memberships in the same transaction (PA-03).
+  const admin = createAdminService({ transaction: accountDataAccess(database.prisma).transaction, events, clock });
   const vaultData = vaultDataAccess(database.prisma);
   const vault = createVaultService({
     store: vaultData.store,
@@ -97,6 +103,12 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
     authenticate: (token) => resolveSession(data.store, token, clock()),
     now: clock,
   };
+  // Central room authorization (CM-T029): every room route is checked against the membership
+  // stored for the session user and the shared matrix before its handler runs.
+  const roomAccess = createRoomAccessStore(database.prisma);
+  const rooms = createRoomAuthorizer({ store: roomAccess, events });
+  const roomData = roomDataAccess(database.prisma);
+  const roomService = createRoomService({ store: roomData.store, transaction: roomData.transaction, events, clock });
 
   const app = express();
   app.disable('x-powered-by');
@@ -120,10 +132,12 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
       ...systemRoutes(lifecycle, createReadinessProbe(database)),
       ...authRoutes(auth, admin),
       ...vaultRoutes(vault),
+      ...roomRoutes(roomService, roomAccess),
       ...(testing?.routes ?? []),
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],
     authenticator,
+    rooms,
   );
   app.use(API_PREFIX, router);
 

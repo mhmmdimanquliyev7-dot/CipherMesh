@@ -1,10 +1,12 @@
 import { ConfigError, loadWorkerConfigFromProcessEnv } from '../config/env';
 import { createDatabase, describeDatabaseError } from '../db/client';
 import { runAuthRetention } from '../db/retention';
+import { runRoomCleanup } from '../db/room-cleanup';
 import { createLogger } from '../logging/logger';
 
 /**
- * One-shot retention job (`pnpm worker:retention`), connecting as cm_worker (CM-T017, CM-T018).
+ * One-shot retention job (`pnpm worker:retention`), connecting as cm_worker (CM-T017, CM-T018),
+ * which also finishes room deletions (CM-T030).
  * Scheduling belongs to the worker container (Phase 12) and the deployment (Phase 17); until then
  * the job is run on demand. It logs counts only.
  */
@@ -20,6 +22,8 @@ async function main(): Promise<void> {
   try {
     const removed = await runAuthRetention(database.prisma, new Date());
     logger.info('retention completed', removed);
+    // Finishes room deletions (CM-T030): DELETING rooms with nothing left to clean become DELETED.
+    logger.info('room cleanup completed', await runRoomCleanup(database.prisma));
   } finally {
     await database.close();
   }

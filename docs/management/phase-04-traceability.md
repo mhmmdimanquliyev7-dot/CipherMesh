@@ -1,6 +1,6 @@
 # Phase 4 Traceability
 
-Status: Phase 4 implemented on 2026-10-05, awaiting project owner approval. Covers CM-T086 and CM-T023 to CM-T028 in [jira-backlog.md](jira-backlog.md) (checked against the current backlog before the work started). No item is DONE: DONE requires SECURITY REVIEW and TESTING in Jira and the full Definition of Done (CLAUDE.md section 14), including CI on the pull request.
+Status: Phase 4 implemented on 2026-10-05, approved by the project owner and merged into `main` through pull request #10 (merge commit `9e13259`). Covers CM-T086 and CM-T023 to CM-T028 in [jira-backlog.md](jira-backlog.md) (checked against the current backlog before the work started). No item is DONE: DONE requires SECURITY REVIEW and TESTING in Jira and the full Definition of Done (CLAUDE.md section 14), including CI on the pull request.
 
 Branch: `feature/CM-T023-cryptographic-vault`, created from the updated `main` (`f86a2ce`, which contains Phases 1 to 3 through pull requests #1, #7, #8 and #9). Pull request #10; CI run 37347479619 passed every job (EV-04-13).
 

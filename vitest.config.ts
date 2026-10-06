@@ -8,8 +8,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     // `pnpm test:coverage:crypto`: CLAUDE.md section 10 requires at least 90% of statements and
-    // branches for packages/crypto. The run fails below the thresholds. The authorization module
-    // and the policy engine join this list when they exist (Phase 5).
+    // branches for packages/crypto. The run fails below the thresholds. `pnpm test:coverage:authz`
+    // applies the same thresholds to the room authorization decision (Phase 5, CM-T029) by
+    // overriding `include` on the command line; the policy engine joins when it exists (Phase 10).
     coverage: {
       provider: 'v8',
       include: ['packages/crypto/src/**'],
@@ -44,6 +45,21 @@ export default defineConfig({
           include: ['tests/vault/**/*.test.ts'],
           globalSetup: ['tests/database/global-setup.ts'],
           testTimeout: 120_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
+        // Room authorization suites (Phase 5): the real API and the central room authorizer,
+        // real sessions and memberships in PostgreSQL as the least-privilege API role.
+        test: {
+          name: 'authz',
+          include: ['tests/authz/**/*.test.ts'],
+          // One file at a time: each file starts an API with its own pool and several clients as
+          // cm_api, whose connection limit (40, database-security.md) is shared with the other
+          // projects. Run in parallel they exceeded it.
+          fileParallelism: false,
+          globalSetup: ['tests/database/global-setup.ts'],
+          testTimeout: 60_000,
           hookTimeout: 120_000,
         },
       },
