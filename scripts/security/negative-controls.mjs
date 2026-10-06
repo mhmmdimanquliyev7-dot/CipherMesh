@@ -1,5 +1,6 @@
 // `pnpm security:negative-controls`: proves that the security tests are real (Phase 3, extended
-// with the vault and cryptography controls of Phase 4).
+// with the vault and cryptography controls of Phase 4 and the room authorization controls of
+// Phase 5). `--only=<prefix>` runs a subset, for example `--only=NC-05`.
 //
 // For each control, one deliberate defect is written into a source file in the working tree, the
 // tests that must catch it are run, and the original file is restored immediately afterwards
@@ -304,6 +305,119 @@ const CONTROLS = [
     tests: [],
     e2e: { spec: 'tests/e2e/vault.spec.ts', title: 'a failed background refresh keeps the vault under the auto-lock' },
   },
+  // ------------------------------------------------------- Phase 5: room authorization (CM-T029)
+  {
+    id: 'NC-05-01',
+    defect: 'The registry trusts the path and skips the membership check (everyone is OWNER)',
+    file: 'apps/api/src/routes/registry.ts',
+    edits: [
+      [
+        '  return rooms.authorize({',
+        "  return Promise.resolve({ roomId, membershipId: roomId, role: 'OWNER', room: { keyState: 'ACTIVE', securityProfile: 'STANDARD' }, action, resource: undefined });\n  return rooms.authorize({",
+      ],
+    ],
+    tests: ['tests/authz/room-access.test.ts'],
+  },
+  {
+    id: 'NC-05-02',
+    defect: 'The room decision grants access without a membership',
+    file: 'packages/shared/src/authorization.ts',
+    edits: [
+      [
+        "  if (membership === null) return deny('NOT_A_MEMBER');",
+        "  if (membership === null) return { allowed: true, role: 'VIEWER' };",
+      ],
+    ],
+    tests: ['packages/shared/src/authorization.test.ts'],
+  },
+  {
+    id: 'NC-05-03',
+    defect: 'The membership lookup is not scoped to the addressed room (cross-room BOLA)',
+    file: 'apps/api/src/db/room-access-store.ts',
+    edits: [
+      [
+        "        where: { roomId, userId, status: 'ACTIVE', room: { status: 'ACTIVE' } },",
+        "        where: { userId, status: 'ACTIVE', room: { status: 'ACTIVE' } },",
+      ],
+    ],
+    tests: ['tests/authz/membership-lookup.test.ts'],
+  },
+  {
+    id: 'NC-05-04',
+    defect: 'The membership lookup accepts SUSPENDED, REMOVED and LEFT memberships',
+    file: 'apps/api/src/db/room-access-store.ts',
+    edits: [
+      [
+        "        where: { roomId, userId, status: 'ACTIVE', room: { status: 'ACTIVE' } },",
+        "        where: { roomId, userId, room: { status: 'ACTIVE' } },",
+      ],
+    ],
+    tests: ['tests/authz/membership-lookup.test.ts'],
+  },
+  {
+    id: 'NC-05-05',
+    defect: 'PLATFORM_ADMIN is treated as a room ADMIN without a membership',
+    file: 'apps/api/src/authorization/rooms.ts',
+    edits: [
+      [
+        '      const record = await deps.store.findActiveMembership(roomId, actor.userId);',
+        "      const found = await deps.store.findActiveMembership(roomId, actor.userId);\n      const record = found ?? (actor.user.platformRole === 'PLATFORM_ADMIN' ? { membershipId: roomId, roomId, userId: actor.userId, role: 'ADMIN' as const, status: 'ACTIVE' as const, room: { status: 'ACTIVE' as const, keyState: 'ACTIVE' as const, securityProfile: 'STANDARD' as const } } : null);",
+      ],
+    ],
+    tests: ['tests/authz/room-access.test.ts'],
+  },
+  {
+    id: 'NC-05-06',
+    defect: 'Matrix cell widened: an ADMIN may delete the room (AZ-04 is OWNER-only)',
+    file: 'packages/shared/src/authorization.ts',
+    edits: [
+      [
+        "  'AZ-04': { title: 'Delete room', rules: row(Y, N, N, N), stepUp: 'always' },",
+        "  'AZ-04': { title: 'Delete room', rules: row(Y, Y, N, N), stepUp: 'always' },",
+      ],
+    ],
+    tests: ['tests/security/authz-matrix.test.ts', 'packages/shared/src/authorization.test.ts'],
+  },
+  {
+    id: 'NC-05-07',
+    defect: 'Role ceilings checked loosely: one permitted role is enough (an ADMIN can create an ADMIN)',
+    file: 'packages/shared/src/authorization.ts',
+    edits: [
+      [
+        '      return touched.length > 0 && touched.every((r) => ceiling.includes(r))',
+        '      return touched.length > 0 && touched.some((r) => ceiling.includes(r))',
+      ],
+    ],
+    tests: ['packages/shared/src/authorization.test.ts', 'tests/authz/room-access.test.ts'],
+  },
+  {
+    id: 'NC-05-08',
+    defect: 'A room action is accepted on a route without room access (no membership check)',
+    file: 'apps/api/src/routes/registry.ts',
+    edits: [["    if (info.scope !== 'self' && info.scope !== 'platform') {", "    if (info.scope === 'none') {"]],
+    tests: ['apps/api/src/routes/registry.test.ts'],
+  },
+  {
+    id: 'NC-05-09',
+    defect: 'A path below /rooms/:roomId may be declared without room access',
+    file: 'apps/api/src/routes/registry.ts',
+    edits: [
+      [
+        "  if (NAMES_ROOM.test(route.path) && access.kind !== 'room') {",
+        '  if (NAMES_ROOM.test(route.path) && access.kind === undefined) {',
+      ],
+    ],
+    tests: ['apps/api/src/routes/registry.test.ts'],
+  },
+  {
+    id: 'NC-05-10',
+    defect: 'Undecodable path parameters become unhandled 500 errors again (R-05-01)',
+    file: 'apps/api/src/http/errors.ts',
+    edits: [
+      ['    if (isParameterDecodingError(err)) {', '    if (isParameterDecodingError(err) && req.path === "") {'],
+    ],
+    tests: ['tests/security/malformed-requests.test.ts'],
+  },
 ];
 
 /** @param {string[]} files */
@@ -311,7 +425,12 @@ const vitest = (files) =>
   spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...files], { encoding: 'utf8' });
 
 const VITEST_ONLY = process.argv.includes('--vitest-only');
-const controls = VITEST_ONLY ? CONTROLS.filter((c) => c.e2e === undefined) : CONTROLS;
+// `--only=NC-05` runs the controls whose ID starts with the prefix, for example one phase's.
+const ONLY = process.argv.find((arg) => arg.startsWith('--only='))?.slice('--only='.length);
+const controls = CONTROLS.filter(
+  (c) => (!VITEST_ONLY || c.e2e === undefined) && (ONLY === undefined || c.id.startsWith(ONLY)),
+);
+if (controls.length === 0) throw new Error(`No negative control matches ${ONLY ?? 'the options'}`);
 
 /** Rebuilds the static export like `pnpm --filter @ciphermesh/web build` (next build, then the CSP). */
 const buildWeb = () => {
