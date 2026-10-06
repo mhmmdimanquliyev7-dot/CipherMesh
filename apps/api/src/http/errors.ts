@@ -63,6 +63,16 @@ function bodyParserError(err: unknown): readonly [number, ErrorCode, string] | u
 }
 
 /**
+ * Express's router decodes path parameters while matching a route, before any handler or
+ * authentication runs, and rejects malformed percent-encoding with a URIError carrying status
+ * 400 and the raw segment in its message. Such a segment names no resource (review finding
+ * R-05-01), so it is the generic 404, and the message is never logged.
+ */
+function isParameterDecodingError(err: unknown): boolean {
+  return err instanceof URIError && 'status' in err && err.status === 400;
+}
+
+/**
  * Last middleware. Clients get a stable code, a generic message and the request ID,
  * never a stack trace, SQL, file path or internal message (principle 10).
  */
@@ -72,6 +82,11 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
     if (err instanceof HttpError) {
       for (const [name, value] of Object.entries(err.headers)) res.setHeader(name, value);
       sendError(res, err.status, err.code, err.message, err.issues);
+      return;
+    }
+    if (isParameterDecodingError(err)) {
+      logger.warn('request path rejected', { requestId, method: req.method, code: ErrorCode.NOT_FOUND });
+      sendError(res, 404, ErrorCode.NOT_FOUND, 'Resource not found');
       return;
     }
     const parserError = bodyParserError(err);
