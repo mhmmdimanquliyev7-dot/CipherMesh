@@ -1,6 +1,6 @@
 # Authorization Model
 
-Status: Phase 0.5 baseline. Normative. Related: [security-policy-profiles.md](security-policy-profiles.md), [../architecture/data-model.md](../architecture/data-model.md), [../threat-model/threat-model.md](../threat-model/threat-model.md) (T-05, T-06).
+Status: Phase 0.5 baseline. Normative. The central module and the shared matrix are implemented since Phase 5 (CM-T029); section 9 records how. Related: [security-policy-profiles.md](security-policy-profiles.md), [../architecture/data-model.md](../architecture/data-model.md), [../threat-model/threat-model.md](../threat-model/threat-model.md) (T-05, T-06).
 
 ## 1. Principles
 
@@ -152,3 +152,62 @@ Denials are logged with the request ID and reason code, and recorded as audit ev
 - **Tampering tests:** requests that include role, owner, sender or room fields in the body are rejected.
 - **Platform admin tests:** PLATFORM_ADMIN receives 404 for every room-scoped endpoint of rooms they are not a member of.
 - **Rekey authorization tests:** MEMBERs and VIEWERs cannot start rekeys; only the starter can finalize; a removed member's requests fail at OL-01; client-supplied recipient lists are ignored.
+
+## 9. Implementation (Phase 5, CM-T029)
+
+Status: the central authorization module, the shared matrix and the route-registry enforcement are implemented. No production room route exists yet: room creation, listing, renaming and deletion (CM-T030) and membership administration (CM-T031) add them, and the BOLA suite (CM-T032) covers them. Sections 1 to 8 stay normative; this section records how the code realizes them.
+
+### 9.1 Where the rules live
+
+| Part | Location | Role |
+|---|---|---|
+| Matrix as data | `packages/shared/src/authorization.ts` (`ROOM_ACTIONS`, `ACCOUNT_ACTIONS`) | Every AZ cell of section 3 and every PA and SS action of section 4, deeply frozen at load. The web client may read it to hide controls (UX only) |
+| Decision function | `decideRoomAction` in the same file | Pure and fail-closed: membership, room state and target facts in; allow or a reason code out. The platform role is not an input (PA-05) |
+| Membership lookup | `apps/api/src/db/room-access-store.ts` | One query per request, filtered by room ID, session user, ACTIVE membership and ACTIVE room (OL-01). Projection without room name or key material |
+| Central authorizer | `apps/api/src/authorization/rooms.ts` | Loads the membership, decides, loads the target object only when the membership and role allow a first step, maps reasons to the responses of section 7 and records `ROOM_ACCESS_DENIED` |
+| Declarations | `apps/api/src/routes/registry.ts` | Refuses to start when a route's declaration is missing, unknown or inconsistent (section 9.3). Runs the authorizer for every room route before the handler |
+
+`tests/security/authz-matrix.test.ts` parses sections 3 and 4 of this document and compares every cell with the catalogue, so the table and the code cannot drift apart.
+
+### 9.2 Cell notation
+
+| Cell in section 3 | Catalogue rule | Meaning in the decision |
+|---|---|---|
+| Y, Y (any) | `allow` | Allowed for the role |
+| N, N (transfer first) | `deny` | Denied for the role (403) |
+| own, own (sender) | `own` | Allowed only when the stored author, uploader, sender or inviter is the caller (OL-04) |
+| Recipient | `recipient` | Allowed only for the stored recipient (OL-06); others get 404 |
+| Y (ADMIN, MEMBER, VIEWER) and similar | `targetRoles` | Every role the action touches must be in the list: the target member's stored role and, for role changes and invitations, the requested role. This is how an ADMIN never creates, removes or demotes an ADMIN and nobody grants OWNER outside AZ-05 |
+| Same as read access to the item | `inherited` | No permission of its own: the decision denies AZ-27, and the registry refuses a route that declares it. The Crypto Inspector (Phase 13) authorizes through the read action of the inspected item |
+
+Reviewed readings:
+- **AZ-05:** the cell says Y, and the action is "Transfer ownership to an ADMIN", so the OWNER's rule is `targetRoles` with ADMIN only.
+- **AZ-12:** Y for every role; "own envelopes only" is enforced by selecting envelopes by recipient in the query (OL-05), not by an object rule.
+- **AZ-13:** Y for OWNER and ADMIN; the operation rules of OL-13 (only the starter finalizes, the starter or the OWNER cancels) need the operation row and belong to the rekey state machine (CM-T050).
+- **Notes that are profile conditions** (PC-03 to PC-16, including "blocked while REKEY_REQUIRED or REKEYING", PC-16) are not cells. They arrive with the policy gates (CM-T046, CM-T047). INV-07 still applies from the first invitation or content-write route on (Phase 6). Whether AZ-07, AZ-14 ("same checks as invitations") and AZ-26 count as invitations or content writes for PC-16 is decided when they are implemented.
+- **Step-up in every profile** (AZ-04, AZ-05) and the step-up of PA-03 and PA-04 are part of the catalogue, so a route that forgets them is refused at startup. Profile-dependent step-ups (PC-03, the AZ-03 downgrade) are not.
+
+### 9.3 Route declarations
+
+- Public routes declare no matrix action. Routes behind authentication declare a self-service (SS-xx) or platform (PA-xx) action; PA actions require the platform administrator gate, and only they may use it. PA-05 is an explicit deny and cannot be declared.
+- Room routes declare `access: { kind: 'room' }` and a room action (AZ-xx, for example `AZ-02-ROOM-RENAME`); their path starts with `/rooms/:roomId` (OL-01). Conversely, any path below `/rooms/:param` or with a `:roomId` parameter must be a room route, so no route can carry a room ID without the membership check.
+- A room route declares a resource loader exactly when some cell of its action depends on the target object. The loader loads the object by its identifier and the room ID (OL-02); null is 404. The decision checks again that the object belongs to the addressed room.
+- Paths use lowercase static segments and `:named` parameters only. A route with path parameters declares an object schema with exactly those keys. A malformed or undecodable parameter is the generic 404, never a validation error (review finding R-05-01: undecodable percent-encoding used to reach the error handler as an unhandled 500).
+
+### 9.4 Evaluation order and responses
+
+For a room route: authenticate the session (401) → path parameters (404) → query and body schemas (400) → central room authorization (404 or 403) → step-up gate (401) → handler → response projection. The matrix is checked before the step-up prompt, so a non-member learns nothing and a member without the permission gets 403 without being asked to step up.
+
+| Reason codes | Response |
+|---|---|
+| `NOT_A_MEMBER`, `MEMBERSHIP_MISMATCH`, `MEMBERSHIP_NOT_ACTIVE`, `ROOM_NOT_ACTIVE`, `UNKNOWN_ROLE`, `RESOURCE_OUTSIDE_ROOM`, `RESOURCE_NOT_FOUND`, `NOT_RECIPIENT` | 404 `NOT_FOUND`, the same body as an unknown room or path |
+| `ROLE_NOT_PERMITTED`, `NOT_OWN_ITEM`, `TARGET_ROLE_NOT_PERMITTED`, `INHERITED_ACTION`, `UNKNOWN_ACTION`, `RESOURCE_REQUIRED` | 403 `FORBIDDEN` |
+
+SUSPENDED, REMOVED and LEFT memberships and DELETING or DELETED rooms behave as no membership. The reason code goes only into the `ROOM_ACCESS_DENIED` security event (action and reason, plus the actor and request ID), which is written to the application log until the Phase 12 ledger (L-33).
+
+The decision describes the database state at the start of the request; nothing is cached between requests. A handler that changes membership, roles or ownership must re-check the stored state inside its own transaction (a conditional update or a row lock), so a concurrent change cannot slip between the check and the write.
+
+### 9.5 Open items for CM-T030 and CM-T031
+
+- Listing one's own rooms has no action in section 3 or 4. The listing route needs a reviewed matrix entry before it can be registered.
+- PA-03 says that disabling an account sets its memberships to SUSPENDED and their rooms to REKEY_REQUIRED. Disabled accounts already lose every session, so they cannot reach a room; the membership change itself is membership administration and is still to be implemented.

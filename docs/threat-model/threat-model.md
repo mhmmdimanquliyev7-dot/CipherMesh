@@ -597,3 +597,14 @@ Phase 4 implemented the client-side vault and the public-key directory. New entr
 | T-35 Identity spoofing | Exact-match, rate-limited directory that requires an own vault and labels addresses unverified | Unchanged (L-21) |
 | T-36 Injected key version | ADR-015 accepted; identity signing keys, binding signatures and signed re-wraps implemented (Wycheproof ECDSA vectors, NC-04-07) | The room verification itself (Phase 6) |
 | T-40 Vault replacement or reset | As described in T-40 | Account takeover with both factors can reset the vault (residual) |
+
+## 11. Phase 5 implementation check (room authorization, in progress)
+
+Prompt 07A implemented the authorization foundation (CM-T029): the shared matrix, the central decision function, the membership lookup and the route-registry enforcement. It adds no production entry point, asset, trust boundary or data flow: no room route is registered yet (CM-T030 and CM-T031 add them, CM-T032 adds the BOLA suite), and nothing in Phase 5 creates or handles key material. Ratings are unchanged; this section is completed when Phase 5 closes. Design: [../security/authorization-model.md](../security/authorization-model.md) section 9.
+
+| Threat | Implemented and tested so far | Still open in Phase 5 |
+|---|---|---|
+| T-04 Malicious member | Matrix as frozen data, compared cell by cell with the authorization model; role ceilings (an ADMIN never creates, removes or demotes an ADMIN; OWNER only through a transfer to an ADMIN); OWNER-only actions; roles only from the membership row (NC-05-06, NC-05-07) | Role-change and ownership-transfer endpoints with in-transaction re-checks (CM-T031) |
+| T-05 Non-member access | Membership loaded for (path room ID, session user) on every room request; non-members, inactive memberships and deleting rooms get one generic 404; PLATFORM_ADMIN has no implicit access (NC-05-01, NC-05-02, NC-05-05) | Room routes themselves (CM-T030) |
+| T-06 BOLA / IDOR | The lookup query is scoped to room and user, and the decision re-checks both; target objects are loaded by identifier and room and re-checked; a path that names a room can only be a room route (NC-05-03, NC-05-04, NC-05-08, NC-05-09) | The BOLA suite over every room route (CM-T032) |
+| T-15 Disclosure | Review finding R-05-01 fixed: an undecodable path parameter reached the error handler as an unhandled 500 with the raw segment in the logged message; it is now the generic 404 (regression test, NC-05-10). Denial reasons stay server-side | |

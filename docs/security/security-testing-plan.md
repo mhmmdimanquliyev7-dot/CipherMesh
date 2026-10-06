@@ -1,6 +1,6 @@
 # Security Testing Plan
 
-Status: Phase 0.5 baseline; section 3.2 implemented in Phase 3; section 3.3 (vault and cryptography) and the coverage gate implemented in Phase 4. Related: [../threat-model/threat-model.md](../threat-model/threat-model.md), [authorization-model.md](authorization-model.md), [security-policy-profiles.md](security-policy-profiles.md), [../report/evidence-plan.md](../report/evidence-plan.md).
+Status: Phase 0.5 baseline; section 3.2 implemented in Phase 3; section 3.3 (vault and cryptography) and the coverage gate implemented in Phase 4; section 3.4 (room authorization foundation, CM-T029) implemented in Phase 5. Related: [../threat-model/threat-model.md](../threat-model/threat-model.md), [authorization-model.md](authorization-model.md), [security-policy-profiles.md](security-policy-profiles.md), [../report/evidence-plan.md](../report/evidence-plan.md).
 
 ## 1. Objectives
 
@@ -32,11 +32,11 @@ All scanning and testing targets only CipherMesh infrastructure, following the c
 
 | Suite | What it proves | Threats |
 |---|---|---|
-| `authz-matrix` | Every action, role and profile combination returns the expected result, generated from the shared matrix | T-04, T-05 |
+| `authz-matrix` | Every action, role and profile combination returns the expected result, generated from the shared matrix. **Phase 5:** every action and role, with the matrix compared cell by cell with the authorization model (section 3.4); profile combinations follow with the policy matrix (CM-T049) | T-04, T-05 |
 | `bola` | Identifiers from another room or user always give 404 with no side effects, for every endpoint | T-06 |
-| `route-inventory` | Every route declares an action and has tests; public routes match the allowlist | T-05, T-06 |
+| `route-inventory` | Every route declares an action and has tests; public routes match the allowlist. **Phase 5:** every route's matrix action is consistent with its access, and room routes exist only as a reviewed list (empty until CM-T030) | T-05, T-06 |
 | `http-baseline` | Security headers on every response, no framework disclosure, server-generated request IDs, no CORS grants, the same-origin gate, and no secrets from headers, query strings or bodies in the log (implemented in Phase 1) | T-12, T-13, T-15 |
-| `malformed-requests` | Malformed and dot-segment paths, oversized URLs and compressed bodies get generic errors without crashes or decompression (implemented in Phase 1) | T-14, T-15, T-26 |
+| `malformed-requests` | Malformed and dot-segment paths, oversized URLs and compressed bodies get generic errors without crashes or decompression (implemented in Phase 1); undecodable path parameters get the generic 404 (Phase 5, R-05-01) | T-14, T-15, T-26 |
 | `startup-config` | The real server process refuses invalid configuration and never echoes values (implemented in Phase 1) | Principle 10 |
 | `lint-guards` | The ESLint guards for CLAUDE.md section 8 fire on forbidden code (implemented in Phase 1); Phase 2 adds `Prisma.raw` and database imports outside `apps/api/src/db` | T-14, T-27 |
 | `schema-forbidden-fields` | The forbidden-field checker passes the real schema and fails on every "must never exist" field, unclassified fields and text-typed ciphertext (33 negative controls, implemented in Phase 2) | T-01, T-28 |
@@ -95,6 +95,22 @@ Negative controls NC-04-01 to NC-04-14: AAD removed from the private-key wrap, f
 Coverage: `pnpm test:coverage:crypto` enforces at least 90% statements, branches, functions and lines for `packages/crypto` in CI. Phase 4 result: 99.5% statements and 91.8% branches. The uncovered branches are `?? 0` defaults that `noUncheckedIndexedAccess` requires for typed-array reads and checks on WebCrypto's own output; none can run with a correct platform.
 
 Performance: `pnpm bench:vault` measures the real crypto code in the three engines under the production CSP (crypto-decisions section 8).
+
+### 3.4 Room authorization suites (Phase 5, CM-T029)
+
+The central decision is pure, so it is tested exhaustively as a unit; the authorizer, the membership lookup and the registry are tested against the real API and PostgreSQL as `cm_api` (`pnpm test:authz`), with real users, sessions and memberships and nothing in the authorization path mocked. Rooms are inserted as fixtures without key material until CM-T030 adds the room routes. Design: [authorization-model.md](authorization-model.md) section 9.
+
+| Suite | What it proves | Threats |
+|---|---|---|
+| `packages/shared/src/authorization.test.ts` | Every action and role through every kind of fact (allow, deny, own, recipient, target roles, inherited); no membership, a membership of another room or user, SUSPENDED, REMOVED and LEFT memberships, DELETING and DELETED rooms, unknown roles and unknown actions all deny; the platform role grants nothing; OWNER-only actions, the VIEWER and MEMBER columns and the role ceilings asserted independently; the catalogue is frozen | T-04, T-05, T-06 |
+| `tests/security/authz-matrix.test.ts` | Parses sections 3 and 4 of the authorization model and compares every cell, title and step-up note with the catalogue; role-model invariants | T-04 |
+| `tests/authz/membership-lookup.test.ts` | The query enforces room, user, ACTIVE membership and ACTIVE room: a membership in room A never comes back for room B; historical rows are ignored; malformed identifiers return nothing without a database error; changes are visible at once | T-05, T-06 |
+| `tests/authz/room-access.test.ts` | Test-only room routes through the production registry and authorizer: outsiders, nonexistent rooms, malformed identifiers and objects outside the room get one identical 404; PLATFORM_ADMIN without a membership is an outsider, and as a member has exactly that role; every role gets its cells; the matrix is checked before the step-up prompt; forged headers, query and body fields never carry a role; role changes and removals apply on the next request; AZ-10 ceilings with the stored target role; targets are never looked up for refused callers; denials record only the action and the reason | T-04, T-05, T-06, T-15 |
+| `apps/api/src/routes/registry.test.ts`, `apps/api/src/authorization/rooms.test.ts` | Startup refusals for missing, unknown or inconsistent declarations (room path, room action, step-up, resource loader, platform gate, paths that name a room, path grammar, parameter schemas); every reason code maps to the response of section 7; the shared role and state lists equal the database enums | T-05, T-06 |
+
+Negative controls NC-05-01 to NC-05-10 (`pnpm security:negative-controls --only=NC-05`): the registry skips the membership check, the decision allows a missing membership, the lookup is not scoped to the room, the lookup accepts inactive memberships, PLATFORM_ADMIN is treated as a room ADMIN, AZ-04 is widened to ADMIN, the role ceiling is checked with `some` instead of `every`, a room action is accepted without room access, a path below `/rooms/:roomId` is accepted without room access, and the R-05-01 fix is reverted. All ten are caught.
+
+Coverage: `pnpm test:coverage:authz` enforces at least 90% statements, branches, functions and lines for the decision module in CI. Phase 5 result: 97.3% statements, 98.3% branches; the uncovered lines are the unreachable fallback for an unknown rule kind.
 
 ### 3.1 Database suite (`tests/database`, Phase 2)
 

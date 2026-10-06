@@ -1,6 +1,6 @@
-# Engineering Baseline (Phases 1 to 4)
+# Engineering Baseline (Phases 1 to 5)
 
-Status: Phase 1, 2026-10-02; database layer added in Phase 2, authentication in Phase 3 (2026-10-04), and the cryptography package and vault in Phase 4 (2026-10-05). Records the tool and version decisions, the request pipeline and the local development setup established by CM-T006 to CM-T028. Related: [ADR-001](adr/ADR-001-monorepo-architecture.md), [ADR-011](adr/ADR-011-static-frontend-delivery.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
+Status: Phase 1, 2026-10-02; database layer added in Phase 2, authentication in Phase 3 (2026-10-04), the cryptography package and vault in Phase 4 (2026-10-05), and the room authorization step in Phase 5 (CM-T029, 2026-10-06). Records the tool and version decisions, the request pipeline and the local development setup established by CM-T006 to CM-T029. Related: [ADR-001](adr/ADR-001-monorepo-architecture.md), [ADR-011](adr/ADR-011-static-frontend-delivery.md), [../security/security-testing-plan.md](../security/security-testing-plan.md).
 
 ## 1. Versions
 
@@ -71,19 +71,21 @@ flowchart LR
   SO --> CT["JSON content-type gate"]
   CT --> P["JSON parser<br/>128 KiB limit, strict"]
   P --> AN["Authentication<br/>Phase 3"]
-  AN --> AZ["Authorization<br/>Phase 5"]
-  AZ --> V["Schema validation<br/>query and body, strict"]
-  V --> C["Handler"]
+  AN --> V["Schema validation<br/>path parameters, query and body, strict"]
+  V --> AZ["Room authorization<br/>room routes, Phase 5"]
+  AZ --> G["Gates<br/>platform administrator, step-up"]
+  G --> C["Handler"]
   C --> PR["Response projection<br/>response schema"]
   PR --> E["Error handler<br/>generic body, request ID"]
 ```
 
-The authentication and authorization steps do not exist yet. The route registry (`apps/api/src/routes/registry.ts`) makes their absence fail closed:
-- every route declares an action ID, an access level, a query schema, a body schema exactly when the method carries a body, and a response schema;
-- registering a route that requires authentication throws at startup until the authentication pipeline exists (CM-T016);
-- public routes must be on `PUBLIC_ROUTE_ALLOWLIST`, which currently holds only `GET /api/health` and `GET /api/ready`;
+The route registry (`apps/api/src/routes/registry.ts`) is the only way to mount a route, and it refuses to start when a rule is broken:
+- every route declares an action ID, an access level, a query schema, a body schema exactly when the method carries a body, a parameter schema exactly when the path has parameters, and a response schema;
+- the action ID names what the route authorizes in the shared matrix (Phase 5, CM-T029): no matrix action for public routes, a self-service or platform action for authenticated routes, a room action for room routes, whose paths start with `/rooms/:roomId` ([authorization-model.md](../security/authorization-model.md) section 9);
+- a route behind authentication cannot be registered without the authenticator, and a room route not without the central room authorizer;
+- public routes must be on the reviewed allowlists (`PUBLIC_ROUTE_ALLOWLIST`, `AUTH_PUBLIC_ROUTES`);
 - handlers can respond only through their response schema, and unexpected fields cause a 500 without sending anything;
-- requests with unexpected query parameters or body fields are rejected.
+- requests with unexpected query parameters or body fields are rejected; a malformed path parameter is a 404.
 
 The same-origin gate (INV-19) is part of the foundation rather than waiting for Phase 3. It does not depend on sessions, and the invariant applies to the first state-changing route ever added. CM-T020 still owns login-CSRF tests and the client side.
 
@@ -148,8 +150,10 @@ zod 4 compiles object parsers with `new Function`, and when the first object sch
 | `pnpm test:e2e` | Playwright against the built export and the built API over HTTPS on one origin (`tests/e2e/static-server.mjs`: throwaway self-signed certificate from OpenSSL, generated headers, `/api` reverse proxy with one forwarding hop). Needs `DATABASE_URL` |
 | `pnpm test:auth` | Authentication security suites against the real API and a throwaway database |
 | `pnpm test:vault` | Vault and directory suites against the real API, real Argon2id and a throwaway database (Phase 4) |
+| `pnpm test:authz` | Room authorization suites against the real API and a throwaway database: membership lookup and the central authorizer through test-only room routes (Phase 5) |
 | `pnpm test:coverage:crypto` | Coverage of `packages/crypto`; fails below 90% statements, branches, functions or lines (Phase 4, run in CI) |
-| `pnpm security:negative-controls` | 27 deliberate defects (ten from Phase 3, seventeen from Phase 4), each of which must make the security suites fail; the five browser controls rebuild the web client and run Playwright. `--vitest-only` skips those. Every touched file is compared with its original by SHA-256 afterwards |
+| `pnpm test:coverage:authz` | Coverage of the room authorization decision (`packages/shared/src/authorization.ts`) with the same thresholds (Phase 5, run in CI) |
+| `pnpm security:negative-controls` | 37 deliberate defects (ten from Phase 3, seventeen from Phase 4, ten from Phase 5), each of which must make the security suites fail; the five browser controls rebuild the web client and run Playwright. `--vitest-only` skips those, `--only=<prefix>` (for example `--only=NC-05`) runs a subset. Every touched file is compared with its original by SHA-256 afterwards |
 | `pnpm bench:argon2` | Argon2id benchmark and RFC 9106 check (CP-05) |
 | `pnpm bench:vault` | Browser benchmark of the vault in Chromium, Firefox and WebKit: the real crypto code under the production CSP (CP-04, crypto-decisions section 8) |
 | `node scripts/crypto/embed-argon2id-wasm.mjs` | Regenerates the embedded Argon2id WebAssembly after an update of the pinned `argon2id` package |
