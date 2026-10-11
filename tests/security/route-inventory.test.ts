@@ -71,6 +71,16 @@ describe('route inventory', () => {
       'POST /rooms/:roomId/members/:userId/role AZ-10-MEMBER-ROLE',
       'POST /rooms/:roomId/members/:userId/remove AZ-09-MEMBER-REMOVE',
       'POST /rooms/:roomId/members/:userId/transfer-ownership AZ-05-OWNERSHIP-TRANSFER',
+      // Phase 6 (CM-T033 to CM-T036, CM-T085): key material, reports and invitations of one room.
+      'GET /rooms/:roomId/key-versions AZ-15-KEY-VERSIONS',
+      'GET /rooms/:roomId/envelopes AZ-12-ENVELOPES',
+      'GET /rooms/:roomId/members/:userId/identity AZ-01-MEMBER-IDENTITY',
+      'POST /rooms/:roomId/key-reports AZ-29-KEY-REPORT',
+      'POST /rooms/:roomId/safety-code AZ-30-SAFETY-CODE',
+      'GET /rooms/:roomId/invitations AZ-31-INVITATION-LIST',
+      'POST /rooms/:roomId/invitations AZ-06-INVITATION-CREATE',
+      'POST /rooms/:roomId/invitations/:invitationId/approve AZ-07-INVITATION-APPROVE',
+      'POST /rooms/:roomId/invitations/:invitationId/revoke AZ-08-INVITATION-REVOKE',
     ]);
   });
 
@@ -107,6 +117,24 @@ describe('route inventory', () => {
       '/rooms',
       '/rooms/:roomId',
       '/rooms/:roomId/members',
+      // Phase 6: key material, a member's public identity and invitations are reads only.
+      '/rooms/:roomId/key-versions',
+      '/rooms/:roomId/envelopes',
+      '/rooms/:roomId/members/:userId/identity',
+      '/rooms/:roomId/invitations',
+      '/invitations',
+    ]);
+  });
+
+  it("the invitee's own invitation routes exist only as reviewed, all self-service (CM-T035)", () => {
+    const { routes } = productionApp();
+    const own = routes
+      .filter((r) => r.path.startsWith('/invitations'))
+      .map((r) => `${r.method} ${r.path} ${r.action} ${r.access}`);
+    expect(own).toEqual([
+      'GET /invitations SS-03-INVITATION-LIST authenticated',
+      'POST /invitations/:invitationId/accept SS-03-INVITATION-ACCEPT authenticated',
+      'POST /invitations/:invitationId/decline SS-03-INVITATION-DECLINE authenticated',
     ]);
   });
 

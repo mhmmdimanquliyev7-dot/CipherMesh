@@ -80,7 +80,7 @@ export interface RoomFixture {
   readonly ownerKeyId: string;
 }
 
-/** A room with key version 1, its OWNER membership and the owner's envelope. */
+/** A room with its genesis, key version 1, its OWNER membership and the owner's envelope (DUMMY bytes). */
 export async function insertRoom(client: pg.Client, ownerId?: string): Promise<RoomFixture> {
   const owner = ownerId ?? (await insertUser(client));
   const ownerKeyId = await insertKeyPair(client, owner);
@@ -91,6 +91,8 @@ export async function insertRoom(client: pg.Client, ownerId?: string): Promise<R
     security_profile: 'STANDARD',
     policy_version: 1,
     created_by_id: owner,
+    creator_key_id: ownerKeyId,
+    genesis_signature: DUMMY.signature(),
   });
   await insert(client, 'room_key_versions', {
     room_id: roomId,
@@ -100,6 +102,10 @@ export async function insertRoom(client: pg.Client, ownerId?: string): Promise<R
     algorithm_suite: 'CM1',
     reasons: '{INITIAL}',
     created_by_id: owner,
+    created_by_key_id: ownerKeyId,
+    recipient_user_ids: [owner],
+    recipient_key_ids: [ownerKeyId],
+    statement_signature: DUMMY.signature(),
   });
   await insert(client, 'room_members', {
     room_id: roomId,

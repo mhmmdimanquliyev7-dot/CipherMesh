@@ -27,6 +27,9 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
               <Link href="/rooms" className="text-slate-300 hover:text-white">
                 Rooms
               </Link>
+              <Link href="/invitations" className="text-slate-300 hover:text-white">
+                Invitations
+              </Link>
               <Link href="/vault" className="text-slate-300 hover:text-white">
                 Vault
               </Link>

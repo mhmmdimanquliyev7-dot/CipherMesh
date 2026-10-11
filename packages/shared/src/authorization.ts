@@ -128,6 +128,9 @@ const ROOM_MATRIX = {
   'AZ-28': { title: 'View room audit log', rules: row(Y, Y, N, N) },
   'AZ-29': { title: 'Report a key-commitment mismatch', rules: row(Y, Y, Y, Y) },
   'AZ-30': { title: 'Record a Room Safety Code comparison or report a mismatch', rules: row(Y, Y, Y, Y) },
+  // Added in Phase 6 (CM-T034, CM-T035): OL-11 lets the OWNER and ADMINs see the room's
+  // invitations, which no other action covered; MEMBER and VIEWER see none.
+  'AZ-31': { title: "View the room's invitations", rules: row(Y, Y, N, N) },
 } satisfies Record<string, RoomActionDefinition>;
 
 export type RoomActionId = keyof typeof ROOM_MATRIX;

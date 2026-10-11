@@ -33,8 +33,11 @@ import {
   type RegisteredRoute,
 } from './routes/registry';
 import { createReadinessProbe, PUBLIC_ROUTE_ALLOWLIST, systemRoutes } from './routes/system';
+import { invitationRoutes } from './routes/invitations';
 import { roomRoutes } from './routes/rooms';
 import { vaultRoutes } from './routes/vault';
+import { createInvitationService } from './rooms/invitations';
+import { createRoomKeyService } from './rooms/keys';
 import { createRoomService } from './rooms/service';
 import { createVaultService, defaultVaultRateLimits, type VaultRateLimits, type VaultService } from './vault/service';
 
@@ -109,6 +112,14 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
   const rooms = createRoomAuthorizer({ store: roomAccess, events });
   const roomData = roomDataAccess(database.prisma);
   const roomService = createRoomService({ store: roomData.store, transaction: roomData.transaction, events, clock });
+  // Cryptographic membership (Phase 6): the signed statements, envelopes and invitations.
+  const roomKeys = createRoomKeyService({ store: roomData.store, events });
+  const invitations = createInvitationService({
+    store: roomData.store,
+    transaction: roomData.transaction,
+    events,
+    clock,
+  });
 
   const app = express();
   app.disable('x-powered-by');
@@ -132,7 +143,8 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
       ...systemRoutes(lifecycle, createReadinessProbe(database)),
       ...authRoutes(auth, admin),
       ...vaultRoutes(vault),
-      ...roomRoutes(roomService, roomAccess),
+      ...roomRoutes(roomService, roomAccess, roomKeys, invitations, roomData.store),
+      ...invitationRoutes(invitations),
       ...(testing?.routes ?? []),
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],

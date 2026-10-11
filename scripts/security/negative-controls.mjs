@@ -1,6 +1,6 @@
 // `pnpm security:negative-controls`: proves that the security tests are real (Phase 3, extended
-// with the vault and cryptography controls of Phase 4 and the room authorization controls of
-// Phase 5). `--only=<prefix>` runs a subset, for example `--only=NC-05`.
+// with the vault and cryptography controls of Phase 4, the room authorization controls of Phase 5
+// and the cryptographic membership controls of Phase 6). `--only=<prefix>` runs a subset, for example `--only=NC-05`.
 //
 // For each control, one deliberate defect is written into a source file in the working tree, the
 // tests that must catch it are run, and the original file is restored immediately afterwards
@@ -472,7 +472,12 @@ const CONTROLS = [
     id: 'NC-05-15',
     defect: 'One-OWNER invariant broken: a transfer demotes the OWNER without promoting the target',
     file: 'apps/api/src/db/room-store.ts',
-    edits: [["        data: { role: 'OWNER' },", "        data: { role: 'ADMIN' },"]],
+    edits: [
+      [
+        "        data: { role: 'OWNER', ...grantColumns(grant) },",
+        "        data: { role: 'ADMIN', ...grantColumns(grant) },",
+      ],
+    ],
     tests: ['tests/authz/membership-admin.test.ts'],
   },
   {
@@ -620,6 +625,125 @@ const CONTROLS = [
     ],
     tests: ['tests/security/bola-inventory.test.ts'],
   },
+  // ---------------------------------------------------------------- Phase 6: cryptographic membership
+  {
+    id: 'NC-06-01',
+    defect: 'The browser skips the key-version signature check (a server-made key version is used, T-36)',
+    file: 'packages/crypto/src/room-keys.ts',
+    edits: [
+      [
+        '  if (!(await verifyStatementBy(creator, creatorRef, statement, keyVersion.signature))) throw authenticationFailed();',
+        '  void statement;',
+      ],
+    ],
+    tests: ['packages/crypto/src/room-keys.test.ts'],
+  },
+  {
+    id: 'NC-06-02',
+    defect: 'The browser skips the commitment check (a key that does not match the signed commitment is used, T-29)',
+    file: 'packages/crypto/src/room-keys.ts',
+    edits: [['    if (!bytesEqual(commitment, keyVersion.commitment)) {', '    if (commitment.length === 0) {']],
+    tests: ['packages/crypto/src/room-keys.test.ts', 'tests/authz/room-keys.test.ts'],
+  },
+  {
+    id: 'NC-06-03',
+    defect: 'The envelope label no longer names the recipient user and key (envelopes become transferable, T-25)',
+    file: 'packages/crypto/src/room-keys.ts',
+    edits: [
+      [
+        '    recipientUserId: recipient.userId,\n    recipientKeyId: recipient.keyId,',
+        '    recipientUserId: roomId,\n    recipientKeyId: roomId,',
+      ],
+    ],
+    tests: ['packages/crypto/src/room-keys.test.ts'],
+  },
+  {
+    id: 'NC-06-04',
+    defect: 'An invitation without an envelope for the current key version is accepted (PC-07 version check removed)',
+    file: 'apps/api/src/rooms/invitations.ts',
+    edits: [['            requested.includes(room.currentKeyVersion) &&', '            requested.length > 0 &&']],
+    tests: ['tests/authz/invitations.test.ts'],
+  },
+  {
+    id: 'NC-06-05',
+    defect: 'An ADMIN grant signed by someone who is not an OWNER confers ADMIN authority (authority chain)',
+    file: 'packages/crypto/src/room-keys.ts',
+    edits: [
+      [
+        "  for (const g of valid) if (g.role === 'ADMIN' && owners.has(grantor(g))) admins.add(subject(g));",
+        "  for (const g of valid) if (g.role === 'ADMIN') admins.add(subject(g));",
+      ],
+    ],
+    tests: ['packages/crypto/src/room-keys.test.ts'],
+  },
+  {
+    id: 'NC-06-06',
+    defect: "Another user can accept someone else's invitation (invitee filter removed from lookup and re-check)",
+    file: 'apps/api/src/db/invitation-store.ts',
+    edits: [['        where: { id: invitationId, inviteeUserId },', '        where: { id: invitationId },']],
+    also: [
+      {
+        file: 'apps/api/src/rooms/invitations.ts',
+        edits: [
+          [
+            "        if (invitation === null || invitation.inviteeUserId !== actor.userId) throw notFound();\n        if (invitation.status !== 'PENDING') throw notOpen();",
+            "        if (invitation === null) throw notFound();\n        if (invitation.status !== 'PENDING') throw notOpen();",
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/authz/invitations.test.ts'],
+  },
+  {
+    id: 'NC-06-07',
+    defect:
+      "Invitation acceptance no longer locks and re-checks the invitee's user row (an account disable can miss it)",
+    file: 'apps/api/src/rooms/invitations.ts',
+    edits: [
+      [
+        '        if (!(await tx.lockActiveUser(actor.userId))) throw unauthenticated();',
+        '        void unauthenticated;',
+      ],
+    ],
+    tests: ['tests/authz/invitation-concurrency.test.ts'],
+  },
+  {
+    id: 'NC-06-08',
+    defect: 'The API stores a new room without verifying the signed genesis and key-version statements',
+    file: 'apps/api/src/rooms/service.ts',
+    edits: [
+      [
+        '        creator === undefined ||\n        !(await verifyRoomCreation(creator, {',
+        '        creator === undefined ||\n        !(await Promise.resolve(true) || await verifyRoomCreation(creator, {',
+      ],
+    ],
+    tests: ['tests/authz/room-keys.test.ts'],
+  },
+  {
+    id: 'NC-06-09',
+    defect: 'The Safety Code is derived from the public, server-supplied commitment instead of the key material',
+    file: 'packages/crypto/src/room-keys.ts',
+    edits: [
+      [
+        '    return safetyCodeFromBits(opened.keyVersion, rsc);',
+        '    return safetyCodeFromBits(opened.keyVersion, opened.commitment);',
+      ],
+    ],
+    tests: ['packages/crypto/src/room-keys.test.ts'],
+  },
+  {
+    id: 'NC-06-10',
+    defect: 'The browser keeps the Room Safety Code in localStorage (INV-18)',
+    file: 'apps/web/src/rooms/key-panel.tsx',
+    edits: [
+      [
+        '  const rows = [code.words.slice(0, 3), code.words.slice(3, 6)];',
+        "  localStorage.setItem('cm-last-safety-code', code.words.join(' '));\n  const rows = [code.words.slice(0, 3), code.words.slice(3, 6)];",
+      ],
+    ],
+    tests: [],
+    e2e: { spec: 'tests/e2e/room-keys.spec.ts', title: 'kept in the browser' },
+  },
 ];
 
 /** @param {string[]} files */
@@ -727,6 +851,11 @@ for (const control of controls) {
 restoreAll();
 const changed = [...checksums].filter(([file, digest]) => sha256(file) !== digest).map(([file]) => file);
 const baseline = vitest([...new Set(controls.flatMap((c) => c.tests))]);
+if (baseline.status !== 0) {
+  // A failing baseline invalidates the run: show which tests failed so the cause can be found.
+  const failing = `${baseline.stdout}${baseline.stderr}`.split(/\r?\n/).filter((l) => / FAIL | Error:/.test(l));
+  console.error(['Baseline failures:', ...failing.slice(0, 20)].join(String.fromCharCode(10)));
+}
 const e2eTests = [...new Set(controls.flatMap((c) => (c.e2e === undefined ? [] : [JSON.stringify(c.e2e)])))].map(
   (key) => /** @type {{ spec: string, title: string }} */ (JSON.parse(key)),
 );

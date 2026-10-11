@@ -20,6 +20,7 @@ import {
   stepUp,
   type Person,
 } from '../helpers/rooms';
+import { grantOrFiller } from '../helpers/room-crypto';
 
 // CM-T031: role changes (AZ-10), member removal (AZ-09) and ownership transfer (AZ-05) against
 // the real API and PostgreSQL as cm_api. The matrix is the one in authorization-model.md
@@ -43,7 +44,13 @@ beforeAll(async () => {
   db = await testDatabase(inject('databaseName')).connect('api');
   database = apiDatabase();
   owner = await personWithVault(api, db);
-  [admin, admin2, member, viewer] = [await person(api), await person(api), await person(api), await person(api)];
+  // Members that can receive an ADMIN or OWNER grant need an identity (ADR-015 section 4).
+  [admin, admin2, member, viewer] = [
+    await personWithVault(api, db),
+    await personWithVault(api, db),
+    await personWithVault(api, db),
+    await personWithVault(api, db),
+  ];
   outsider = await personWithVault(api, db);
 });
 afterAll(async () => {
@@ -71,12 +78,25 @@ const setRole = (roomId: string, userId: string, role: Role) =>
 const roleOf = async (roomId: string, userId: string) =>
   (await memberships(db, roomId)).find((m) => m.user_id === userId && m.status !== 'REMOVED')?.role;
 
-const changeRole = (who: Person, roomId: string, targetId: string, role: string) =>
-  who.browser.request('POST', `/rooms/${roomId}/members/${targetId}/role`, { role });
+/** The person with this user ID, for signing grants to them. */
+const known = (userId: string): Person | undefined =>
+  [owner, admin, admin2, member, viewer, outsider].find((p) => p.userId === userId);
+
+// Granting ADMIN and transferring ownership carry the caller's signed grant (ADR-015 section 4).
+// Requests that authorization must refuse carry a well-formed grant too, so the refusal tested is
+// the matrix's, not the schema's.
+const changeRole = async (who: Person, roomId: string, targetId: string, role: string) =>
+  who.browser.request(
+    'POST',
+    `/rooms/${roomId}/members/${targetId}/role`,
+    role === 'ADMIN' ? { role, grant: await grantOrFiller(who, roomId, known(targetId), 'ADMIN') } : { role },
+  );
 const remove = (who: Person, roomId: string, targetId: string) =>
   who.browser.request('POST', `/rooms/${roomId}/members/${targetId}/remove`, {});
-const transfer = (who: Person, roomId: string, targetId: string) =>
-  who.browser.request('POST', `/rooms/${roomId}/members/${targetId}/transfer-ownership`, {});
+const transfer = async (who: Person, roomId: string, targetId: string) =>
+  who.browser.request('POST', `/rooms/${roomId}/members/${targetId}/transfer-ownership`, {
+    grant: await grantOrFiller(who, roomId, known(targetId), 'OWNER'),
+  });
 
 describe('role changes (AZ-10)', () => {
   it('lets the OWNER change any member among ADMIN, MEMBER and VIEWER', async () => {
@@ -213,7 +233,8 @@ describe('member removal (AZ-09, INV-07)', () => {
       'SELECT recipient_user_id::text AS recipient FROM key_envelopes WHERE room_id = $1',
       [roomId],
     );
-    expect(rows.map((row) => row.recipient)).toEqual([viewer.userId]);
+    // Exactly the removed member's envelopes are gone; the owner's (Phase 6) and the viewer's stay.
+    expect(rows.map((row) => row.recipient).sort()).toEqual([owner.userId, viewer.userId].sort());
     expect(await roomRow(db, roomId)).toMatchObject({
       key_state: 'REKEY_REQUIRED',
       rekey_reasons: '{MEMBER_REMOVED}',

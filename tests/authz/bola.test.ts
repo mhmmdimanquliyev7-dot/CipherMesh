@@ -1,11 +1,12 @@
+import { roomRuleFor, type RoomRole } from '@ciphermesh/shared';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import type { Database } from '../../apps/api/src/db/client';
 import { startAuthApi, type AuthTestApi } from '../helpers/auth';
-import { BOLA_CASES, ROOM_CASES, type BolaCase, type Response } from '../helpers/bola-cases';
+import { BOLA_CASES, ROOM_CASES, type BolaCase, type Response, type RoomRef } from '../helpers/bola-cases';
 import { loadDatabaseTestEnv, testDatabase } from '../helpers/database';
-import { insertKeyPair } from '../helpers/db-fixtures';
+import { creationBody, insertIdentity, invite } from '../helpers/room-crypto';
 import {
   addMember,
   apiDatabase,
@@ -47,9 +48,14 @@ let outsider: Person;
 let platform: Person & { readonly secret: string };
 let dualAdmin: Person; // ADMIN in A, VIEWER in B
 let dualOwner: Person; // OWNER of C, MEMBER in B
+let inviteeA: Person;
+let inviteeB: Person;
 let roomA: string;
 let roomB: string;
 let roomC: string;
+/** Open invitations of rooms A and B (Phase 6): targets of the invitation routes. */
+let invitationA: string;
+let invitationB: string;
 
 const NAME_A = 'BOLA room A confidential codename';
 const NAME_B = 'BOLA room B confidential codename';
@@ -79,6 +85,8 @@ beforeAll(async () => {
     await person(api),
   ];
   platform = await platformAdministrator(api, database);
+  inviteeA = await personWithVault(api, db);
+  inviteeB = await personWithVault(api, db);
 
   roomA = await createRoom(ownerA, 'STANDARD', NAME_A);
   roomB = await createRoom(ownerB, 'STANDARD', NAME_B);
@@ -100,6 +108,14 @@ beforeAll(async () => {
   await addMember(db, roomB, viewerB.userId, 'VIEWER');
   await addMember(db, roomB, dualAdmin.userId, 'VIEWER');
   await addMember(db, roomB, dualOwner.userId, 'MEMBER');
+  // Real invitations with envelopes and signed grants, made by the owners' keys (CM-T034).
+  const openInvitation = async (owner: Person, roomId: string, invitee: Person): Promise<string> => {
+    const created = await invite(owner, roomId, invitee, 'MEMBER');
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    return (created.body['invitation'] as { id: string }).id;
+  };
+  invitationA = await openInvitation(ownerA, roomA, inviteeA);
+  invitationB = await openInvitation(ownerB, roomB, inviteeB);
 
   // Everyone confirms their account first, so a step-up never explains a refusal: it is the
   // authorization that denies (the registry decides membership before it asks for a step-up).
@@ -119,11 +135,17 @@ afterAll(async () => {
 const read = (who: Person, path: string, headers: Record<string, string> = {}): Promise<Response> =>
   who.browser.request('GET', path, undefined, headers);
 
-/** Every row of the given rooms and their memberships, as text: compared before and after. */
+/**
+ * Every row of the given rooms, their memberships, invitations, key versions and envelopes, as
+ * text: compared before and after (Phase 6 added the last three).
+ */
 async function snapshot(rooms: readonly string[]): Promise<string> {
-  const roomRows = await db.query('SELECT * FROM rooms WHERE id = ANY($1) ORDER BY id', [rooms]);
-  const memberRows = await db.query('SELECT * FROM room_members WHERE room_id = ANY($1) ORDER BY id', [rooms]);
-  return JSON.stringify([roomRows.rows, memberRows.rows]);
+  const rows = [];
+  for (const table of ['rooms', 'room_members', 'invitations', 'room_key_versions', 'key_envelopes']) {
+    const column = table === 'rooms' ? 'id' : 'room_id';
+    rows.push((await db.query(`SELECT * FROM ${table} WHERE ${column} = ANY($1) ORDER BY id`, [rooms])).rows);
+  }
+  return JSON.stringify(rows);
 }
 
 /** What an observer sees of a refusal: the status, the stable code, the message and the body shape. */
@@ -152,13 +174,22 @@ const FORBIDDEN = {
   topKeys: ['error'],
 };
 
-/** The target member a case names inside the given room's cast. */
-type Cast = { readonly MEMBER: Person; readonly ADMIN: Person };
-const castA = (): Cast => ({ MEMBER: memberA, ADMIN: adminA });
-const castB = (): Cast => ({ MEMBER: memberB, ADMIN: adminB });
-const targetIn = (c: BolaCase, cast: Cast): string | undefined =>
-  c.targetsMember && c.target !== undefined ? cast[c.target].userId : undefined;
-const ref = (roomId: string, userId: string | undefined) => (userId === undefined ? { roomId } : { roomId, userId });
+/** The target object a case names inside the given room's cast: a member or an invitation. */
+type Cast = { readonly MEMBER: Person; readonly ADMIN: Person; readonly INVITATION: string };
+const castA = (): Cast => ({ MEMBER: memberA, ADMIN: adminA, INVITATION: invitationA });
+const castB = (): Cast => ({ MEMBER: memberB, ADMIN: adminB, INVITATION: invitationB });
+type Target = Pick<RoomRef, 'userId' | 'invitationId'>;
+const targetIn = (c: BolaCase, cast: Cast): Target => {
+  if (c.target === 'INVITATION') return { invitationId: cast.INVITATION };
+  if (c.target !== undefined && c.targetsMember) return { userId: cast[c.target].userId };
+  return {};
+};
+const inventedTarget = (c: BolaCase): Target =>
+  c.targetsInvitation ? { invitationId: randomUUID() } : c.targetsMember ? { userId: randomUUID() } : {};
+const ref = (roomId: string, target: Target): RoomRef => ({ roomId, ...target });
+/** What a member with `role` gets for a target outside the room: the matrix's first step decides. */
+const crossRoomAnswer = (c: BolaCase, role: RoomRole) =>
+  c.action !== undefined && roomRuleFor(c.action, role).kind === 'deny' ? FORBIDDEN : NOT_FOUND;
 
 /** Nothing of room B (or of room A) in a refusal: names, member names, member IDs. */
 function expectNoRoomData(response: Response, label: string): void {
@@ -204,8 +235,8 @@ describe('A, B and G: a caller who is not in room B gets nothing, and cannot tel
 
 // ------------------------------------------------------------------ C: target member of room B
 
-describe('C: addressed room A with a target member of room B', () => {
-  const targeted = ROOM_CASES.filter((c) => c.targetsMember);
+describe('C: addressed room A with a target object (member or invitation) of room B', () => {
+  const targeted = ROOM_CASES.filter((c) => c.targetsMember || c.targetsInvitation);
   const callers = (): [string, Person, 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'][] => [
     ['OWNER of A', ownerA, 'OWNER'],
     ['ADMIN of A', adminA, 'ADMIN'],
@@ -220,15 +251,14 @@ describe('C: addressed room A with a target member of room B', () => {
         const foreign = targetIn(c, castB());
         const before = await snapshot([roomA, roomB, roomC]);
         const response = await c.send(who, ref(roomA, foreign));
-        // OWNER and ADMIN pass the first step of the matrix and then fail to find the target in
-        // this room (404); a transfer is OWNER-only, so an ADMIN is refused by role (403); MEMBER
-        // and VIEWER are refused by role. Nobody learns anything about room B.
-        const transfer = c.key.endsWith('/transfer-ownership');
-        const expected = role === 'OWNER' || (role === 'ADMIN' && !transfer) ? NOT_FOUND : FORBIDDEN;
-        expect(shape(response), `${label} targeting a member of B in A`).toEqual(expected);
+        // A role whose cell permits a first step then fails to find the target in this room (404);
+        // a role the matrix refuses is refused by role (403), for example an ADMIN transferring
+        // ownership or approving. Nobody learns anything about room B.
+        const expected = crossRoomAnswer(c, role);
+        expect(shape(response), `${label} targeting an object of B in A`).toEqual(expected);
         if (expected === NOT_FOUND) {
-          const invented = await c.send(who, ref(roomA, randomUUID()));
-          expect(shape(invented), `${label}: a foreign target must look like an invented one`).toEqual(NOT_FOUND);
+          const made = await c.send(who, ref(roomA, inventedTarget(c)));
+          expect(shape(made), `${label}: a foreign target must look like an invented one`).toEqual(NOT_FOUND);
         }
         expectNoRoomData(response, label);
         expect(await snapshot([roomA, roomB, roomC]), `${label}: no row may change`).toBe(before);
@@ -240,7 +270,7 @@ describe('C: addressed room A with a target member of room B', () => {
   it('the same attack with the target inside room A is the legitimate path (control)', async () => {
     // Proves the refusals above come from the room boundary and not from a broken fixture.
     const roleCase = ROOM_CASES.find((c) => c.key.endsWith('/role')) as BolaCase;
-    const response = await roleCase.send(ownerA, ref(roomA, memberA.userId));
+    const response = await roleCase.send(ownerA, ref(roomA, { userId: memberA.userId }));
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ userId: memberA.userId, role: 'VIEWER' });
     await db.query("UPDATE room_members SET role = 'MEMBER' WHERE room_id = $1 AND user_id = $2", [
@@ -253,8 +283,13 @@ describe('C: addressed room A with a target member of room B', () => {
 // ---------------------------------------------------- D: authority never crosses a room boundary
 
 describe('D: a role in one room gives no authority in another', () => {
+  /** Mutations the matrix refuses to `role`: AZ-29 and AZ-30 are open to every member by design. */
+  const refusedTo = (role: RoomRole) =>
+    ROOM_CASES.filter((x) => x.mutates && x.action !== undefined && roomRuleFor(x.action, role).kind === 'deny');
+
   it('an ADMIN of room A is only a VIEWER in room B', async () => {
-    for (const c of ROOM_CASES.filter((x) => x.mutates)) {
+    expect(refusedTo('VIEWER').length).toBeGreaterThanOrEqual(8);
+    for (const c of refusedTo('VIEWER')) {
       const before = await snapshot([roomA, roomB, roomC]);
       const response = await c.send(dualAdmin, ref(roomB, targetIn(c, castB())));
       expect(shape(response), `${c.key} as ADMIN-of-A in B`).toEqual(FORBIDDEN);
@@ -272,13 +307,24 @@ describe('D: a role in one room gives no authority in another', () => {
   }, 120_000);
 
   it('an OWNER of room C is only a MEMBER in room B: no deletion, transfer or administration there', async () => {
-    for (const c of ROOM_CASES.filter((x) => x.mutates)) {
+    for (const c of refusedTo('MEMBER')) {
       const before = await snapshot([roomA, roomB, roomC]);
       const response = await c.send(dualOwner, ref(roomB, targetIn(c, castB())));
       expect(shape(response), `${c.key} as OWNER-of-C in B`).toEqual(FORBIDDEN);
       expect(await snapshot([roomA, roomB, roomC]), c.key).toBe(before);
     }
   }, 120_000);
+
+  it('a key report or Safety Code record in room B names room B only, and changes no row', async () => {
+    for (const c of ROOM_CASES.filter((x) => x.action === 'AZ-29' || x.action === 'AZ-30')) {
+      const before = await snapshot([roomA, roomB, roomC]);
+      api.events.length = 0;
+      const response = await c.send(dualAdmin, ref(roomB, {}));
+      expect(response.status, c.key).toBe(200);
+      expect(api.events.map((e) => e.details?.['roomId'])).toEqual([roomB]);
+      expect(await snapshot([roomA, roomB, roomC]), c.key).toBe(before);
+    }
+  });
 
   it('lists each room with the role the person has in that room', async () => {
     const listed = await read(dualAdmin, '/rooms');
@@ -413,7 +459,7 @@ describe('H: nothing the client sends can name the caller, the room owner or a r
         // ownerB is the real OWNER of room B; for the collection route any signed-in user works.
         const response = await c.send(
           ownerB,
-          ref(c.kind === 'collection' ? randomUUID() : roomB, targetIn(c, castB())),
+          ref(c.kind === 'collection' ? randomUUID() : roomB, c.kind === 'collection' ? {} : targetIn(c, castB())),
           {
             fields: { [field]: FORGED()[field] as string },
           },
@@ -431,7 +477,7 @@ describe('H: nothing the client sends can name the caller, the room owner or a r
     '%s rejects identity, room and role query parameters',
     async (_key, c) => {
       for (const field of ['userId', 'roomId', 'role', 'ownerId']) {
-        const response = await c.send(ownerB, ref(roomB, undefined), {
+        const response = await c.send(ownerB, ref(roomB, {}), {
           fields: { [field]: FORGED()[field] as string },
         });
         expect(response.status, `${c.key} with ?${field}`).toBe(400);
@@ -481,11 +527,15 @@ describe('H: nothing the client sends can name the caller, the room owner or a r
 
 describe('L-45: creating a room with a known ID answers 409 (documented limitation, not a membership leak)', () => {
   it('reveals only that the ID was used, takes nothing over and changes nothing', async () => {
-    const create = BOLA_CASES.find((c) => c.key === 'POST /rooms') as BolaCase;
-    // A real creator has an identity (SS-04); a synthetic one is enough to reach the ID check.
-    await insertKeyPair(db, outsider.userId);
+    // A real creator has an identity (SS-04) and signs key version 1 for this room ID (DF-05):
+    // the request is valid in every respect except that the ID was used.
+    const creator = { ...outsider, vault: await insertIdentity(db, outsider.userId) };
     const before = await snapshot([roomA, roomB, roomC]);
-    const retry = await create.send(outsider, { roomId: roomB });
+    const retry = await outsider.browser.request(
+      'POST',
+      '/rooms',
+      await creationBody(creator, roomB, 'STANDARD', 'Hijack'),
+    );
     const error = retry.body['error'] as { code?: string } | undefined;
     expect(retry.status).toBe(409);
     expect(error?.code).toBe('ROOM_ID_UNAVAILABLE');

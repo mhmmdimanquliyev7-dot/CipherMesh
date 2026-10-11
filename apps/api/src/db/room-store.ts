@@ -9,6 +9,8 @@ import type {
   SecurityProfile,
 } from '../generated/prisma/enums';
 import { createAuthStore, type AuthStore } from './auth-store';
+import { invitationStoreFunctions } from './invitation-store';
+import { roomKeyStoreFunctions } from './room-key-store';
 
 /**
  * Data access for rooms and memberships (Phase 5, CM-T030, CM-T031). The only module that writes
@@ -24,8 +26,12 @@ import { createAuthStore, type AuthStore } from './auth-store';
  *   the two kinds of transaction cannot deadlock.
  * - Writes are conditional on the state that was checked, and report whether they applied.
  * - Losing a member deletes that member's envelopes, increments the membership epoch and sets
- *   REKEY_REQUIRED in the same transaction (INV-07, ADR-013). No envelope exists before Phase 6;
- *   the deletion is part of the transaction so it holds once they do. Nothing here creates keys.
+ *   REKEY_REQUIRED in the same transaction (INV-07, ADR-013).
+ * - Phase 6: a room is created with key version 1, its signed genesis and key-version statements
+ *   and the creator's envelope, all produced by the creator's browser (DF-05). The store writes
+ *   what the service verified; it never creates key material, envelopes or signatures. The room
+ *   key and invitation functions (room-key-store.ts, invitation-store.ts) are part of the same
+ *   store, so one transaction can lock and write rooms, memberships, invitations and envelopes.
  */
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -55,6 +61,8 @@ export interface LockedRoom {
   readonly id: string;
   readonly status: RoomStatus;
   readonly keyState: RoomKeyState;
+  readonly securityProfile: SecurityProfile;
+  readonly currentKeyVersion: number;
 }
 
 export interface LockedMembership {
@@ -72,7 +80,32 @@ export interface NewRoom {
   readonly policyVersion: number;
   readonly creatorId: string;
   readonly now: Date;
+  /** Key version 1 as the creator's browser produced it (CM-T033); verified by the service. */
+  readonly keys: {
+    readonly creatorKeyId: string;
+    readonly genesisSignature: Uint8Array;
+    readonly commitment: Uint8Array;
+    readonly keyVersionSignature: Uint8Array;
+    readonly envelope: Uint8Array;
+  };
 }
+
+/** A membership grant signed by the OWNER (ADMIN grant or ownership transfer, ADR-015). */
+export interface MemberGrant {
+  readonly subjectKeyId: string;
+  readonly role: RoomRole;
+  readonly grantorUserId: string;
+  readonly grantorKeyId: string;
+  readonly signature: Uint8Array;
+}
+
+const grantColumns = (grant: MemberGrant) => ({
+  subjectKeyId: grant.subjectKeyId,
+  grantRole: grant.role,
+  grantorUserId: grant.grantorUserId,
+  grantorKeyId: grant.grantorKeyId,
+  grantSignature: new Uint8Array(grant.signature),
+});
 
 export interface SuspendedRoom {
   readonly roomId: string;
@@ -109,6 +142,9 @@ export function createRoomStore(db: Db) {
   }
 
   return {
+    ...roomKeyStoreFunctions(db),
+    ...invitationStoreFunctions(db),
+
     // ---------------------------------------------------------------------------------- creation
 
     /** Locks the user row against concurrent disabling and reports whether the account is ACTIVE. */
@@ -118,11 +154,11 @@ export function createRoomStore(db: Db) {
       return rows[0]?.status === 'ACTIVE';
     },
 
-    async hasActiveIdentity(userId: string): Promise<boolean> {
-      return (await db.userKeyPair.count({ where: { userId, status: 'ACTIVE' } })) > 0;
-    },
-
-    /** The room and its OWNER membership. No key version, envelope or commitment (Phase 6). */
+    /**
+     * The room with its signed genesis, the OWNER membership (whose authority is the genesis, so it
+     * carries no grant), key version 1 with its signed statement (recipient list: the creator) and
+     * the creator's ACTIVE envelope (DF-05). One transaction with the caller's other checks.
+     */
     async insertRoomWithOwner(room: NewRoom): Promise<void> {
       try {
         await db.room.create({
@@ -132,6 +168,9 @@ export function createRoomStore(db: Db) {
             securityProfile: room.securityProfile,
             policyVersion: room.policyVersion,
             createdById: room.creatorId,
+            creatorKeyId: room.keys.creatorKeyId,
+            genesisSignature: new Uint8Array(room.keys.genesisSignature),
+            currentKeyVersion: 1,
             createdAt: room.now,
             updatedAt: room.now,
             members: { create: { userId: room.creatorId, role: 'OWNER', firstKeyVersion: 1, joinedAt: room.now } },
@@ -144,6 +183,38 @@ export function createRoomStore(db: Db) {
         }
         throw error;
       }
+      await db.roomKeyVersion.create({
+        data: {
+          roomId: room.roomId,
+          version: 1,
+          status: 'ACTIVE',
+          commitment: new Uint8Array(room.keys.commitment),
+          algorithmSuite: 'CM1',
+          reasons: ['INITIAL'],
+          createdById: room.creatorId,
+          createdByKeyId: room.keys.creatorKeyId,
+          previousCommitment: null,
+          recipientUserIds: [room.creatorId],
+          recipientKeyIds: [room.keys.creatorKeyId],
+          statementSignature: new Uint8Array(room.keys.keyVersionSignature),
+          createdAt: room.now,
+        },
+        select: { id: true },
+      });
+      await db.keyEnvelope.create({
+        data: {
+          roomId: room.roomId,
+          keyVersion: 1,
+          recipientUserId: room.creatorId,
+          recipientKeyId: room.keys.creatorKeyId,
+          status: 'ACTIVE',
+          wrappedKey: new Uint8Array(room.keys.envelope),
+          algorithm: 'RSA-OAEP-3072-SHA256',
+          createdById: room.creatorId,
+          createdAt: room.now,
+        },
+        select: { id: true },
+      });
     },
 
     // ------------------------------------------------------------------------------------ reads
@@ -226,11 +297,29 @@ export function createRoomStore(db: Db) {
 
     /** Locks the room row; every membership change in the room takes this lock first. */
     async lockRoom(roomId: string): Promise<LockedRoom | null> {
-      const rows = await db.$queryRaw<{ id: string; status: RoomStatus; key_state: RoomKeyState }[]>`
-        SELECT id::text AS id, status::text AS status, key_state::text AS key_state
+      if (!isUuidV4(roomId)) return null;
+      const rows = await db.$queryRaw<
+        {
+          id: string;
+          status: RoomStatus;
+          key_state: RoomKeyState;
+          security_profile: SecurityProfile;
+          current_key_version: number;
+        }[]
+      >`
+        SELECT id::text AS id, status::text AS status, key_state::text AS key_state,
+               security_profile::text AS security_profile, current_key_version
           FROM rooms WHERE id = ${roomId}::uuid FOR UPDATE`;
       const row = rows[0];
-      return row === undefined ? null : { id: row.id, status: row.status, keyState: row.key_state };
+      return row === undefined
+        ? null
+        : {
+            id: row.id,
+            status: row.status,
+            keyState: row.key_state,
+            securityProfile: row.security_profile,
+            currentKeyVersion: row.current_key_version,
+          };
     },
 
     /** Locks the current (ACTIVE or SUSPENDED) membership of a user in the room, or returns null. */
@@ -269,11 +358,15 @@ export function createRoomStore(db: Db) {
       return result.count === 1;
     },
 
-    /** Changes a role only if the membership is still ACTIVE with the role that was checked. */
-    async setMemberRole(membership: LockedMembership, role: RoomRole): Promise<boolean> {
+    /**
+     * Changes a role only if the membership is still ACTIVE with the role that was checked. An ADMIN
+     * grant replaces the membership's stored grant with the OWNER's signed one (ADR-015); other
+     * changes keep the stored grant, which a demotion cannot revoke (L-46).
+     */
+    async setMemberRole(membership: LockedMembership, role: RoomRole, grant?: MemberGrant): Promise<boolean> {
       const result = await db.roomMember.updateMany({
         where: { id: membership.membershipId, roomId: membership.roomId, role: membership.role, status: 'ACTIVE' },
-        data: { role },
+        data: { role, ...(grant === undefined ? {} : grantColumns(grant)) },
       });
       return result.count === 1;
     },
@@ -343,15 +436,16 @@ export function createRoomStore(db: Db) {
      * The demotion runs first, so the partial unique index (one ACTIVE OWNER per room) holds at
      * every statement; both updates are conditional on the checked roles.
      */
-    async transferOwnership(owner: LockedMembership, target: LockedMembership): Promise<boolean> {
+    async transferOwnership(owner: LockedMembership, target: LockedMembership, grant: MemberGrant): Promise<boolean> {
       const demoted = await db.roomMember.updateMany({
         where: { id: owner.membershipId, roomId: owner.roomId, role: 'OWNER', status: 'ACTIVE' },
         data: { role: 'ADMIN' },
       });
       if (demoted.count !== 1) return false;
+      // The new OWNER's authority is the outgoing OWNER's signed OWNER grant (ADR-015 section 4).
       const promoted = await db.roomMember.updateMany({
         where: { id: target.membershipId, roomId: target.roomId, role: 'ADMIN', status: 'ACTIVE' },
-        data: { role: 'OWNER' },
+        data: { role: 'OWNER', ...grantColumns(grant) },
       });
       return promoted.count === 1;
     },

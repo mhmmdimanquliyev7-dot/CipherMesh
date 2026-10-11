@@ -27,6 +27,14 @@ export const CryptoErrorCode = {
   KDF_FAILED: 'KDF_FAILED',
   /** The Vault Passphrase does not meet the policy (CP-06). */
   PASSPHRASE_REJECTED: 'PASSPHRASE_REJECTED',
+  /**
+   * A room key version failed the verification rule of ADR-015 section 4: a signature, the
+   * creator's authority, this client's authorization as a recipient, or the envelope itself. The
+   * key is refused; nothing derived from it is used (T-36).
+   */
+  KEY_AUTHENTICATION_FAILED: 'KEY_AUTHENTICATION_FAILED',
+  /** The decrypted room key does not match the signed commitment (cryptographic-architecture 7.3, T-29). */
+  KEY_COMMITMENT_MISMATCH: 'KEY_COMMITMENT_MISMATCH',
 } as const;
 
 export type CryptoErrorCode = (typeof CryptoErrorCode)[keyof typeof CryptoErrorCode];
@@ -43,6 +51,8 @@ const MESSAGES: Readonly<Record<CryptoErrorCode, string>> = {
   KDF_BUSY: 'A vault key derivation is already running',
   KDF_FAILED: 'The vault key derivation failed',
   PASSPHRASE_REJECTED: 'The Vault Passphrase does not meet the policy',
+  KEY_AUTHENTICATION_FAILED: 'The room key could not be authenticated and was not used',
+  KEY_COMMITMENT_MISMATCH: "The room key does not match the room's signed record and was not used",
 };
 
 export class CryptoError extends Error {

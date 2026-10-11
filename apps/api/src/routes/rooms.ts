@@ -1,15 +1,33 @@
-import { MEMBER_LIST_PAGE_SIZE, ROOM_LIST_PAGE_SIZE, type RoomResourceFacts } from '@ciphermesh/shared';
+import { toBase64Url } from '@ciphermesh/crypto/identity';
+import {
+  INVITATION_LIST_PAGE_SIZE,
+  MEMBER_LIST_PAGE_SIZE,
+  ROOM_LIST_PAGE_SIZE,
+  type RoomResourceFacts,
+} from '@ciphermesh/shared';
 import {
   emptyBodySchema,
   emptyQuerySchema,
+  envelopesResponseSchema,
   formatListCursor,
+  invitationApprovedResponseSchema,
+  invitationClosedResponseSchema,
+  invitationCreatedResponseSchema,
+  invitationCreateRequestSchema,
+  invitationParamsSchema,
+  keyReportRequestSchema,
+  keyVersionsResponseSchema,
   listQuerySchema,
+  memberIdentityResponseSchema,
   memberListResponseSchema,
   memberRemovedResponseSchema,
   memberRoleChangedResponseSchema,
   memberRoleChangeRequestSchema,
   ownershipTransferredResponseSchema,
+  ownershipTransferRequestSchema,
   parseListCursor,
+  recordedResponseSchema,
+  roomInvitationListResponseSchema,
   roomCreateRequestSchema,
   roomDeletedResponseSchema,
   roomDetailResponseSchema,
@@ -19,10 +37,15 @@ import {
   roomRenamedResponseSchema,
   roomRenameRequestSchema,
   roomSummarySchema,
+  safetyCodeRecordRequestSchema,
 } from '@ciphermesh/validation';
+import type { RoomInvitationRecord } from '../db/invitation-store';
 import type { RoomAccessStore } from '../db/room-access-store';
-import type { RoomSummaryRecord } from '../db/room-store';
+import type { RoomStore, RoomSummaryRecord } from '../db/room-store';
+import type { InvitationService } from '../rooms/invitations';
+import type { RoomKeyService } from '../rooms/keys';
 import type { RoomService } from '../rooms/service';
+import { identityToWire } from '../rooms/statements';
 import { actorOf, defineRoute, roomOf, type AnyRoute } from './registry';
 
 /**
@@ -33,10 +56,27 @@ import { actorOf, defineRoute, roomOf, type AnyRoute } from './registry';
  * (AZ-05, AZ-09, AZ-10) load that member by room ID and user ID (OL-02). Handlers never decide
  * authorization themselves; the service re-checks on locked state when it writes.
  *
- * No route accepts or returns key material; room keys arrive with Phase 6.
+ * Phase 6 (CM-T033 to CM-T036, CM-T085) adds the cryptographic membership routes: key version 1
+ * at creation, the signed statements and the caller's own envelopes, invitations, signed grants
+ * for ADMIN and ownership, key reports and Safety Code records. No route accepts or returns room
+ * key material: envelopes are RSA-OAEP ciphertext for one recipient, everything else is public.
  */
 
 const iso = (date: Date): string => date.toISOString();
+
+const b64 = (value: Uint8Array): string => toBase64Url(value);
+
+const invitationView = (invitation: RoomInvitationRecord) => ({
+  id: invitation.id,
+  invitee: invitation.invitee,
+  invitedBy: invitation.invitedBy,
+  role: invitation.role,
+  status: invitation.status,
+  fingerprintConfirmed: invitation.fingerprintConfirmed,
+  approvedByUserId: invitation.approvedByUserId,
+  expiresAt: iso(invitation.expiresAt),
+  createdAt: iso(invitation.createdAt),
+});
 
 const summary = (room: RoomSummaryRecord) => ({
   id: room.id,
@@ -55,7 +95,13 @@ function page<T>(items: readonly T[], size: number, keyOf: (item: T) => { at: Da
   return { visible, nextCursor: next === undefined ? null : formatListCursor(next.at, next.id) };
 }
 
-export function roomRoutes(rooms: RoomService, access: RoomAccessStore): readonly AnyRoute[] {
+export function roomRoutes(
+  rooms: RoomService,
+  access: RoomAccessStore,
+  keys: RoomKeyService,
+  invitations: InvitationService,
+  store: RoomStore,
+): readonly AnyRoute[] {
   /** The stored role of the target member, plus the requested role for role changes (OL-02). */
   const targetFacts =
     (includeSuspended: boolean) =>
@@ -199,7 +245,14 @@ export function roomRoutes(rooms: RoomService, access: RoomAccessStore): readonl
       response: memberRoleChangedResponseSchema,
       handler: async (ctx) => ({
         status: 200,
-        body: await rooms.changeMemberRole(actorOf(ctx), roomOf(ctx), ctx.params.userId, ctx.body.role, ctx.request),
+        body: await rooms.changeMemberRole(
+          actorOf(ctx),
+          roomOf(ctx),
+          ctx.params.userId,
+          ctx.body.role,
+          ctx.body.grant,
+          ctx.request,
+        ),
       }),
     }),
     defineRoute({
@@ -230,11 +283,211 @@ export function roomRoutes(rooms: RoomService, access: RoomAccessStore): readonl
       },
       params: roomMemberParamsSchema,
       query: emptyQuerySchema,
-      body: emptyBodySchema,
+      body: ownershipTransferRequestSchema,
       response: ownershipTransferredResponseSchema,
       handler: async (ctx) => {
-        await rooms.transferOwnership(actorOf(ctx), roomOf(ctx), ctx.params.userId, ctx.request);
+        await rooms.transferOwnership(actorOf(ctx), roomOf(ctx), ctx.params.userId, ctx.body.grant, ctx.request);
         return { status: 200, body: { ownerUserId: ctx.params.userId, formerOwnerRole: 'ADMIN' as const } };
+      },
+    }),
+    // ----------------------------------------------------------- Phase 6: room keys (CM-T036)
+    defineRoute({
+      method: 'GET',
+      path: '/rooms/:roomId/key-versions',
+      action: 'AZ-15-KEY-VERSIONS',
+      access: { kind: 'room' },
+      params: roomParamsSchema,
+      query: emptyQuerySchema,
+      body: undefined,
+      response: keyVersionsResponseSchema,
+      handler: async (ctx) => {
+        const material = await keys.keyMaterial(actorOf(ctx), roomOf(ctx));
+        const { genesis } = material.state;
+        return {
+          status: 200,
+          body: {
+            currentKeyVersion: material.state.currentKeyVersion,
+            keyState: material.state.keyState,
+            genesis:
+              genesis === null
+                ? null
+                : {
+                    creatorUserId: genesis.creatorUserId,
+                    creatorKeyId: genesis.creatorKeyId,
+                    suite: 'CM1' as const,
+                    signature: b64(genesis.signature),
+                  },
+            keyVersions: material.keyVersions.map((v) => ({
+              keyVersion: v.keyVersion,
+              status: v.status,
+              suite: 'CM1' as const,
+              commitment: b64(v.commitment),
+              previousCommitment: v.previousCommitment === null ? null : b64(v.previousCommitment),
+              creatorUserId: v.creatorUserId,
+              creatorKeyId: v.creatorKeyId,
+              recipients: v.recipients.map((r) => ({ userId: r.userId, keyId: r.keyId })),
+              signature: b64(v.signature),
+              createdAt: iso(v.createdAt),
+            })),
+            grants: material.grants.map((g) => ({
+              subjectUserId: g.subjectUserId,
+              subjectKeyId: g.subjectKeyId,
+              role: g.role,
+              grantorUserId: g.grantorUserId,
+              grantorKeyId: g.grantorKeyId,
+              signature: b64(g.signature),
+            })),
+            identities: material.identities.map((identity) => ({ ...identityToWire(identity), suite: 'CM1' as const })),
+          },
+        };
+      },
+    }),
+    defineRoute({
+      method: 'GET',
+      path: '/rooms/:roomId/envelopes',
+      action: 'AZ-12-ENVELOPES',
+      access: { kind: 'room' },
+      params: roomParamsSchema,
+      query: emptyQuerySchema,
+      body: undefined,
+      response: envelopesResponseSchema,
+      handler: async (ctx) => ({
+        status: 200,
+        body: {
+          envelopes: (await keys.ownEnvelopes(actorOf(ctx), roomOf(ctx))).map((e) => ({
+            keyVersion: e.keyVersion,
+            recipientKeyId: e.recipientKeyId,
+            wrappedKey: b64(e.wrappedKey),
+          })),
+        },
+      }),
+    }),
+    defineRoute({
+      method: 'GET',
+      path: '/rooms/:roomId/members/:userId/identity',
+      action: 'AZ-01-MEMBER-IDENTITY',
+      access: { kind: 'room' },
+      params: roomMemberParamsSchema,
+      query: emptyQuerySchema,
+      body: undefined,
+      response: memberIdentityResponseSchema,
+      handler: async (ctx) => {
+        const identity = await keys.memberIdentity(actorOf(ctx), roomOf(ctx), ctx.params.userId);
+        const { userId: _userId, ...wire } = identityToWire(identity);
+        return {
+          status: 200,
+          body: {
+            userId: identity.userId,
+            identity: { ...wire, suite: 'CM1' as const, createdAt: iso(identity.createdAt) },
+          },
+        };
+      },
+    }),
+    defineRoute({
+      method: 'POST',
+      path: '/rooms/:roomId/key-reports',
+      action: 'AZ-29-KEY-REPORT',
+      access: { kind: 'room' },
+      params: roomParamsSchema,
+      query: emptyQuerySchema,
+      body: keyReportRequestSchema,
+      response: recordedResponseSchema,
+      handler: (ctx) => {
+        keys.reportRejectedKey(actorOf(ctx), roomOf(ctx), ctx.body, ctx.request);
+        return { status: 200, body: { status: 'recorded' as const } };
+      },
+    }),
+    defineRoute({
+      method: 'POST',
+      path: '/rooms/:roomId/safety-code',
+      action: 'AZ-30-SAFETY-CODE',
+      access: { kind: 'room' },
+      params: roomParamsSchema,
+      query: emptyQuerySchema,
+      body: safetyCodeRecordRequestSchema,
+      response: recordedResponseSchema,
+      handler: (ctx) => {
+        keys.recordSafetyCode(actorOf(ctx), roomOf(ctx), ctx.body, ctx.request);
+        return { status: 200, body: { status: 'recorded' as const } };
+      },
+    }),
+    // ------------------------------------------------- Phase 6: invitations (CM-T034, CM-T035)
+    defineRoute({
+      method: 'GET',
+      path: '/rooms/:roomId/invitations',
+      action: 'AZ-31-INVITATION-LIST',
+      access: { kind: 'room' },
+      params: roomParamsSchema,
+      query: listQuerySchema,
+      body: undefined,
+      response: roomInvitationListResponseSchema,
+      handler: async (ctx) => {
+        const after = ctx.query.cursor === undefined ? undefined : parseListCursor(ctx.query.cursor);
+        const items = await invitations.listRoomInvitations(
+          actorOf(ctx),
+          roomOf(ctx),
+          after,
+          INVITATION_LIST_PAGE_SIZE + 1,
+        );
+        const { visible, nextCursor } = page(items, INVITATION_LIST_PAGE_SIZE, (i) => ({ at: i.createdAt, id: i.id }));
+        return { status: 200, body: { invitations: visible.map(invitationView), nextCursor } };
+      },
+    }),
+    defineRoute({
+      method: 'POST',
+      path: '/rooms/:roomId/invitations',
+      action: 'AZ-06-INVITATION-CREATE',
+      access: {
+        kind: 'room',
+        // The requested role is what the cell restricts (ADMINs invite only MEMBER or VIEWER).
+        resource: ({ room, body }) => Promise.resolve({ roomId: room.roomId, roles: [body.role] }),
+      },
+      params: roomParamsSchema,
+      query: emptyQuerySchema,
+      body: invitationCreateRequestSchema,
+      response: invitationCreatedResponseSchema,
+      handler: async (ctx) => ({
+        status: 201,
+        body: {
+          invitation: invitationView(
+            await invitations.createInvitation(actorOf(ctx), roomOf(ctx), ctx.body, ctx.request),
+          ),
+        },
+      }),
+    }),
+    defineRoute({
+      method: 'POST',
+      path: '/rooms/:roomId/invitations/:invitationId/approve',
+      action: 'AZ-07-INVITATION-APPROVE',
+      access: { kind: 'room' },
+      params: invitationParamsSchema,
+      query: emptyQuerySchema,
+      body: emptyBodySchema,
+      response: invitationApprovedResponseSchema,
+      handler: async (ctx) => {
+        await invitations.approveInvitation(actorOf(ctx), roomOf(ctx), ctx.params.invitationId, ctx.request);
+        return { status: 200, body: { status: 'PENDING' as const } };
+      },
+    }),
+    defineRoute({
+      method: 'POST',
+      path: '/rooms/:roomId/invitations/:invitationId/revoke',
+      action: 'AZ-08-INVITATION-REVOKE',
+      access: {
+        kind: 'room',
+        // OL-02: the invitation is loaded by its ID and the room ID; the inviter decides `own`.
+        resource: async ({ room, params }) => {
+          const invitation = await store.findRoomInvitation(room.roomId, params.invitationId);
+          return invitation === null ? null : { roomId: invitation.roomId, createdById: invitation.invitedById };
+        },
+      },
+      params: invitationParamsSchema,
+      query: emptyQuerySchema,
+      body: emptyBodySchema,
+      response: invitationClosedResponseSchema,
+      handler: async (ctx) => {
+        await invitations.revokeInvitation(actorOf(ctx), roomOf(ctx), ctx.params.invitationId, ctx.request);
+        return { status: 200, body: { status: 'REVOKED' as const } };
       },
     }),
   ];

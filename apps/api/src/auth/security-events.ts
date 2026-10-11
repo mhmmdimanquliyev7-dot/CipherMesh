@@ -1,7 +1,7 @@
 import type { Logger } from '../logging/logger';
 
 /**
- * Authentication, vault and room authorization security events (Phase 3, extended in Phases 4 and 5).
+ * Authentication, vault and room security events (Phase 3, extended in Phases 4, 5 and 6).
  *
  * Every security-relevant authentication action goes through this single module with a name from
  * a fixed catalogue and allowlisted detail fields. In Phase 3 the sink is the structured
@@ -55,6 +55,22 @@ export const SECURITY_EVENTS = [
   'MEMBER_SUSPENDED',
   'OWNERSHIP_TRANSFERRED',
   'REKEY_REQUIRED',
+  // Cryptographic membership (Phase 6, PC-13 BASELINE). Details carry identifiers, roles, key
+  // versions and reason codes only: never an envelope, commitment, signature, fingerprint or
+  // Room Safety Code (INV-10, INV-18).
+  'INVITATION_CREATED',
+  'INVITATION_APPROVED',
+  'INVITATION_REVOKED',
+  'INVITATION_DECLINED',
+  'INVITATION_INVALIDATED',
+  'MEMBER_JOINED',
+  /** A signed room statement failed the API's verification and nothing was stored. */
+  'ROOM_STATEMENT_REJECTED',
+  /** A member's browser refused a room key version and reported it (AZ-29). */
+  'ROOM_KEY_REJECTED',
+  /** A member's statement that they compared the Room Safety Code of a version (AZ-30). */
+  'SAFETY_CODE_CONFIRMED',
+  'SAFETY_CODE_MISMATCH_REPORTED',
 ] as const;
 export type SecurityEventName = (typeof SECURITY_EVENTS)[number];
 

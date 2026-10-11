@@ -425,10 +425,16 @@ model UserKeyPair {
   /// class: META
   revokedAt                  DateTime?     @map("revoked_at") @db.Timestamptz(3)
 
-  user                User          @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user                User             @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   envelopes           KeyEnvelope[]
   secretsReceived     Secret[]
-  invitationsReceived Invitation[]
+  invitationsReceived Invitation[]     @relation("InvitationInviteeKey")
+  // Signed room statements (Phase 6, ADR-015): the identity that signed or is named by each.
+  roomsCreated        Room[]           @relation("RoomCreatorKey")
+  grantsReceived      RoomMember[]     @relation("MemberSubjectKey")
+  grantsGiven         RoomMember[]     @relation("MemberGrantorKey")
+  invitationsGranted  Invitation[]     @relation("InvitationGrantorKey")
+  keyVersionsCreated  RoomKeyVersion[] @relation("KeyVersionCreatorKey")
 
   // Composite key target: envelopes, secrets and invitations prove the key belongs to the user.
   @@unique([id, userId])
@@ -464,6 +470,10 @@ model Room {
   status             RoomStatus      @default(ACTIVE)
   /// class: ID
   createdById        String          @map("created_by_id") @db.Uuid
+  /// class: ID (the creator's identity key that signed cm.room.genesis; NULL only for rooms created before Phase 6, L-43)
+  creatorKeyId       String?         @map("creator_key_id") @db.Uuid
+  /// class: INT (ECDSA P-256 signature over cm.room.genesis, IEEE P1363, 64 bytes; ADR-015; write-once)
+  genesisSignature   Bytes?          @map("genesis_signature")
   /// class: META
   createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   /// class: META
@@ -472,6 +482,8 @@ model Room {
   deletedAt          DateTime?       @map("deleted_at") @db.Timestamptz(3)
 
   createdBy       User             @relation("RoomCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  // The genesis signer must be an identity of the creator.
+  creatorKey      UserKeyPair?     @relation("RoomCreatorKey", fields: [creatorKeyId, createdById], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
   members         RoomMember[]
   invitations     Invitation[]
   keyVersions     RoomKeyVersion[]
@@ -511,6 +523,16 @@ model RoomMember {
   removedById     String?          @map("removed_by_id") @db.Uuid
   /// class: META
   removalReason   RemovalReason?   @map("removal_reason")
+  /// class: ID (identity key named by the member's latest signed grant; NULL when the genesis statement is the authority, or before Phase 6)
+  subjectKeyId    String?          @map("subject_key_id") @db.Uuid
+  /// class: META (role named by that grant; can exceed the current role after a demotion, L-46)
+  grantRole       RoomRole?        @map("grant_role")
+  /// class: ID
+  grantorUserId   String?          @map("grantor_user_id") @db.Uuid
+  /// class: ID
+  grantorKeyId    String?          @map("grantor_key_id") @db.Uuid
+  /// class: INT (ECDSA P-256 signature over cm.room.membership-grant, 64 bytes; ADR-015)
+  grantSignature  Bytes?           @map("grant_signature")
 
   room       Room        @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   user       User        @relation("MemberUser", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
@@ -518,6 +540,9 @@ model RoomMember {
   removedBy  User?       @relation("MemberRemovedBy", fields: [removedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
   // The invitation must belong to the same room.
   invitation Invitation? @relation(fields: [invitationId, roomId], references: [id, roomId], onDelete: Restrict, onUpdate: Restrict)
+  // The granted key belongs to the member; the grantor key belongs to the grantor.
+  subjectKey UserKeyPair? @relation("MemberSubjectKey", fields: [subjectKeyId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  grantorKey UserKeyPair? @relation("MemberGrantorKey", fields: [grantorKeyId, grantorUserId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
 
   // Object-level authorization lookup (roomId, userId) is served by the partial unique index.
   @@unique([roomId, userId], map: "room_members_one_current_membership", where: raw("status = 'ACTIVE' OR status = 'SUSPENDED'"))
@@ -555,11 +580,17 @@ model Invitation {
   createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   /// class: META
   respondedAt          DateTime?        @map("responded_at") @db.Timestamptz(3)
+  /// class: ID (the inviter's identity key that signed the membership grant; ADR-015)
+  grantorKeyId         String           @map("grantor_key_id") @db.Uuid
+  /// class: INT (ECDSA P-256 signature over cm.room.membership-grant for the invitee's key and role; write-once)
+  grantSignature       Bytes            @map("grant_signature")
 
   room       Room          @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   invitee    User          @relation("InvitationInvitee", fields: [inviteeUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   // The invitee key must belong to the invitee.
-  inviteeKey UserKeyPair   @relation(fields: [inviteeKeyId, inviteeUserId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  inviteeKey UserKeyPair   @relation("InvitationInviteeKey", fields: [inviteeKeyId, inviteeUserId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  // The grant is signed by an identity of the inviter.
+  grantorKey UserKeyPair   @relation("InvitationGrantorKey", fields: [grantorKeyId, invitedById], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
   invitedBy  User          @relation("InvitationInvitedBy", fields: [invitedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
   approvedBy User?         @relation("InvitationApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
   members    RoomMember[]
@@ -596,6 +627,16 @@ model RoomKeyVersion {
   wrapCount            Int                @default(0) @map("wrap_count")
   /// class: ID
   createdById          String             @map("created_by_id") @db.Uuid
+  /// class: ID (the creator's identity key that signed cm.room.key-version; ADR-015)
+  createdByKeyId       String             @map("created_by_key_id") @db.Uuid
+  /// class: INT (RKC_(v-1); NULL exactly for version 1)
+  previousCommitment   Bytes?             @map("previous_commitment")
+  /// class: ID (signed recipient list: user IDs, sorted together with recipient_key_ids)
+  recipientUserIds     String[]           @map("recipient_user_ids") @db.Uuid
+  /// class: ID (signed recipient list: identity key IDs, parallel to recipient_user_ids)
+  recipientKeyIds      String[]           @map("recipient_key_ids") @db.Uuid
+  /// class: INT (ECDSA P-256 signature over cm.room.key-version, IEEE P1363, 64 bytes; write-once)
+  statementSignature   Bytes              @map("statement_signature")
   /// class: META
   createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   /// class: META
@@ -605,6 +646,8 @@ model RoomKeyVersion {
 
   room               Room            @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   createdBy          User            @relation("KeyVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  // The statement is signed by an identity of the creator.
+  createdByKey       UserKeyPair     @relation("KeyVersionCreatorKey", fields: [createdByKeyId, createdById], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
   // Operations are purged 90 days after closing (data-model section 5); the version row stays.
   createdByOperation RekeyOperation? @relation(fields: [createdByOperationId], references: [id], onDelete: SetNull, onUpdate: Restrict)
   envelopes          KeyEnvelope[]

@@ -52,6 +52,9 @@ describe('bola inventory', () => {
       expect(c.kind === 'room', c.key).toBe(route?.access === 'room');
       expect(c.mutates, c.key).toBe(route?.method !== 'GET');
       expect(c.targetsMember, c.key).toBe(c.key.includes(':userId'));
+      expect(c.targetsInvitation, c.key).toBe(c.key.includes(':invitationId'));
+      // The action a case names is the matrix action the route declares (AZ-xx).
+      if (c.kind === 'room') expect(route?.action.startsWith(`${String(c.action)}-`), c.key).toBe(true);
     }
   });
 
@@ -59,7 +62,7 @@ describe('bola inventory', () => {
     for (const c of ROOM_CASES) {
       for (const required of ['A', 'B', 'D', 'E', 'F', 'H'] as const) expect(c.classes, c.key).toContain(required);
       if (c.mutates) expect(c.classes, c.key).toContain('G');
-      if (c.targetsMember) {
+      if (c.targetsMember || c.targetsInvitation) {
         expect(c.classes, c.key).toContain('C');
         expect(c.target, c.key).toBeDefined();
       }

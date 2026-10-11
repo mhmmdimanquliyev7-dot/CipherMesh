@@ -16,6 +16,7 @@ afterAll(() => api.close());
 // Identifiers for the parameterized room routes; the gate rejects before they are looked at.
 const PROBE_ROOM = randomUUID();
 const PROBE_MEMBER = randomUUID();
+const PROBE_INVITATION = randomUUID();
 
 const STATE_CHANGING = [
   '/auth/register',
@@ -41,6 +42,14 @@ const STATE_CHANGING = [
   `/rooms/${PROBE_ROOM}/members/${PROBE_MEMBER}/role`,
   `/rooms/${PROBE_ROOM}/members/${PROBE_MEMBER}/remove`,
   `/rooms/${PROBE_ROOM}/members/${PROBE_MEMBER}/transfer-ownership`,
+  // Cryptographic membership (Phase 6): the same gate before any key, statement or invitation work.
+  `/rooms/${PROBE_ROOM}/key-reports`,
+  `/rooms/${PROBE_ROOM}/safety-code`,
+  `/rooms/${PROBE_ROOM}/invitations`,
+  `/rooms/${PROBE_ROOM}/invitations/${PROBE_INVITATION}/approve`,
+  `/rooms/${PROBE_ROOM}/invitations/${PROBE_INVITATION}/revoke`,
+  `/invitations/${PROBE_INVITATION}/accept`,
+  `/invitations/${PROBE_INVITATION}/decline`,
 ];
 
 interface Attack {

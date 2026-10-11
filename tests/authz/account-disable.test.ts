@@ -17,6 +17,7 @@ import {
   whileLocked,
   type Person,
 } from '../helpers/rooms';
+import { creationBody } from '../helpers/room-crypto';
 
 // PA-03 and key-lifecycle R3 (Phase 5): disabling an account suspends every ACTIVE room
 // membership of it and sets those rooms to REKEY_REQUIRED with MEMBER_SUSPENDED, in the same
@@ -74,8 +75,9 @@ describe('disabling an account (PA-03) suspends its room memberships', () => {
       removed_at: new Date(),
       removal_reason: 'REMOVED_BY_ADMIN',
     });
+    // The creators' own envelopes exist since Phase 6 (room creation, DF-05); the target's in the
+    // room it only belongs to is a DUMMY fixture.
     await insertDummyEnvelope(db, asMember, target.userId, other.userId);
-    await insertDummyEnvelope(db, unrelated, other.userId, other.userId);
   });
 
   it('starts from ACTIVE memberships and writable rooms', async () => {
@@ -118,7 +120,9 @@ describe('disabling an account (PA-03) suspends its room memberships', () => {
     expect(await roomRow(db, unrelated)).toMatchObject({ key_state: 'ACTIVE', epoch: epochs[2] });
     expect(await roomRow(db, formerRoom)).toMatchObject({ key_state: 'ACTIVE', epoch: epochs[3] });
     expect((await membershipOf(formerRoom, target.userId))?.status).toBe('REMOVED');
-    expect(await envelopeRecipients(asMember)).toEqual([]);
+    // Exactly the disabled user's envelopes are gone; the other members keep theirs.
+    expect(await envelopeRecipients(asMember)).toEqual([other.userId]);
+    expect(await envelopeRecipients(asOwner)).toEqual([]);
     expect(await envelopeRecipients(unrelated)).toEqual([other.userId]);
 
     const disabled = api.events.find((e) => e.name === 'ACCOUNT_DISABLED');
@@ -155,7 +159,7 @@ describe('disabling an account (PA-03) suspends its room memberships', () => {
     expect(api.events.filter((e) => e.name === 'MEMBER_SUSPENDED')).toEqual([]);
   });
 
-  it('re-enabling restores the login but not the memberships (reinstatement is AZ-14, Phase 6)', async () => {
+  it('re-enabling restores the login but not the memberships (reinstatement is AZ-14, CM-T053)', async () => {
     expect((await enable(target.userId)).status).toBe(200);
     const browser = new Browser(api);
     expect((await browser.login({ email: target.email, password: target.password })).status).toBe(200);
@@ -173,6 +177,7 @@ describe('disabling an account while the same user creates a room', () => {
       const user = await personWithVault(api, db);
       await stepUp(api, platform, platform.secret);
       const roomId = randomUUID();
+      const body = await creationBody(user, roomId, 'STANDARD', 'Racing');
       // Both transactions need the user row: the creation to check the account, the disable to
       // change it. Holding it makes them overlap; either may win.
       const [created, disabled] = await whileLocked(
@@ -181,7 +186,7 @@ describe('disabling an account while the same user creates a room', () => {
         [user.userId],
         () =>
           Promise.all([
-            user.browser.request('POST', '/rooms', { roomId, name: 'Racing', securityProfile: 'STANDARD' }),
+            user.browser.request('POST', '/rooms', body),
             platform.browser.request('POST', '/admin/users/disable', { userId: user.userId }),
           ]),
       );

@@ -1,6 +1,6 @@
 import { ECDSA, RSA_OAEP, SUITE, VAULT_KDF, VAULT_VERSION, WRAPPED_KEY_BYTES } from '@ciphermesh/crypto/params';
 import { emailSchema } from './auth';
-import { isoTimestampSchema, uuidV4Schema } from './schemas';
+import { base64Url, isoTimestampSchema, uuidV4Schema } from './schemas';
 import { z } from './zod';
 
 /**
@@ -13,16 +13,6 @@ import { z } from './zod';
  * No schema here has a field for a passphrase, a vault-derived key or a plaintext private key:
  * such a field would be rejected as unknown by the strict objects (INV-01).
  */
-
-/** Unpadded base64url of exactly or between the given byte lengths. */
-function base64Url(minBytes: number, maxBytes: number = minBytes) {
-  const length = (bytes: number): number => Math.ceil((bytes * 4) / 3);
-  return z
-    .string()
-    .min(length(minBytes))
-    .max(length(maxBytes))
-    .regex(/^[A-Za-z0-9_-]*$/);
-}
 
 export const fingerprintSchema = z.string().regex(/^[0-9a-f]{64}$/);
 

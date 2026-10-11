@@ -66,9 +66,31 @@ async function invitationRow(
     invitee_user_id: invitee,
     invitee_key_id: inviteeKey,
     invited_by_id: room.ownerId,
+    grantor_key_id: room.ownerKeyId,
+    grant_signature: DUMMY.signature(),
     role: 'MEMBER',
     status: 'PENDING',
     expires_at: new Date(Date.now() + 86_400_000),
+    ...overrides,
+  };
+}
+
+/** A key-version row of the fixture room (DUMMY commitment and signature). */
+function versionRow(room: RoomFixture, v: number, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    room_id: room.roomId,
+    version: v,
+    status: 'RETIRED',
+    retired_at: new Date(),
+    commitment: DUMMY.digest(),
+    algorithm_suite: 'CM1',
+    reasons: '{MANUAL}',
+    created_by_id: room.ownerId,
+    created_by_key_id: room.ownerKeyId,
+    previous_commitment: v === 1 ? null : DUMMY.digest(),
+    recipient_user_ids: [room.ownerId],
+    recipient_key_ids: [room.ownerKeyId],
+    statement_signature: DUMMY.signature(),
     ...overrides,
   };
 }
@@ -125,20 +147,11 @@ describe('partial unique indexes (data-model 4.5 to 4.9.1)', () => {
 
   it('allows one ACTIVE key version per room and unique version numbers', async () => {
     const room = await insertRoom(api);
-    const version = (v: number, status: string, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
-      room_id: room.roomId,
-      version: v,
-      status,
-      commitment: DUMMY.digest(),
-      algorithm_suite: 'CM1',
-      reasons: '{MANUAL}',
-      created_by_id: room.ownerId,
-      ...extra,
-    });
-    expect(await attempt('room_key_versions', version(2, 'ACTIVE'))).toBe(SQLSTATE.uniqueViolation);
-    expect(await attempt('room_key_versions', version(1, 'RETIRED', { retired_at: new Date() }))).toBe(
+    expect(await attempt('room_key_versions', versionRow(room, 2, { status: 'ACTIVE', retired_at: null }))).toBe(
       SQLSTATE.uniqueViolation,
     );
+    expect(await attempt('room_key_versions', versionRow(room, 1))).toBe(SQLSTATE.uniqueViolation);
+    expect(await attempt('room_key_versions', versionRow(room, 2))).toBe('none');
   });
 
   it('allows one PENDING rekey operation per room (ADR-013)', async () => {
@@ -221,6 +234,113 @@ describe('composite foreign keys', () => {
         memberRow(room.roomId, String(invitation['invitee_user_id']), { invitation_id: invitationId }),
       ),
     ).toBe(SQLSTATE.foreignKeyViolation);
+  });
+});
+
+describe('signed room statements (Phase 6, ADR-015 section 4)', () => {
+  it('stores a genesis statement completely or not at all, with a 64-byte signature', async () => {
+    const owner = await insertUser(api);
+    const ownerKey = await insertKeyPair(api, owner);
+    const room = (extra: Record<string, unknown>) => ({
+      id: randomUUID(),
+      name: 'Synthetic room',
+      security_profile: 'STANDARD',
+      policy_version: 1,
+      created_by_id: owner,
+      ...extra,
+    });
+    expect(await attempt('rooms', room({ creator_key_id: ownerKey, genesis_signature: DUMMY.signature() }))).toBe(
+      'none',
+    );
+    // Rooms created before Phase 6 have neither (L-43).
+    expect(await attempt('rooms', room({}))).toBe('none');
+    expect(await attempt('rooms', room({ creator_key_id: ownerKey }))).toBe(SQLSTATE.checkViolation);
+    expect(await attempt('rooms', room({ genesis_signature: DUMMY.signature() }))).toBe(SQLSTATE.checkViolation);
+    expect(await attempt('rooms', room({ creator_key_id: ownerKey, genesis_signature: DUMMY.ciphertext(63) }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+    // The genesis signer must be an identity of the creator.
+    const other = await insertUser(api);
+    const otherKey = await insertKeyPair(api, other);
+    expect(await attempt('rooms', room({ creator_key_id: otherKey, genesis_signature: DUMMY.signature() }))).toBe(
+      SQLSTATE.foreignKeyViolation,
+    );
+  });
+
+  it('requires a previous commitment exactly for versions after 1, and a bounded signed recipient list', async () => {
+    const room = await insertRoom(api);
+    expect(await attempt('room_key_versions', versionRow(room, 2, { previous_commitment: null }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+    expect(await attempt('room_key_versions', versionRow(room, 2, { previous_commitment: DUMMY.ciphertext(31) }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+    const many = Array.from({ length: 101 }, () => room.ownerId);
+    for (const recipients of [
+      { recipient_user_ids: [], recipient_key_ids: [] },
+      { recipient_user_ids: null, recipient_key_ids: null },
+      { recipient_user_ids: [room.ownerId], recipient_key_ids: [] },
+      { recipient_user_ids: [room.ownerId, null], recipient_key_ids: [room.ownerKeyId, room.ownerKeyId] },
+      { recipient_user_ids: many, recipient_key_ids: many.map(() => room.ownerKeyId) },
+    ]) {
+      expect(await attempt('room_key_versions', versionRow(room, 2, recipients)), JSON.stringify(recipients)).toBe(
+        SQLSTATE.checkViolation,
+      );
+    }
+    expect(await attempt('room_key_versions', versionRow(room, 2, { statement_signature: DUMMY.ciphertext(65) }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+    // The statement is signed by an identity of the version's creator.
+    const other = await insertUser(api);
+    expect(
+      await attempt('room_key_versions', versionRow(room, 2, { created_by_key_id: await insertKeyPair(api, other) })),
+    ).toBe(SQLSTATE.foreignKeyViolation);
+  });
+
+  it('stores a membership grant completely or not at all, for identities of the member and the grantor', async () => {
+    const room = await insertRoom(api);
+    const user = await insertUser(api);
+    const userKey = await insertKeyPair(api, user);
+    const grant = {
+      subject_key_id: userKey,
+      grant_role: 'ADMIN',
+      grantor_user_id: room.ownerId,
+      grantor_key_id: room.ownerKeyId,
+      grant_signature: DUMMY.signature(),
+    };
+    expect(await attempt('room_members', memberRow(room.roomId, user, grant))).toBe('none');
+    for (const missing of Object.keys(grant)) {
+      const partial: Record<string, unknown> = { ...grant, [missing]: null };
+      expect(await attempt('room_members', memberRow(room.roomId, user, partial)), missing).toBe(
+        SQLSTATE.checkViolation,
+      );
+    }
+    // A grant for someone else's key, or signed by a key that is not the grantor's, is refused
+    // (fresh members, so the one-current-membership index is not what refuses them).
+    const second = await insertUser(api);
+    expect(
+      await attempt('room_members', memberRow(room.roomId, second, { ...grant, subject_key_id: room.ownerKeyId })),
+    ).toBe(SQLSTATE.foreignKeyViolation);
+    const third = await insertUser(api);
+    const thirdKey = await insertKeyPair(api, third);
+    expect(
+      await attempt(
+        'room_members',
+        memberRow(room.roomId, third, { ...grant, subject_key_id: thirdKey, grantor_key_id: userKey }),
+      ),
+    ).toBe(SQLSTATE.foreignKeyViolation);
+  });
+
+  it("refuses an invitation grant by a key that is not the inviter's, or with a malformed signature", async () => {
+    const room = await insertRoom(api);
+    const stranger = await insertUser(api);
+    const strangerKey = await insertKeyPair(api, stranger);
+    expect(await attempt('invitations', await invitationRow(room, { grantor_key_id: strangerKey }))).toBe(
+      SQLSTATE.foreignKeyViolation,
+    );
+    expect(await attempt('invitations', await invitationRow(room, { grant_signature: DUMMY.ciphertext(32) }))).toBe(
+      SQLSTATE.checkViolation,
+    );
   });
 });
 
@@ -514,6 +634,37 @@ describe('write-once identity columns', () => {
         [key, DUMMY.encryptedPrivateKey(), DUMMY.encryptedSigningPrivateKey()],
       ),
     ).toBe(SQLSTATE.integrityConstraintViolation);
+  });
+
+  it('never replaces a signed statement: genesis, key-version statement or invitation grant (ADR-015)', async () => {
+    const room = await insertRoom(api);
+    for (const [sql, values] of [
+      ['UPDATE rooms SET genesis_signature = $2 WHERE id = $1', [room.roomId, DUMMY.signature().fill(1)]],
+      ['UPDATE rooms SET creator_key_id = NULL, genesis_signature = NULL WHERE id = $1', [room.roomId]],
+      [
+        'UPDATE room_key_versions SET statement_signature = $2 WHERE room_id = $1',
+        [room.roomId, DUMMY.signature().fill(1)],
+      ],
+      ['UPDATE room_key_versions SET recipient_user_ids = $2 WHERE room_id = $1', [room.roomId, [randomUUID()]]],
+      ['UPDATE room_key_versions SET created_by_key_id = $2 WHERE room_id = $1', [room.roomId, randomUUID()]],
+    ] as const) {
+      expect(await run(sql, [...values]), sql).toBe(SQLSTATE.integrityConstraintViolation);
+    }
+    const invitationId = randomUUID();
+    await insert(api, 'invitations', { id: invitationId, ...(await invitationRow(room)) });
+    for (const [column, value] of [
+      ['grant_signature', DUMMY.signature().fill(2)],
+      ['role', 'ADMIN'],
+      ['expires_at', new Date(Date.now() + 999_000_000)],
+      ['invitee_key_id', randomUUID()],
+    ] as const) {
+      expect(await run(`UPDATE invitations SET ${column} = $2 WHERE id = $1`, [invitationId, value]), column).toBe(
+        SQLSTATE.integrityConstraintViolation,
+      );
+    }
+    // Status and timestamps stay updatable.
+    expect(await run(`UPDATE invitations SET status = 'REVOKED' WHERE id = $1`, [invitationId])).toBe('none');
+    expect(await run(`UPDATE rooms SET name = 'Renamed' WHERE id = $1`, [room.roomId])).toBe('none');
   });
 
   it('never changes the commitment of a key version', async () => {

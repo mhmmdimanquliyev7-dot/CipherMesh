@@ -77,6 +77,8 @@ const KEY_FIELD_ALLOWED = [
   /^publickey(spki|fingerprint)$/,
   /^signingpublickeyspki$/,
   /^objectkey$/,
+  // Phase 6: the signed recipient list of a key version holds identity key IDs (public, ADR-015).
+  /^recipientkeyids$/,
 ];
 
 /** @type {[(n: string) => boolean, string][]} */
