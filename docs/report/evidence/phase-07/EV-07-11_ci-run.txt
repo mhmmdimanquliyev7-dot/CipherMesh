@@ -1,0 +1,17 @@
+EV-07-11: CI run of pull request #24 (Phase 7)
+Merged: 2026-10-11 as merge commit ce331c0 (parents c175d22 and 91d8340)
+Redaction: check names and results only.
+
+CI workflow run 38143399418 (https://github.com/mhmmdimanquliyev7-dot/CipherMesh/actions/runs/38143399418), attempt 2
+  Lint, types, tests, build, E2E    pass (9m18s)
+  Dependency audit                  pass
+  Secret scan (gitleaks, full history)  pass
+GitGuardian Security Checks         pass
+
+Attempt 1 failed in the E2E step with one test: tests/e2e/rooms.spec.ts "create, open after a reload, rename and
+delete a room" in WebKit, where creating the vault (RSA-3072 key generation and Argon2id in WebKit on the shared
+runner) did not finish within the 90 second wait of the helper (room-helpers.ts, signedInWithVault). Every other
+step of that attempt had passed, including the unit, database, files and coverage steps and all other E2E tests
+(92 of 93). The test and the helper are Phase 5 and 6 code that Phase 7 did not change, and the vault flow does not
+use any Phase 7 code. The failed job was rerun once (attempt 2) and everything passed; no assertion or timeout was
+changed. Treated as the known timing-sensitive class of the vault E2E tests (CI timing notes of the handoff).

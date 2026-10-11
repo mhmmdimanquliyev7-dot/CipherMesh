@@ -1,15 +1,16 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-11, end of Prompt 09 (Phase 7 implemented and verified on `feature/CM-T037-encrypted-files`: CM-T037 to CM-T041; the pull request and merge identifiers are recorded by the post-merge handoff pull request). Phases 1 to 6 are merged into `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-11, end of Prompt 09 (Phase 7 implemented, verified and merged into `main`: CM-T037 to CM-T041). Phases 1 to 7 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
 | Item | State |
 |---|---|
-| Completed on `main` | Phases 1 to 6 (pull requests #1, #7, #8, #10, #13, #22; Phase 6 merge commit `b3e9dd5`; last handoff PR #23, `c175d22`) |
-| Phase 7 | **Encrypted Files (CM-T037 to CM-T041), implemented and verified in Prompt 09** on `feature/CM-T037-encrypted-files`, created from `main` at `c175d22`. It is merged only through its pull request; the PR number, CI run and merge commit are recorded in [phase-07-traceability.md](phase-07-traceability.md) section 7 by the post-merge handoff |
-| Branch | `feature/CM-T037-encrypted-files`; no further commits after the PR is created except review fixes |
-| Next | **Prompt 10: Phase 8, Secure Notes** (CM-T042). It starts from the updated `main` after the Phase 7 merge. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Files panel only follows the current style |
+| Completed on `main` | Phases 1 to 7 (pull requests #1, #7, #8, #10, #13, #22, #24). **Phase 7 (CM-T037 to CM-T041) was merged through pull request #24, merge commit `ce331c0`** (`ce331c0789fc2d3454005e077bcbe17818701844`; parents `c175d22` and `91d8340`). CI run 38143399418 passed every job on attempt 2 (attempt 1 had one unrelated WebKit vault timeout, EV-07-11); GitGuardian, the dependency audit and the secret scan passed. Traceability: [phase-07-traceability.md](phase-07-traceability.md) |
+| Phase 7 | Encrypted Files: client-side AES-256-GCM files of at most 50 MiB with a per-file FEK wrapped under RWK_v, ciphertext in the S3-compatible bucket through presigned URLs, quotas, expiry, deletion and worker cleanup (section 6b) |
+| Branch | `feature/CM-T037-encrypted-files` (head `91d8340`) is merged and takes no further commits |
+| Next | **Prompt 10: Phase 8, Secure Notes** (CM-T042). It starts from the updated `main` after the Phase 7 handoff merge, never from the Phase 7 branch. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Files panel only follows the current style |
+| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 7. It is the baseline for Prompt 10 |
 
 ## 2. Architecture implemented so far
 
@@ -172,8 +173,8 @@ Local notes: the files suites need the local storage (`pnpm services:up && pnpm 
 
 - Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including both coverage steps) as required checks, then capture EV-01-01 to EV-01-03.
 - Dependabot pull requests remain open (#2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24; the `next` update is covered by Phase 6, which pins 16.3.8).
-- Jira: import the backlog; move CM-T006 to CM-T036, CM-T085 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01 and R-05-01 as `security-finding` items. Nothing is DONE yet.
-- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 6. EV-06-01 to EV-06-10 are in `docs/report/evidence/phase-06/` (EV-06-10 is the CI run of pull request #22).
+- Jira: import the backlog; move CM-T006 to CM-T041, CM-T085 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01, R-05-01 and SF-07-01 as `security-finding` items. Nothing is DONE yet.
+- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 7. EV-07-01 to EV-07-11 are in `docs/report/evidence/phase-07/` (EV-07-11 is the CI run of pull request #24). EV-06-01 to EV-06-10 are in `docs/report/evidence/phase-06/` (EV-06-10 is the CI run of pull request #22).
 
 ## 13. Not implemented yet
 

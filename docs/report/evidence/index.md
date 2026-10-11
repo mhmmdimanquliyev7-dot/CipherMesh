@@ -90,3 +90,25 @@ Captured on `feature/CM-T029-secure-rooms-rbac` (from `main` at `5c1ed32`) again
 | EV-05-04 | [phase-05/EV-05-04_supply-chain.txt](phase-05/EV-05-04_supply-chain.txt) | 2026-10-06 | CM-T029 to CM-T032 | The `source-map-js` advisory and its lockfile-only remediation to 1.2.2; audit clean |
 | EV-05-05 | [phase-05/EV-05-05_phase-5-gates.txt](phase-05/EV-05-05_phase-5-gates.txt) | 2026-10-06 | CM-T029 to CM-T032 | Every gate of CLAUDE.md section 10: 1516 Vitest tests, E2E in three engines, build, smoke, audit, SBOM, full-history secret scan |
 | EV-05-06 | [phase-05/EV-05-06_ci-run.txt](phase-05/EV-05-06_ci-run.txt) | 2026-10-06 | CM-T029 to CM-T032 | CI run of pull request #13: every job passed (1516 Vitest tests, both coverage gates, E2E in three engines, dependency audit, full-history secret scan); merge commit `bd4d2f6` |
+
+## Phase 6
+
+Captured in Prompt 08; the files are in [phase-06/](phase-06/): EV-06-01 (stored key material: lengths and hashes), EV-06-02 (RESTRICTED invitation screenshots), EV-06-03 (commitment and key-injection refusals), EV-06-04 (three-engine results), EV-06-05 and EV-06-06 (Safety Code screenshots), EV-06-07 (gates), EV-06-08 (negative controls), EV-06-09 (supply chain), EV-06-10 (CI run of pull request #22).
+
+## Phase 7
+
+Captured on `feature/CM-T037-encrypted-files` (from `main` at `c175d22`) against the real API, PostgreSQL and the local S3-compatible storage, with synthetic data only. Merged through pull request #24 (merge commit `ce331c0`).
+
+| ID | File | Date | Work item | What it shows |
+|---|---|---|---|---|
+| EV-07-01 | [phase-07/EV-07-01-original-head.txt](phase-07/EV-07-01-original-head.txt), [phase-07/EV-07-01-object-head.txt](phase-07/EV-07-01-object-head.txt) | 2026-10-11 | CM-T038 | First 64 bytes of a synthetic original file and of its stored object (hex): the object is ciphertext |
+| EV-07-02 | [phase-07/EV-07-02_bucket-objects.txt](phase-07/EV-07-02_bucket-objects.txt) | 2026-10-11 | CM-T037, CM-T038 | Bucket listing by the administrator: random object names only; runtime credential cannot list; anonymous read refused (stands in for the provider console until Phase 19) |
+| EV-07-03 | [phase-07/EV-07-03_file-row.txt](phase-07/EV-07-03_file-row.txt) | 2026-10-11 | CM-T038 | The file row: wrapped FEK, encrypted manifest, sizes and hashes only; no name, type or key column |
+| EV-07-04 | [phase-07/EV-07-04_tamper-tests.txt](phase-07/EV-07-04_tamper-tests.txt), [phase-07/EV-07-04-tampered.png](phase-07/EV-07-04-tampered.png), [phase-07/EV-07-04-download-ok.png](phase-07/EV-07-04-download-ok.png) | 2026-10-11 | CM-T039 | Tamper tests; the integrity error with nothing saved; a second member's download |
+| EV-07-05 | [phase-07/EV-07-05_canary-scan.txt](phase-07/EV-07-05_canary-scan.txt) | 2026-10-11 | CM-T038 | Canary scan: no file name or content in any table, the object or the log |
+| EV-07-06 | [phase-07/EV-07-06_presigned-expiry.txt](phase-07/EV-07-06_presigned-expiry.txt) | 2026-10-11 | CM-T037 | Presigned URLs expire; one object, one method, one size |
+| EV-07-07 | [phase-07/EV-07-07_file-benchmark.txt](phase-07/EV-07-07_file-benchmark.txt) | 2026-10-11 | CM-T038 | CP-19 benchmark in three engines; memory was not measured (L-47) |
+| EV-07-08 | [phase-07/EV-07-08_phase-7-gates.txt](phase-07/EV-07-08_phase-7-gates.txt) | 2026-10-11 | CM-T037 to CM-T041 | Gates: 1876 Vitest tests in 75 files, 83 E2E passed (10 skipped by design), coverage, build, audit |
+| EV-07-09 | [phase-07/EV-07-09_negative-controls.txt](phase-07/EV-07-09_negative-controls.txt) | 2026-10-11 | CM-T037 to CM-T041 | 69 of 69 negative controls caught, ten of them new |
+| EV-07-10 | [phase-07/EV-07-10_supply-chain.txt](phase-07/EV-07-10_supply-chain.txt) | 2026-10-11 | CM-T037 | `aws4fetch` 1.0.20 (LIB-09), audit, SBOM, secret scan |
+| EV-07-11 | [phase-07/EV-07-11_ci-run.txt](phase-07/EV-07-11_ci-run.txt) | 2026-10-11 | CM-T037 to CM-T041 | CI run 38143399418 of pull request #24: every job passed on attempt 2 after one unrelated WebKit timeout on attempt 1 |

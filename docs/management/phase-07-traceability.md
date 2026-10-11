@@ -1,6 +1,6 @@
 # Phase 7 Traceability
 
-Status: implemented on 2026-10-11 (Prompt 09): CM-T037 to CM-T041. Branch `feature/CM-T037-encrypted-files`, created from `main` at `c175d22`. Backlog items: [jira-backlog.md](jira-backlog.md) (CM-EPIC-07). Specification: [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md) section 6.1, [../architecture/data-flow.md](../architecture/data-flow.md) DF-07 and DF-08, [../architecture/data-model.md](../architecture/data-model.md) 4.11 and 5, [../security/authorization-model.md](../security/authorization-model.md) section 9.8, crypto-decisions CP-19, CP-20, CD-30, LIB-09.
+Status: implemented on 2026-10-11 (Prompt 09): CM-T037 to CM-T041, verified, and merged into `main` through pull request #24 (merge commit `ce331c0`, parents `c175d22` and `91d8340`, CI run 38143399418, EV-07-11). Branch `feature/CM-T037-encrypted-files` was created from `main` at `c175d22`. Backlog items: [jira-backlog.md](jira-backlog.md) (CM-EPIC-07). Specification: [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md) section 6.1, [../architecture/data-flow.md](../architecture/data-flow.md) DF-07 and DF-08, [../architecture/data-model.md](../architecture/data-model.md) 4.11 and 5, [../security/authorization-model.md](../security/authorization-model.md) section 9.8, crypto-decisions CP-19, CP-20, CD-30, LIB-09.
 
 ## 1. Work items
 
@@ -92,4 +92,8 @@ Local notes: the files suites and the E2E tests need the local storage (`pnpm se
 
 ## 7. Merge and CI
 
-Recorded after the merge by the post-merge handoff pull request: pull request number, CI run, merge commit and evidence EV-07-11.
+Pull request #24 (`feature/CM-T037-encrypted-files` into `main`) was merged on 2026-10-11 by the project owner with a normal merge commit, `ce331c0789fc2d3454005e077bcbe17818701844` (ce331c0); the first parent is the Phase 6 handoff merge `c175d22`. The merge itself was done by the owner because Claude Code's permission check ("Merge Without Review") blocked the merge command; nothing was bypassed.
+
+CI run 38143399418 (EV-07-11): every job passed on attempt 2 (lint, types, tests, build, E2E; dependency audit; gitleaks over the full history), and GitGuardian passed. **Attempt 1 failed** in one WebKit E2E test, `rooms.spec.ts` "create, open after a reload, rename and delete a room", whose vault creation did not finish within its 90 second wait on the shared runner (92 of 93 E2E tests passed in that attempt). The test, the helper and the vault flow are unchanged by Phase 7 and use no Phase 7 code. The job was rerun once and passed; no assertion or timeout was changed. It belongs to the known timing-sensitive class of vault E2E tests; if it recurs, look at WebKit key generation time on the runner, not at Phase 7.
+
+Phase 7 acceptance criteria: every criterion of CM-T037 to CM-T041 in section 1 is met, with two recorded exceptions: the bucket lifecycle rules of CM-T040 (provider configuration, Phase 19) and the memory figure of the CP-19 checkpoint (not measured, L-47).
