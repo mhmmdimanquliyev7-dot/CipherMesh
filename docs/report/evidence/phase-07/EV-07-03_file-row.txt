@@ -1,0 +1,14 @@
+EV-07-03: one encrypted file row as stored (synthetic E2E upload, Chromium)
+Captured: 2026-10-11T11:38:35.397Z
+Redaction: binary values are shown as length and SHA-256 prefix only; no key, URL or secret is printed.
+
+id 2d405c1c-f5b6-41c2-98a4-8221c986b4a0 room 7eee29d9-4775-440a-9b0f-35a6e861b9f6 key_version 1 status AVAILABLE suite CM1
+  wrapped_dek (FEK wrapped under RWK_1, AES-256-GCM): 48 bytes, sha256 12ce4b6d541d50c8
+  dek_iv: 12 bytes, sha256 16c187171aded866; content_iv: 12 bytes, sha256 3ca41600f043dc39; manifest_iv: 12 bytes, sha256 e0a1909882baab29
+  manifest_ciphertext (name, type, size, plaintext SHA-256, encrypted): 148 bytes, sha256 d36107b0cf4b4972
+  object_key: f/cVKDHs... (f/ + 32 random bytes, base64url; 45 characters)
+  ciphertext_size: 2097196; ciphertext_sha256: 32 bytes, sha256 c0808481f488c790
+  expires_at null uploaded_at 2026-10-11T10:49:10.370Z
+
+Columns of encrypted_files (19): id, room_id, uploader_id, key_version, status, algorithm_suite, wrapped_dek, dek_iv, content_iv, manifest_ciphertext, manifest_iv, object_key, ciphertext_size, ciphertext_sha256, expires_at, created_at, uploaded_at, deleted_at, object_deleted_at
+No column holds a file name, a MIME type, a plaintext hash or a key in plaintext (INV-16, data-model 6).

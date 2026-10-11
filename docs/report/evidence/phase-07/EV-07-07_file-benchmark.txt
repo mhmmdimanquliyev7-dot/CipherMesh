@@ -1,0 +1,12 @@
+$ node scripts/bench/files-browsers.mjs
+File encryption benchmark (CP-19), 2026-10-11T10:41:05.328Z
+Host: 12th Gen Intel(R) Core(TM) i7-12700H, 20 logical CPUs, 31.6 GiB RAM, win32 10.0.26200, Node.js v24.19.0
+
+| Measurement | chromium 153.0.8010.12 | firefox 155.0 | webkit 26.6 |
+|---|---|---|---|
+| 1 MiB: encrypt / decrypt and verify | 4 ms / 4 ms | 6 ms / 5 ms | 69 ms / 75 ms |
+| 10 MiB: encrypt / decrypt and verify | 29 ms / 30 ms | 33 ms / 32 ms | 192 ms / 201 ms |
+| 50 MiB: encrypt / decrypt and verify | 155 ms / 150 ms | 156 ms / 145 ms | 912 ms / 885 ms |
+| Page memory after the 50 MiB round trip (measureUserAgentSpecificMemory) | not reported by the engine | not reported by the engine | not reported by the engine |
+| 50 MiB + 1 byte refused before encryption | yes | yes | yes |
+| CSP violations or page errors | none | none | none |

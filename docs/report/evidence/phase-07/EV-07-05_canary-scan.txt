@@ -1,0 +1,7 @@
+EV-07-05: canary scan (CM-T038, INV-16)
+Captured: 2026-10-11T13:10:33Z
+A synthetic file name canary and content canary (random hex) are uploaded; each is searched in plain, hex, base64 and base64url form in every table of the database, in the stored object and in the API log and security events.
+
+ ✓ |files| tests/files/files-upload.test.ts > client-side encrypted upload and download (DF-07, DF-08) > finds no file name or content canary in the database, the bucket or the log (EV-07-05, INV-16) 332ms
+ Test Files  1 passed (1)
+      Tests  1 passed | 17 skipped (18)

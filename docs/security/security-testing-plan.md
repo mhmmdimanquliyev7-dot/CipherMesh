@@ -44,6 +44,7 @@ All scanning and testing targets only CipherMesh infrastructure, following the c
 | `session` | Cookie attributes, fixation, every rotation and invalidation event, idle and absolute expiry, logout, session limit ([session-and-csrf.md](session-and-csrf.md)) | T-08 |
 | `csrf` | `Sec-Fetch-Site` and `Origin` checks, the custom request header, content types, login CSRF, side-effect-free GETs, `Origin` behaviour under `no-referrer` in three engines | T-13 |
 | `auth-abuse` | Rate limits, backoff, TOTP attempt limits, replay, recovery-code reuse | T-09, T-10, T-30 |
+| `canary-scan` and `upload` (Phase 7) | `tests/files/*.test.ts`: file name and content canaries (plain, hex, base64, base64url) are absent from every table, the bucket and the log; HTML and SVG never render (`tests/e2e/files.spec.ts`); size, quota and expiry limits; storage keys independent of file names | T-01, T-02, T-11, T-26 |
 | `crypto-invariants` | Known-answer tests, tamper tests, context separation, IV uniqueness, commitment checks, the RSA wrapper rejecting anything but 32-byte keys. **Phase 4:** implemented as the `packages/crypto` unit suites listed in section 3.3. **Phase 6:** commitment, envelope-binding and statement tests in `room-keys.test.ts`, `room-format.test.ts` and `contexts.test.ts` (section 3.5) | T-07, T-29 |
 | `projection` | Responses contain only allowlisted fields; forbidden field names never appear | T-15 |
 | `log-redaction` | Canary secrets sent through every endpoint never appear in logs | T-15, T-16 |
@@ -204,3 +205,18 @@ Each finding records: affected component, threat ID, CWE and OWASP category wher
 ## 9. Traceability
 
 Each automated test is tagged with the threat IDs and control IDs it covers (for example `@T-06 @OL-02`). A script produces a table of threats and controls with their tests. The table is attached to the final report as evidence that every control is tested.
+
+### 3.6 Encrypted file suites (Phase 7, CM-T037 to CM-T041)
+
+| Suite | Location | What it proves |
+|---|---|---|
+| File format and tampering | `packages/crypto/src/files.test.ts` | The format against Node.js `crypto` in both directions; round trips at 0, 1, 15, 16, 17 bytes, 4 KiB, 1 MB and exactly 50 MiB; refusal of 50 MiB plus one byte; bit flips in the wrapped FEK, manifest, IVs, tags and content; truncated, extended and empty content; a wrapped FEK, manifest or object moved to another file, room, key version, item type or revision; a manifest from a malicious uploader (extra fields, control or bidirectional characters, wrong types, unknown version, hash or size mismatch) |
+| Object storage and uploads | `tests/files/files-upload.test.ts` | Real storage: ciphertext only, upload URLs bound to one object, method and size, expired URLs, completion rules, abandoned and cancelled uploads, write-locked rooms, quotas, wrap bound, PC-08, canary scan, URLs absent from logs |
+| Access, tampering and deletion | `tests/files/files-access.test.ts` | Listing and paging, bit flips in object, manifest and wrapped FEK detected in the browser code, PC-12 and PC-13, expiry at read time, deletion rights and tombstones, storage failure during deletion |
+| Worker cleanup | `tests/files/files-cleanup.test.ts` | Expired, abandoned and room-deleted files; object deletion retried; a room becomes DELETED only without objects; `cm_worker` cannot delete rows or resurrect tombstones |
+| Database | `tests/database/constraints.test.ts` | Object-key format, write-once columns, key material only removable, final DELETED, expiry only earlier |
+| Configuration | `apps/api/src/config/env.test.ts`, `scripts/storage/bootstrap.mjs` | Storage is all or nothing, https in production, never on the application host; the runtime credential cannot list, create or delete buckets |
+| BOLA | `tests/authz/bola.test.ts` | Six file routes attacked with files of another room by every kind of caller |
+| Browser | `tests/e2e/files.spec.ts` | Upload and download with identical bytes in Chromium, Firefox and WebKit, no name or content in any request or browser storage, no cookie or Referer to storage, tamper detection, HTML and SVG never rendered, vault lock removes names, cross-engine decryption |
+
+The Phase 7 negative controls (NC-07-01 to NC-07-10) are listed in `scripts/security/negative-controls.mjs`. `pnpm test:files` runs the `files` project (needs `pnpm services:up` and `pnpm storage:bootstrap`); `pnpm bench:files` is the CP-19 benchmark.

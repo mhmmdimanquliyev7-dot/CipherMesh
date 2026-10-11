@@ -1,0 +1,12 @@
+EV-07-06: presigned URLs expire (CP-20) and bind one object, one method and one size (OL-07)
+Captured: 2026-10-11T11:38:35.397Z
+Made with the API storage adapter (apps/api/src/storage/object-store.ts) against the local emulator. URLs and signatures are not printed.
+
+GET signed now, valid 60 s: HTTP 200
+GET signed 61 s ago (expired 1 s ago): HTTP 403
+GET signed 120 s ago: HTTP 403
+PUT of 16 bytes signed 301 s ago (expired): HTTP 403
+PUT of 15 bytes to a URL signed for 16 bytes: HTTP 403
+PUT of 16 bytes with the same URL: HTTP 200
+DELETE with the upload URL: HTTP 403
+download response headers: content-type application/octet-stream, content-disposition attachment

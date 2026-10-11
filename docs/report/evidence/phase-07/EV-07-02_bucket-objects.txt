@@ -1,0 +1,14 @@
+EV-07-02: the content bucket of the local S3-compatible emulator (SeaweedFS), listed by the administrator
+Captured: 2026-10-11T11:38:35.397Z
+Stands in for the provider console screenshot of the evidence plan until the cloud bucket exists (Phase 19).
+
+bucket cm-files: 71 objects, every key of the form f/<43 base64url characters>: true
+object names containing a dot, a slash beyond the prefix or a room ID: 0
+sample keys (first 8 characters): f/--43EA..., f/-NQJ5-..., f/-Rn78L..., f/-abkqL..., f/0knK_G...
+sizes: smallest 1 bytes, largest 2097196 bytes (ciphertext = plaintext + 16-byte tag)
+
+object of the EV-07-03 row: 2097196 bytes, sha256 2de45805450db1a2 (equals the stored ciphertext_sha256: n/a)
+  full SHA-256 of the object equals ciphertext_sha256: true
+  first 32 bytes (hex): 4d7584f9a9bc50cc836c27cdfa14181ff73e93e8d56767e5325353f05c0b5315
+listing with the runtime credential (API and worker): HTTP 403
+anonymous read of the object: HTTP 403

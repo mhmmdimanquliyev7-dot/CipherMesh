@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)); Phase 4 implemented (2026-10-05, [phase-04-traceability.md](phase-04-traceability.md)), approved and merged into `main` through pull request #10. Phase 5 implemented (2026-10-06, CM-T029 to CM-T032, [phase-05-traceability.md](phase-05-traceability.md)), approved and merged into `main` through pull request #13. Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
+Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)); Phase 4 implemented (2026-10-05, [phase-04-traceability.md](phase-04-traceability.md)), approved and merged into `main` through pull request #10. Phase 5 implemented (2026-10-06, CM-T029 to CM-T032, [phase-05-traceability.md](phase-05-traceability.md)), approved and merged into `main` through pull request #13. Phase 6 merged through pull request #22. Phase 7 implemented (2026-10-11, CM-T037 to CM-T041, [phase-07-traceability.md](phase-07-traceability.md)). Accepted roadmap addition: **Prompt 16.5, complete UI/UX redesign and visual polish**, which is reserved and not part of any earlier phase. Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
 
 ## 1. Principles
 
@@ -147,7 +147,7 @@ Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceabili
 | Goal | Client-side encrypted upload and download through object storage |
 | Dependencies | Phase 6 |
 | Deliverables | Storage adapter and presigned URLs; upload and download flows; deletion, expiry and cleanup worker; quotas and safe downloads |
-| Security checkpoint | Canary scan passes; presigned lifetimes enforced; URLs never logged; HTML and SVG never rendered inline; size limit confirmed by a browser memory benchmark (CP-19) |
+| Security checkpoint | Canary scan passes; presigned lifetimes enforced; URLs never logged; HTML and SVG never rendered inline; size limit confirmed by a browser memory benchmark (CP-19). **Phase 7 status:** all met except the memory figure: the benchmark measured time in three engines but no engine reported memory, so CP-19 stays at 50 MiB with the gap recorded (crypto-decisions section 9, L-47) |
 | Tests | `canary-scan` and `upload` suites; file tamper tests; expiry tests |
 | Documentation updates | CP-19 confirmation; L-11 demonstration notes |
 | Jira evidence | Bucket object (ciphertext) next to the original file; tamper demonstration |

@@ -1,0 +1,8 @@
+EV-07-10: supply chain
+Captured: 2026-10-11T13:19:58Z
+New runtime dependency: aws4fetch 1.0.20 (apps/api; LIB-09). MIT, no dependencies, 65 KB unpacked, published 2024-08-28 (older than the 3-day release-age policy by two years), no install script (strictDepBuilds).
+Also listed as a root devDependency, for the storage scripts and tests (scripts/storage).
+pnpm install --frozen-lockfile: lockfile passes supply-chain policies.
+pnpm audit:deps: No known vulnerabilities found
+pnpm sbom:generate: sbom.cdx.json (CycloneDX, git-ignored, uploaded by CI)
+Secret scan (gitleaks, all commits): 1:20PM INF no leaks found

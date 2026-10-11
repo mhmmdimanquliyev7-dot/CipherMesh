@@ -1,0 +1,17 @@
+EV-07-08: verification gates of Prompt 09 on the final Phase 7 code
+Captured: 2026-10-11T13:27:36Z (local PostgreSQL 17 and local SeaweedFS 4.47)
+
+| Gate | Result |
+|---|---|
+| pnpm install --frozen-lockfile, pnpm format:check, pnpm lint, pnpm typecheck | Pass |
+| pnpm test | 1876 tests in 75 files (Phase 6: 1734 in 71). New suites: `packages/crypto/src/files.test.ts` (41 tests), `tests/files` (33: upload 18, access 11, cleanup 4); extended: `bola.test.ts` 132 tests over 22 room routes (was 98 over 16), database constraints, storage configuration, file-rule drift, redaction and CSP tests |
+| pnpm test:e2e (three engines, one worker) | 83 passed, 10 skipped by design (single-engine tests); was 70 and 8. files.spec.ts: 5 tests, 13 results, 2 skipped (the cross-engine test runs once from Chromium) |
+| pnpm security:negative-controls | 69 of 69 caught (ten Phase 3, seventeen Phase 4, twenty-two Phase 5, ten Phase 6, ten Phase 7), both baselines pass, 38 source files restored byte for byte. One earlier full run printed a failing Vitest baseline whose failures were all Timeout waiting for worker to respond in heavy crypto tests (machine load); the same files then passed alone (1422 tests) and a full rerun was clean |
+| pnpm test:coverage:crypto | 98.7% statements, 93.2% branches (gate 90%) |
+| pnpm test:coverage:authz | 97.3% statements, 98.3% branches |
+| pnpm build, pnpm smoke:api, pnpm sbom:generate, db:validate, db:check-schema, db:drift | Pass; migrations from zero are exercised by tests/database/migrations.test.ts |
+| pnpm audit:deps | Pass (no known vulnerabilities) |
+| Secret scan (gitleaks, all commits) | No leaks. The staged-change scan is run before the commit |
+| pnpm bench:files | 50 MiB in about 150 ms (Chromium, Firefox) to 0.9 s (WebKit); memory not measured (crypto-decisions section 9) |
+
+Raw outputs are not committed; the CI run (EV-07-11) repeats the gates on a clean runner.
