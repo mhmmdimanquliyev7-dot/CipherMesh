@@ -1,6 +1,6 @@
 # Phase 6 Traceability
 
-Status: implemented on 2026-10-06 to 2026-10-11 (Prompt 08): CM-T033 to CM-T036 and CM-T085 are implemented and verified on branch `feature/CM-T033-cryptographic-membership`, created from `main` at `aaaaf99`. The pull request, its CI run and the merge are recorded in section 9 and in [current-state.md](current-state.md). Backlog items: [jira-backlog.md](jira-backlog.md) (CM-EPIC-06). Specification: [../architecture/adr/ADR-015-identity-signing-keys.md](../architecture/adr/ADR-015-identity-signing-keys.md) section 4.1, [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md) section 7, [../architecture/data-flow.md](../architecture/data-flow.md) DF-05 and DF-06, [../security/authorization-model.md](../security/authorization-model.md) section 9.7.
+Status: implemented on 2026-10-06 to 2026-10-11 (Prompt 08): CM-T033 to CM-T036 and CM-T085 are implemented, verified and merged into `main` through pull request #22 (merge commit `b3e9dd5`, CI run 38126199518, EV-06-10). Branch `feature/CM-T033-cryptographic-membership` was created from `main` at `aaaaf99`. Backlog items: [jira-backlog.md](jira-backlog.md) (CM-EPIC-06). Specification: [../architecture/adr/ADR-015-identity-signing-keys.md](../architecture/adr/ADR-015-identity-signing-keys.md) section 4.1, [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md) section 7, [../architecture/data-flow.md](../architecture/data-flow.md) DF-05 and DF-06, [../security/authorization-model.md](../security/authorization-model.md) section 9.7.
 
 ## 1. Work items
 
@@ -80,3 +80,22 @@ New findings: none in production code. Test-harness defects found and fixed: an 
 - L-46 (grants are statements); L-44 (reinstatement and the rekey: CM-T050, CM-T051, CM-T053); L-43 (legacy rooms); L-42 (remaining profile gates).
 - Phase 7 (Prompt 09) builds encrypted files on `RWK_v`: `openRoomKey` already returns the non-extractable RWK, and `cm.dek.wrap` is the context for wrapped DEKs.
 - Rekey (Phase 11) reuses the verification rule and must decide how a former ADMIN's signature is rejected (L-46).
+
+## 6. Verification in Prompt 08
+
+Gates on the final Phase 6 code (2026-10-11, local PostgreSQL), recorded in EV-06-07; the negative controls in EV-06-08 and the supply chain in EV-06-09.
+
+| Gate | Result |
+|---|---|
+| `pnpm test` | 1734 tests in 71 files (Phase 5: 1516 in 66) |
+| `pnpm test:e2e` (three engines, one worker) | 70 passed, 8 skipped by design |
+| `pnpm security:negative-controls` | 59 of 59 caught (ten Phase 3, seventeen Phase 4, twenty-two Phase 5, ten Phase 6), both baselines pass |
+| `pnpm test:coverage:crypto` | 98.5% statements, 92.3% branches |
+| `pnpm test:coverage:authz` | 97.3% statements, 98.3% branches |
+| `pnpm audit:deps`, `pnpm sbom:generate`, `pnpm build`, `pnpm smoke:api`, format, lint, typecheck, `db:check-schema`, `db:drift` | Pass |
+| Secret scan | Staged scan clean; CI gitleaks over the full history passed |
+
+## 7. Merge and CI
+
+Pull request #22 was opened from `feature/CM-T033-cryptographic-membership` to `main`, and merged on 2026-10-11 with a normal merge commit `b3e9dd5` after every check passed: CI run 38126199518 (lint, types, tests, build, E2E in three engines), the dependency audit, the gitleaks scan and GitGuardian (EV-06-10).
+

@@ -1,16 +1,16 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-11, end of Prompt 08 (Phase 6 implemented and verified on `feature/CM-T033-cryptographic-membership`: CM-T033 to CM-T036 and CM-T085). The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-11, end of Prompt 08 (Phase 6 implemented, verified and merged into `main`: CM-T033 to CM-T036 and CM-T085). The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
 | Item | State |
 |---|---|
-| Completed | Phase 4 (pull request #10), Phase 5 (pull request #13, merge commit `bd4d2f6`) and **Phase 6 (CM-T033 to CM-T036, CM-T085), implemented and verified in Prompt 08**. The pull request number, its CI run, the merge commit and the final `main` commit are recorded by the post-merge handoff pull request that follows the merge (the convention of #12 and #15). Traceability: [phase-06-traceability.md](phase-06-traceability.md) |
+| Completed | Phase 4 (pull request #10), Phase 5 (pull request #13, merge commit `bd4d2f6`) and **Phase 6 (CM-T033 to CM-T036, CM-T085), implemented and verified in Prompt 08**, merged through pull request #22 (merge commit `b3e9dd5`, parents `aaaaf99` and `ead6b8c`). CI run 38126199518 passed every job; GitGuardian, the dependency audit and the secret scan passed (EV-06-10). Traceability: [phase-06-traceability.md](phase-06-traceability.md) |
 | Phase 6 | Cryptographic Membership: key version 1 made in the browser at room creation (RKM_1, commitment, owner envelope, signed genesis and key-version statements), invitations with pre-wrapped envelopes and signed membership grants, OWNER approval, acceptance, client-side verification of room keys (ADR-015 section 4.1), the Room Safety Code. No file, note or secret encryption exists |
-| Branch | `feature/CM-T033-cryptographic-membership`, created from `main` at `aaaaf99` |
+| Branch | `feature/CM-T033-cryptographic-membership` (head `ead6b8c`), created from `main` at `aaaaf99`; it takes no further commits |
 | Next | **Prompt 09: Phase 7, Encrypted File System** (CM-T037 onward). It starts from the updated `main` after the Phase 6 merge, never from the Phase 6 branch. Do not start without explicit approval |
-| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 5, and Phase 6 once its pull request is merged |
+| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 6. It is the baseline for Prompt 09 |
 
 ## 2. Architecture implemented so far
 
@@ -147,7 +147,7 @@ Local notes: the database suites need the local PostgreSQL container (Docker Des
 - Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including both coverage steps) as required checks, then capture EV-01-01 to EV-01-03.
 - Dependabot pull requests remain open (#2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24; the `next` update is covered by Phase 6, which pins 16.3.8).
 - Jira: import the backlog; move CM-T006 to CM-T036, CM-T085 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01 and R-05-01 as `security-finding` items. Nothing is DONE yet.
-- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 6. EV-06-01 to EV-06-09 are in `docs/report/evidence/phase-06/`; EV-06-10 (the CI run of the Phase 6 pull request) is recorded by the post-merge handoff.
+- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 6. EV-06-01 to EV-06-10 are in `docs/report/evidence/phase-06/` (EV-06-10 is the CI run of pull request #22).
 
 ## 13. Not implemented yet
 
