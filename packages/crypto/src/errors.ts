@@ -43,6 +43,13 @@ export const CryptoErrorCode = {
   FILE_INTEGRITY_FAILED: 'FILE_INTEGRITY_FAILED',
   /** An encrypted file uses an algorithm suite or manifest version this client does not support. */
   FILE_FORMAT_UNSUPPORTED: 'FILE_FORMAT_UNSUPPORTED',
+  /**
+   * An encrypted note failed a check other than an AES-GCM tag: the stored record is malformed, or
+   * the authenticated document is not a valid note. No title or body is released (Phase 8, T-07).
+   */
+  NOTE_INTEGRITY_FAILED: 'NOTE_INTEGRITY_FAILED',
+  /** An encrypted note uses an algorithm suite or document version this client does not support. */
+  NOTE_FORMAT_UNSUPPORTED: 'NOTE_FORMAT_UNSUPPORTED',
 } as const;
 
 export type CryptoErrorCode = (typeof CryptoErrorCode)[keyof typeof CryptoErrorCode];
@@ -63,6 +70,8 @@ const MESSAGES: Readonly<Record<CryptoErrorCode, string>> = {
   KEY_COMMITMENT_MISMATCH: "The room key does not match the room's signed record and was not used",
   FILE_INTEGRITY_FAILED: 'The encrypted file failed its integrity check',
   FILE_FORMAT_UNSUPPORTED: 'The encrypted file format is not supported',
+  NOTE_INTEGRITY_FAILED: 'The encrypted note failed its integrity check',
+  NOTE_FORMAT_UNSUPPORTED: 'The encrypted note format is not supported',
 };
 
 export class CryptoError extends Error {

@@ -22,6 +22,7 @@ import { api, ApiError, formText } from '../../../lib/api';
 import { FilePanel } from '../../../rooms/file-panel';
 import { InviteCard, RoomInvitations } from '../../../rooms/invitations';
 import { RoomKeyPanel } from '../../../rooms/key-panel';
+import { NotePanel } from '../../../rooms/note-panel';
 import { roomKeys } from '../../../rooms/keys';
 import { describeRoomError, REKEY_NOTICE, ROOM_NAME_WARNING } from '../../../rooms/messages';
 import { assignableRoles, mayAttempt, ROLE_LABEL } from '../../../rooms/permissions';
@@ -139,6 +140,14 @@ function Room({ roomId }: { readonly roomId: string }) {
       )}
       <RoomKeyPanel roomId={roomId} profile={room.room.securityProfile} members={members} />
       <FilePanel
+        roomId={roomId}
+        role={role}
+        profile={room.room.securityProfile}
+        keyState={room.room.keyState}
+        selfId={selfId}
+        members={members}
+      />
+      <NotePanel
         roomId={roomId}
         role={role}
         profile={room.room.securityProfile}

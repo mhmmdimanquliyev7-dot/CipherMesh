@@ -1,6 +1,7 @@
 // `pnpm security:negative-controls`: proves that the security tests are real (Phase 3, extended
 // with the vault and cryptography controls of Phase 4, the room authorization controls of Phase 5,
-// the cryptographic membership controls of Phase 6 and the encrypted file controls of Phase 7). `--only=<prefix>` runs a subset, for example `--only=NC-05`.
+// the cryptographic membership controls of Phase 6, the encrypted file controls of Phase 7 and the
+// encrypted note controls of Phase 8). `--only=<prefix>` runs a subset, for example `--only=NC-05`.
 //
 // For each control, one deliberate defect is written into a source file in the working tree, the
 // tests that must catch it are run, and the original file is restored immediately afterwards
@@ -864,6 +865,135 @@ const CONTROLS = [
     ],
     tests: [],
     e2e: { spec: 'tests/e2e/files.spec.ts', title: 'another member downloads the identical bytes' },
+  },
+  // ------------------------------------------------------------------- Phase 8: encrypted notes
+  {
+    id: 'NC-08-01',
+    defect: 'Note content is no longer bound to its revision in the AES-GCM AAD (cm.note.content)',
+    file: 'packages/crypto/src/notes.ts',
+    edits: [
+      [
+        "  return contextBytes('cm.note.content', { roomId, noteId, revision });",
+        "  return contextBytes('cm.note.content', { roomId, noteId, revision: revision > 0 ? 1 : 1 });",
+      ],
+    ],
+    tests: ['packages/crypto/src/notes.test.ts'],
+  },
+  {
+    id: 'NC-08-02',
+    defect: 'A wrapped NEK uses the wrong wrapping context (cm.dek.wrap with itemType file instead of note)',
+    file: 'packages/crypto/src/notes.ts',
+    edits: [
+      [
+        "  return contextBytes('cm.dek.wrap', { roomId, keyVersion, itemType: 'note', itemId: noteId, revision });",
+        "  return contextBytes('cm.dek.wrap', { roomId, keyVersion, itemType: 'file', itemId: noteId, revision });",
+      ],
+    ],
+    tests: ['packages/crypto/src/notes.test.ts'],
+  },
+  {
+    id: 'NC-08-03',
+    defect: 'The browser accepts an authenticated note document that is not the canonical version-1 serialization',
+    file: 'packages/crypto/src/notes.ts',
+    edits: [['  if (!same) throw integrityFailed();', '  if (!same && same) throw integrityFailed();']],
+    tests: ['packages/crypto/src/notes.test.ts'],
+  },
+  {
+    id: 'NC-08-04',
+    defect: 'A stale save silently overwrites a newer revision (no optimistic concurrency: last writer wins)',
+    file: 'apps/api/src/notes/service.ts',
+    edits: [
+      [
+        '        if (locked.revision !== input.expectedRevision) throw revisionConflict();\n',
+        '        input = { ...input, expectedRevision: locked.revision };\n',
+      ],
+    ],
+    tests: ['tests/notes/notes-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-08-05',
+    defect: 'One note is served without the room and membership filter (BOLA)',
+    file: 'apps/api/src/db/note-store.ts',
+    edits: [
+      [
+        '        where: { id: noteId, ...readable(roomId, userId, now) },',
+        '        where: { id: noteId, deletedAt: null },',
+      ],
+    ],
+    tests: ['tests/authz/bola.test.ts'],
+  },
+  {
+    id: 'NC-08-06',
+    defect: 'A note update is authorized as a read (AZ-20 instead of AZ-21): VIEWERs and other members may edit',
+    file: 'apps/api/src/routes/notes.ts',
+    edits: [
+      [
+        "      action: 'AZ-21-NOTE-UPDATE',\n      access: { kind: 'room', resource: noteResource },",
+        "      action: 'AZ-20-NOTE-UPDATE',\n      access: { kind: 'room' },",
+      ],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/notes/service.ts',
+        edits: [
+          [
+            "lockAndReauthorize(tx, actor, access.roomId, meta, 'AZ-21', async () => {",
+            "lockAndReauthorize(tx, actor, access.roomId, meta, 'AZ-20', async () => {",
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/notes/notes-access.test.ts'],
+  },
+  {
+    id: 'NC-08-07',
+    defect: 'Note updates are accepted while the room is REKEY_REQUIRED (INV-07, PC-16)',
+    file: 'apps/api/src/notes/service.ts',
+    edits: [
+      [
+        "        }\n        if (room.keyState !== 'ACTIVE') throw rekeyRequired();\n        if (input.keyVersion !== room.currentKeyVersion) throw keyVersionStale();\n        if (locked.revision",
+        '        }\n        if (input.keyVersion !== room.currentKeyVersion) throw keyVersionStale();\n        if (locked.revision',
+      ],
+    ],
+    tests: ['tests/notes/notes-access.test.ts'],
+  },
+  {
+    id: 'NC-08-08',
+    defect: 'Expired notes are still served until the worker runs (INV-14, expiry no longer checked at read time)',
+    file: 'apps/api/src/db/note-store.ts',
+    edits: [
+      [
+        '  OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],',
+        '  OR: [{ expiresAt: null }, { expiresAt: { not: now } }],',
+      ],
+    ],
+    tests: ['tests/notes/notes-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-08-09',
+    defect: 'Note bodies are rendered as HTML (unsafe rendering of untrusted text, T-12)',
+    file: 'apps/web/src/rooms/note-panel.tsx',
+    edits: [
+      [
+        '                            data-testid="note-view-body"\n                          >\n                            {entry.opened.body === \'\' ? (\n                              <span className="text-slate-500">(empty)</span>\n                            ) : (\n                              entry.opened.body\n                            )}\n                          </div>',
+        '                            data-testid="note-view-body"\n                            dangerouslySetInnerHTML={{ __html: entry.opened.body }}\n                          />',
+      ],
+    ],
+    tests: [],
+    e2e: { spec: 'tests/e2e/notes.spec.ts', title: 'XSS payloads in a note render as text' },
+  },
+  {
+    id: 'NC-08-10',
+    defect: 'The browser keeps decrypted note bodies in localStorage',
+    file: 'apps/web/src/rooms/notes.ts',
+    edits: [
+      [
+        '    return { view, opened: await open(roomId, view), ...flag };',
+        '    const opened = await open(roomId, view);\n    localStorage.setItem(`cm-note-${view.id}`, opened.body);\n    return { view, opened, ...flag };',
+      ],
+    ],
+    tests: [],
+    e2e: { spec: 'tests/e2e/notes.spec.ts', title: 'is read by another member' },
   },
 ];
 

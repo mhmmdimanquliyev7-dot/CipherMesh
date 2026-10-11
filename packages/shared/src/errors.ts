@@ -76,6 +76,13 @@ export const ErrorCode = {
   FILE_NOT_PENDING: 'FILE_NOT_PENDING',
   /** Object storage is not configured or did not answer; nothing was changed. */
   STORAGE_UNAVAILABLE: 'STORAGE_UNAVAILABLE',
+  // Encrypted notes (Phase 8, DF-12). The API sees only the note ciphertext and the wrapped NEK.
+  /** The client-chosen note ID was used before; note IDs enter the note's AAD (CD-08). */
+  NOTE_ID_UNAVAILABLE: 'NOTE_ID_UNAVAILABLE',
+  /** An update named a revision that is no longer the stored one: someone else saved first. */
+  REVISION_CONFLICT: 'REVISION_CONFLICT',
+  /** The room holds the most notes D-08-01 allows, or the note reached the last revision. */
+  NOTE_LIMIT_REACHED: 'NOTE_LIMIT_REACHED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

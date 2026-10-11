@@ -72,6 +72,24 @@ export const FILES = Object.freeze({
   maxTypeLength: 127,
 });
 
+/**
+ * Encrypted notes (cryptographic-architecture section 6.2, DF-12, Phase 8). Each saved revision has
+ * its own random 256-bit NEK, which encrypts exactly one message (CP-16): the RFC 8785 note document
+ * {body, title, v}. The NEK is wrapped under RWK_v like a FEK, so a wrapped NEK is 32 key bytes plus
+ * the tag. The size bounds are decision D-08-01 (phase-08-traceability.md): a document of at most
+ * 64 KiB keeps the largest request (ciphertext as base64url plus the other fields) inside the API's
+ * 128 KiB body limit. Revisions start at 1 and end at the largest PostgreSQL integer.
+ * packages/shared repeats the values (NOTE_LIMITS) and a test compares the two.
+ */
+export const NOTES = Object.freeze({
+  nekBytes: 32,
+  wrappedNekBytes: 48,
+  formatVersion: 1,
+  maxTitleLength: 200,
+  maxDocumentBytes: 64 * 1024,
+  maxRevision: 2_147_483_647,
+});
+
 /** Room roles as they appear in signed membership grants (authorization-model section 2.1). */
 export const ROOM_ROLES = Object.freeze(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'] as const);
 export type RoomRole = (typeof ROOM_ROLES)[number];

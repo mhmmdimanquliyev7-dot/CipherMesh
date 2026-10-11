@@ -77,6 +77,19 @@ export default defineConfig({
         },
       },
       {
+        // Encrypted note suites (Phase 8): the real API, PostgreSQL as cm_api and cm_worker, and
+        // notes encrypted by packages/crypto with room keys opened as the browser opens them. One
+        // file at a time, like authz and files (shared connection limit).
+        test: {
+          name: 'notes',
+          include: ['tests/notes/**/*.test.ts'],
+          fileParallelism: false,
+          globalSetup: ['tests/database/global-setup.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
         test: {
           name: 'database',
           include: ['tests/database/**/*.test.ts'],

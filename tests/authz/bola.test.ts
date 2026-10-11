@@ -6,7 +6,7 @@ import type { Database } from '../../apps/api/src/db/client';
 import { startAuthApi, type AuthTestApi } from '../helpers/auth';
 import { BOLA_CASES, ROOM_CASES, type BolaCase, type Response, type RoomRef } from '../helpers/bola-cases';
 import { loadDatabaseTestEnv, testDatabase } from '../helpers/database';
-import { fileRow, insert } from '../helpers/db-fixtures';
+import { fileRow, insert, noteRow } from '../helpers/db-fixtures';
 import { creationBody, insertIdentity, invite } from '../helpers/room-crypto';
 import {
   addMember,
@@ -60,6 +60,9 @@ let invitationB: string;
 /** AVAILABLE files of rooms A and B (Phase 7), uploaded by their MEMBERs: targets of the file routes. */
 let fileA: string;
 let fileB: string;
+/** Live notes of rooms A and B (Phase 8), written by their MEMBERs: targets of the note routes. */
+let noteA: string;
+let noteB: string;
 
 const NAME_A = 'BOLA room A confidential codename';
 const NAME_B = 'BOLA room B confidential codename';
@@ -131,6 +134,14 @@ beforeAll(async () => {
   };
   fileA = await availableFile(roomA, memberA);
   fileB = await availableFile(roomB, memberB);
+  // Note rows with schema-sized DUMMY bytes (no key), likewise refused before any crypto.
+  const liveNote = async (roomId: string, author: Person): Promise<string> => {
+    const row = noteRow({ roomId, ownerId: author.userId } as never);
+    await insert(db, 'encrypted_notes', row);
+    return row['id'] as string;
+  };
+  noteA = await liveNote(roomA, memberA);
+  noteB = await liveNote(roomB, memberB);
 
   // Everyone confirms their account first, so a step-up never explains a refusal: it is the
   // authorization that denies (the registry decides membership before it asks for a step-up).
@@ -153,7 +164,7 @@ const read = (who: Person, path: string, headers: Record<string, string> = {}): 
 /**
  * Every row of the given rooms, their memberships, invitations, key versions and envelopes, as
  * text: compared before and after (Phase 6 added invitations, key versions and envelopes, Phase 7
- * the files).
+ * the files, Phase 8 the notes).
  */
 async function snapshot(rooms: readonly string[]): Promise<string> {
   const rows = [];
@@ -164,6 +175,7 @@ async function snapshot(rooms: readonly string[]): Promise<string> {
     'room_key_versions',
     'key_envelopes',
     'encrypted_files',
+    'encrypted_notes',
   ]) {
     const column = table === 'rooms' ? 'id' : 'room_id';
     rows.push((await db.query(`SELECT * FROM ${table} WHERE ${column} = ANY($1) ORDER BY id`, [rooms])).rows);
@@ -197,14 +209,21 @@ const FORBIDDEN = {
   topKeys: ['error'],
 };
 
-/** The target object a case names inside the given room's cast: a member, an invitation or a file. */
-type Cast = { readonly MEMBER: Person; readonly ADMIN: Person; readonly INVITATION: string; readonly FILE: string };
-const castA = (): Cast => ({ MEMBER: memberA, ADMIN: adminA, INVITATION: invitationA, FILE: fileA });
-const castB = (): Cast => ({ MEMBER: memberB, ADMIN: adminB, INVITATION: invitationB, FILE: fileB });
-type Target = Pick<RoomRef, 'userId' | 'invitationId' | 'fileId'>;
+/** The target object a case names inside the given room's cast: a member, an invitation, a file or a note. */
+type Cast = {
+  readonly MEMBER: Person;
+  readonly ADMIN: Person;
+  readonly INVITATION: string;
+  readonly FILE: string;
+  readonly NOTE: string;
+};
+const castA = (): Cast => ({ MEMBER: memberA, ADMIN: adminA, INVITATION: invitationA, FILE: fileA, NOTE: noteA });
+const castB = (): Cast => ({ MEMBER: memberB, ADMIN: adminB, INVITATION: invitationB, FILE: fileB, NOTE: noteB });
+type Target = Pick<RoomRef, 'userId' | 'invitationId' | 'fileId' | 'noteId'>;
 const targetIn = (c: BolaCase, cast: Cast): Target => {
   if (c.target === 'INVITATION') return { invitationId: cast.INVITATION };
   if (c.target === 'FILE') return { fileId: cast.FILE };
+  if (c.target === 'NOTE') return { noteId: cast.NOTE };
   if (c.target !== undefined && c.targetsMember) return { userId: cast[c.target].userId };
   return {};
 };
@@ -213,9 +232,11 @@ const inventedTarget = (c: BolaCase): Target =>
     ? { invitationId: randomUUID() }
     : c.targetsFile === true
       ? { fileId: randomUUID() }
-      : c.targetsMember
-        ? { userId: randomUUID() }
-        : {};
+      : c.targetsNote === true
+        ? { noteId: randomUUID() }
+        : c.targetsMember
+          ? { userId: randomUUID() }
+          : {};
 const ref = (roomId: string, target: Target): RoomRef => ({ roomId, ...target });
 /** What a member with `role` gets for a target outside the room: the matrix's first step decides. */
 const crossRoomAnswer = (c: BolaCase, role: RoomRole) =>
@@ -265,8 +286,10 @@ describe('A, B and G: a caller who is not in room B gets nothing, and cannot tel
 
 // ------------------------------------------------------------------ C: target member of room B
 
-describe('C: addressed room A with a target object (member, invitation or file) of room B', () => {
-  const targeted = ROOM_CASES.filter((c) => c.targetsMember || c.targetsInvitation || c.targetsFile === true);
+describe('C: addressed room A with a target object (member, invitation, file or note) of room B', () => {
+  const targeted = ROOM_CASES.filter(
+    (c) => c.targetsMember || c.targetsInvitation || c.targetsFile === true || c.targetsNote === true,
+  );
   const callers = (): [string, Person, 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'][] => [
     ['OWNER of A', ownerA, 'OWNER'],
     ['ADMIN of A', adminA, 'ADMIN'],

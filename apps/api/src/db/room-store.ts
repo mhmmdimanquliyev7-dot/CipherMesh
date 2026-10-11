@@ -11,6 +11,7 @@ import type {
 import { createAuthStore, type AuthStore } from './auth-store';
 import { fileStoreFunctions } from './file-store';
 import { invitationStoreFunctions } from './invitation-store';
+import { noteStoreFunctions } from './note-store';
 import { roomKeyStoreFunctions } from './room-key-store';
 
 /**
@@ -146,6 +147,7 @@ export function createRoomStore(db: Db) {
     ...roomKeyStoreFunctions(db),
     ...invitationStoreFunctions(db),
     ...fileStoreFunctions(db, requireRekey),
+    ...noteStoreFunctions(db),
 
     // ---------------------------------------------------------------------------------- creation
 
