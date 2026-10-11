@@ -1,0 +1,48 @@
+EV-06-03: a key that does not match the signed commitment, and injected key versions, are refused
+Captured: 2026-10-11T08:42:53Z on branch feature/CM-T033-cryptographic-membership (Phase 6)
+Redaction: test names and results only; the tests use synthetic identities generated in memory.
+
+✓ |unit| packages/crypto/src/room-keys.test.ts > initial room key version (CM-T033, DF-05) > commits to fresh random key material with HKDF exactly as CP-03 specifies (OpenSSL cross-check)
+✓ |unit| packages/crypto/src/room-keys.test.ts > initial room key version (CM-T033, DF-05) > signs the genesis and version-1 statements so that OpenSSL verifies the hand-written bytes
+✓ |unit| packages/crypto/src/room-keys.test.ts > initial room key version (CM-T033, DF-05) > uses new key material for every room (CSPRNG, CP-23)
+✓ |unit| packages/crypto/src/room-keys.test.ts > initial room key version (CM-T033, DF-05) > returns only non-extractable keys with the minimum usages
+✓ |unit| packages/crypto/src/room-keys.test.ts > initial room key version (CM-T033, DF-05) > the creator reopens version 1 from what the server stores, with the same commitment
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > an invited MEMBER is authorized by a grant signed by the OWNER (Phase 6 clarification)
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > a member invited by an ADMIN needs the ADMIN grant signed by the OWNER (authority chain)
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > ownership transferred by a signed OWNER grant carries OWNER authority
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses a missing recipient: neither in the signed list nor granted
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses grants by people without authority, for another key or for another room
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses unsigned, forged and malformed key-version signatures
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses a key version signed by another key than the one it names (wrongly attributed)
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses a server-made key version even when every member gets a matching envelope (T-36)
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses every modified field of the signed key-version statement
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses a statement signed with a different suite or for another room
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses a forged, foreign or missing genesis statement and a tampered identity
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses a version 1 created by anyone but the room creator, and a rekeyed version by a MEMBER
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses a rekeyed version that reuses the previous key material (reuse check)
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses a key that does not match the signed commitment with KEY_COMMITMENT_MISMATCH (T-29)
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > refuses oversized bundles before verifying them (bounded work)
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > documents the limit: an authorized OWNER colluding with the server can split the room; only Safety Codes reveal it
+✓ |unit| packages/crypto/src/room-keys.test.ts > verification rule (ADR-015 section 4) and the key-injection suite (CM-T036, T-36) > documents the limit: a substituted creator identity verifies; only fingerprint comparison reveals it (T-25)
+✓ |unit| packages/crypto/src/room-keys.test.ts > room-key envelopes (cm.room.envelope label, T-25, T-07) > open only for the intended recipient key, room, version and suite
+✓ |unit| packages/crypto/src/room-keys.test.ts > invitation keys (CM-T034) > wraps every shared version to the invitee only and signs the grant; the invitee opens it
+✓ |unit| packages/crypto/src/room-keys.test.ts > invitation keys (CM-T034) > never passes on a key it could not authenticate, and refuses inconsistent input
+✓ |unit| packages/crypto/src/room-keys.test.ts > Room Safety Code (CM-T085, CP-24, ADR-012) > uses the pinned LIB-08 word list (BIP-39 English, checksum of the upstream file)
+✓ |unit| packages/crypto/src/room-keys.test.ts > Room Safety Code (CM-T085, CP-24, ADR-012) > maps the first 66 bits to six 11-bit word indices, most significant first (known answers)
+✓ |unit| packages/crypto/src/room-keys.test.ts > Room Safety Code (CM-T085, CP-24, ADR-012) > derives RSC_v with HKDF exactly as CP-24 specifies (known-answer vector, OpenSSL cross-check)
+✓ |unit| packages/crypto/src/room-keys.test.ts > Room Safety Code (CM-T085, CP-24, ADR-012) > is the same for every holder of the same key, and changes with the key, the version and the room
+✓ |authz| tests/authz/room-keys.test.ts > room creation with key version 1 (CM-T033, DF-05) > refuses unsigned, wrongly signed and wrongly attributed statements, storing nothing
+✓ |authz| tests/authz/room-keys.test.ts > room creation with key version 1 (CM-T033, DF-05) > signs a recipient list of exactly the creator: a list naming others is refused
+✓ |authz| tests/authz/room-keys.test.ts > room creation with key version 1 (CM-T033, DF-05) > refuses a creator key that is not the caller's ACTIVE identity (another user's, or retired)
+✓ |authz| tests/authz/room-keys.test.ts > room creation with key version 1 (CM-T033, DF-05) > stores key material only as the envelope: the server never holds RKM_1 (INV-04)
+✓ |authz| tests/authz/room-keys.test.ts > what members fetch to verify the room key themselves (AZ-15, AZ-12, CM-T036) > serves the genesis, the signed version 1, the signer identity and the caller's own envelope; the browser opens it
+✓ |authz| tests/authz/room-keys.test.ts > what members fetch to verify the room key themselves (AZ-15, AZ-12, CM-T036) > serves envelopes by recipient only: a member never receives another member's envelope (OL-05)
+✓ |authz| tests/authz/room-keys.test.ts > what members fetch to verify the room key themselves (AZ-15, AZ-12, CM-T036) > a member without an envelope (added before Phase 6 style) gets no key to open
+✓ |authz| tests/authz/room-keys.test.ts > what members fetch to verify the room key themselves (AZ-15, AZ-12, CM-T036) > a room created before Phase 6 has no genesis and no key version (L-43)
+✓ |authz| tests/authz/room-keys.test.ts > a server-side attacker cannot make members use a key of its own (T-36, T-29) > an envelope replaced in the database fails the signed commitment (KEY_COMMITMENT_MISMATCH)
+✓ |authz| tests/authz/room-keys.test.ts > a server-side attacker cannot make members use a key of its own (T-36, T-29) > a key version written into the database without a valid signature is refused (KEY_AUTHENTICATION_FAILED)
+✓ |authz| tests/authz/room-keys.test.ts > key reports and Room Safety Code records carry the key version only (AZ-29, AZ-30, INV-18) > records the events with the version and reason, and refuses any code field
+✓ |authz| tests/authz/room-keys.test.ts > key reports and Room Safety Code records carry the key version only (AZ-29, AZ-30, INV-18) > a person who is not a member gets the generic 404 for every key route
+✓ |authz| tests/authz/room-keys.test.ts > room creation keys bind the creator identity > a package made with one vault does not create a room for another user
+Test Files  2 passed (2)
+Tests  42 passed (42)

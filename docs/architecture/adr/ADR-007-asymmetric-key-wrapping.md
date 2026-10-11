@@ -1,6 +1,6 @@
 # ADR-007: RSA-OAEP-3072 for room-key and secret-key distribution
 
-- Status: **Proposed** (confirm before Phase 6, OCD-01)
+- Status: **Accepted** (2026-10-11, Phase 6: the cross-browser envelope test passed; OCD-01 closed)
 - Date: 2026-09-28
 - Related: [crypto-decisions.md](../../crypto/crypto-decisions.md) CP-02, [cryptographic-architecture.md](../../crypto/cryptographic-architecture.md) section 7, T-25, T-29
 
@@ -43,6 +43,8 @@ Reasons: it is native in every major browser, fully standardized, needs no compo
 - **Quantum:** envelopes recorded today could be decrypted by a future large quantum computer (L-16). The suite identifier allows migration to a post-quantum KEM when browsers support one.
 
 ## Status
-Proposed. Becomes Accepted when the project owner approves Phase 0 and the Phase 6 cross-browser test passes. Superseded by a new ADR if HPKE or a post-quantum KEM is adopted.
+Accepted in Phase 6 (CM-T036). The project owner approved Phase 0, and the cross-browser test passed. Superseded by a new ADR if HPKE or a post-quantum KEM is adopted.
 
-Phase 4 evidence (2026-10-05): the identity encryption key is RSA-OAEP-3072 with e = 65537 and SHA-256, generated in the browser; the single 32-byte wrapper in `packages/crypto` refuses any other size and requires a canonical label. It passes the 37 Wycheproof RSA-OAEP-3072 SHA-256 cases (8 of them with labels) and an OpenSSL interoperability vector, and the vault pair check (a wrap under the label `cm.vault.pair-check`) runs at every unlock in Chromium, Firefox and WebKit. What remains for acceptance is an envelope created in one engine and opened in another (Phase 6, OCD-01).
+Phase 4 evidence (2026-10-05): the identity encryption key is RSA-OAEP-3072 with e = 65537 and SHA-256, generated in the browser; the single 32-byte wrapper in `packages/crypto` refuses any other size and requires a canonical label. It passes the 37 Wycheproof RSA-OAEP-3072 SHA-256 cases (8 of them with labels) and an OpenSSL interoperability vector, and the vault pair check (a wrap under the label `cm.vault.pair-check`) runs at every unlock in Chromium, Firefox and WebKit. What remained for acceptance was an envelope created in one engine and opened in another (Phase 6, OCD-01).
+
+Phase 6 evidence (2026-10-11): room-key envelopes use the label `cm.room.envelope` {roomId, keyVersion, recipientUserId, recipientKeyId, suite}, and `tests/e2e/room-keys.spec.ts` creates a room in Chromium, invites a member in Firefox and in WebKit, and each opens the envelope into the HKDF key, verifies it against the signed commitment and shows the same Room Safety Code as the owner (EV-06-04). Every engine also opens the envelope for its own owner and for members invited by an owner of the same engine (`rooms.spec.ts`, `room-keys.spec.ts`). Unit tests show that an envelope opens only for the intended user, key, room, version and purpose, with Wycheproof and OpenSSL known answers from Phase 4. HPKE was not needed.

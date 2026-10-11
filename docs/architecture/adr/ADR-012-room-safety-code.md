@@ -1,6 +1,6 @@
 # ADR-012: Room Safety Code
 
-- Status: Accepted (word list selected in Phase 6, LIB-08)
+- Status: Accepted (word list selected and the code implemented in Phase 6, LIB-08, CM-T085)
 - Date: 2026-09-28
 - Related: [crypto-decisions.md](../../crypto/crypto-decisions.md) CP-24, CD-13, CD-18; [cryptographic-architecture.md](../../crypto/cryptographic-architecture.md) section 7; [security-ui.md](../security-ui.md); T-25, T-29, T-36; L-22; CM-T085
 
@@ -77,4 +77,4 @@ The Phase 0 documentation claimed more than that. A server, or an attacker contr
 
 ## Status
 
-Accepted. Implementation in Phase 6 (CM-T085). OCD-12 was decided by ADR-015 without changing this ADR.
+Accepted. Implemented in Phase 6 (CM-T085): `computeSafetyCode` in `packages/crypto/src/room-keys.ts`, the word list in `packages/crypto/src/safety-code-words.ts` (BIP-39 English, checksum-verified, LIB-08), the panel in `apps/web/src/rooms/key-panel.tsx`, AZ-29 and AZ-30 as key-version-only records. Known-answer vector: RKM 00 01 .. 1f, room `0f3e2d1c-4b5a-4968-8776-a5b4c3d2e1f0`, version 1 gives "knee want dad also trust siege" and 35631199793402506816, reproduced in Node.js (OpenSSL) and in Chromium, Firefox and WebKit. OCD-12 was decided by ADR-015 without changing this ADR.

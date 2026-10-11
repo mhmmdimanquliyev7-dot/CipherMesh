@@ -1,6 +1,6 @@
 # Cryptographic Architecture
 
-Status: Phase 0.5 baseline, updated in Phase 4 (sections 2 to 5, 7.5, 7.6, 8 to 10, 16 and 17; the vault is specified in [vault.md](vault.md)). Normative. Algorithms and parameters are defined only in [crypto-decisions.md](crypto-decisions.md) (CP-xx). Related: [key-hierarchy.md](key-hierarchy.md), [key-lifecycle.md](key-lifecycle.md), [../architecture/data-flow.md](../architecture/data-flow.md).
+Status: Phase 0.5 baseline, updated in Phase 4 (sections 2 to 5, 7.5, 7.6, 8 to 10, 16 and 17; the vault is specified in [vault.md](vault.md)) and Phase 6 (sections 7.1 to 7.8, 8, 16 and 17: room keys, signed statements, invitations and the Safety Code are implemented). Normative. Algorithms and parameters are defined only in [crypto-decisions.md](crypto-decisions.md) (CP-xx). Related: [key-hierarchy.md](key-hierarchy.md), [key-lifecycle.md](key-lifecycle.md), [../architecture/data-flow.md](../architecture/data-flow.md).
 
 ## 1. Goals
 
@@ -220,9 +220,23 @@ RSA-OAEP provides no sender authentication, and anyone can encrypt to a public k
 
 [ADR-015](../architecture/adr/ADR-015-identity-signing-keys.md), accepted before Phase 4, closes OCD-12 with per-user ECDSA P-256 signing keys:
 - **Phase 4 (implemented):** every identity contains a signing key, bound to the encryption key by a self-signature and covered by the fingerprint, and the vault stores its private key.
-- **Phase 6 and Phase 11 (planned):** the room creator signs a genesis statement, inviters and the OWNER sign membership grants, and the creator of each key version signs a statement with the commitment and the recipient list. Envelopes are authenticated through the signed commitment (CD-24). A client uses a key version only if the signatures verify and the creator's authority follows from the grant chain; otherwise it reports `KEY_AUTHENTICATION_FAILED`.
+- **Phase 6 (implemented, ADR-015 section 4.1):** the room creator signs a genesis statement (`cm.room.genesis`), inviters and the OWNER sign membership grants (`cm.room.membership-grant`), and the creator of each key version signs a statement with the commitment and the recipient list (`cm.room.key-version`). Envelopes are authenticated through the signed commitment (CD-24). A client uses a key version only if the signatures verify, the creator's authority follows from the grant chain, it is an authorized recipient (named in the signed list, or the subject of a verified grant) and the decrypted key matches the signed commitment; otherwise it refuses the key, reports it and raises `KEY_AUTHENTICATION_FAILED` or `KEY_COMMITMENT_MISMATCH`. The API verifies the statements it stores as well, so invalid ones stay out of the database, but members never rely on that.
+- **Phase 11 (planned):** key versions created by rekeys are signed by their creator with the same rule.
 
-Until Phase 6 implements the verification, no rooms exist, so no room key can be injected. The residual risk after Phase 6 is identity substitution (section 7.5), a legitimate member's keys, or control of the served code (L-02).
+The residual risk is identity substitution (section 7.5), a legitimate member's keys, control of the served code (L-02), and an authorized OWNER or ADMIN colluding with the server (section 7.3, L-22). Grants are statements, not revocable credentials (L-46).
+
+### 7.8 Where the room-key code lives (Phase 6)
+
+| Part | Location |
+|---|---|
+| Statement builders and signature checks (shared by browsers and the API, no private keys) | `packages/crypto/src/room-statements.ts`, exported to the API as `@ciphermesh/crypto/identity` |
+| Room key creation, the verification rule, invitation envelopes, grants, Safety Code | `packages/crypto/src/room-keys.ts` |
+| Wire format and bundle assembly from server data (strict decoding) | `packages/crypto/src/room-format.ts` |
+| Canonical recipient order | `packages/crypto/src/recipients.ts` |
+| Safety Code word list (LIB-08, generated) | `packages/crypto/src/safety-code-words.ts`, `scripts/crypto/build-safety-code-words.mjs` |
+| Browser state (opened keys in memory only, cleared on every vault lock) | `apps/web/src/rooms/keys.ts`; UI `key-panel.tsx`, `invitations.tsx` |
+
+Raw RKM bytes exist only inside `room-keys.ts` while a key is created, opened or wrapped for an invitee, and are overwritten afterwards (CD-29, L-15). The opened key is a non-extractable HKDF `CryptoKey`; RWK_v is a non-extractable AES-256-GCM key for `wrapKey` and `unwrapKey`. Nothing is written to browser storage, and no "remember room key" feature exists.
 
 ### 7.7 History access
 The security profile decides which versions a new member receives:
@@ -243,6 +257,9 @@ Every AAD, OAEP label, HKDF info value and signed statement is `JCS({ctx, v, ...
 | `cm.identity.binding` | Statement signed by the identity's own signing key | userId, keyId, suite, encryptionKeySpki, signingKeySpki |
 | `cm.identity.fingerprint` | SHA-256 input of the identity fingerprint | suite, encryptionKeySpki, signingKeySpki |
 | `cm.room.envelope` | RSA-OAEP label for RKM_v | roomId, keyVersion, recipientUserId, recipientKeyId, suite |
+| `cm.room.genesis` | Statement signed by the room creator (Phase 6) | roomId, creatorUserId, creatorKeyId, suite |
+| `cm.room.membership-grant` | Statement signed by the inviter, or by the OWNER for ADMIN and OWNER grants (Phase 6) | roomId, subjectUserId, subjectKeyId, role, grantorUserId, grantorKeyId |
+| `cm.room.key-version` | Statement signed by the creator of a key version (Phase 6) | roomId, keyVersion, commitment, previousCommitment (null for version 1), suite, creatorUserId, creatorKeyId, recipients (sorted list of userId and keyId objects) |
 | `cm.room.dek-wrap-key` | HKDF info for RWK_v | roomId, keyVersion |
 | `cm.room.commitment` | HKDF info for RKC_v | roomId, keyVersion |
 | `cm.room.safety-code` | HKDF info for the Room Safety Code RSC_v | roomId, keyVersion |
@@ -323,10 +340,10 @@ Every encrypted record stores its algorithm suite (`CM1`, CP-18) and every conte
 
 Notes to verify during implementation:
 - Sharing RKM_v with another member requires its raw bytes, so envelopes are opened with `decrypt` and the bytes are imported and dropped as soon as possible (CD-16).
-- OAEP labels work in Chromium, Firefox and WebKit (Phase 4 probe and the vault pair check in all three engines). Decryption of envelopes created in another engine is confirmed in Phase 6 (OCD-01). If behaviour differs, the fallback is recorded in an ADR update, not improvised.
+- OAEP labels work in Chromium, Firefox and WebKit (Phase 4 probe and the vault pair check in all three engines). Decryption of envelopes created in another engine was confirmed in Phase 6 (OCD-01, ADR-007): `tests/e2e/room-keys.spec.ts` opens envelopes made in Chromium in Firefox and WebKit, and runs the invitation flow in all three engines. If behaviour differs in a future engine, the fallback is recorded in an ADR update, not improvised.
 - Ed25519 is not available in the Playwright WebKit build, which is why identities use ECDSA P-256 (ADR-015). ECDSA signatures are in the IEEE P1363 form that WebCrypto produces.
 - PKCS#8 exports of the same RSA key differ by one or two bytes between engines (DER integer encoding), so size checks on wrapped keys use ranges. Vaults created in one engine open in the other two (Phase 4 E2E test).
 - RSA-3072 key generation takes noticeable time: up to about 4 seconds in WebKit on the development laptop (crypto-decisions section 8). It happens once per identity and shows a progress state.
 
 ## 17. Limitations
-Cryptography does not protect against a compromised device, malicious code delivered by a compromised server, copying by authorized users, metadata analysis, or future quantum attacks on RSA. Until Phase 6 implements ADR-015 section 4, it also does not authenticate who created a room-key version (section 7.6). The Room Safety Code helps only when members compare it. The complete list is in [../security/limitations.md](../security/limitations.md).
+Cryptography does not protect against a compromised device, malicious code delivered by a compromised server, copying by authorized users, metadata analysis, or future quantum attacks on RSA. Since Phase 6 it authenticates who created a room-key version (section 7.6), but not whether that creator's identity was substituted (section 7.5), and grants are statements rather than revocable credentials (L-46). The Room Safety Code helps only when members compare it. The complete list is in [../security/limitations.md](../security/limitations.md).

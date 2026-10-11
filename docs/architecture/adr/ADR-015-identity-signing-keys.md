@@ -1,6 +1,6 @@
 # ADR-015: Per-user signing keys and signed room-key versions (OCD-12)
 
-- Status: **Accepted** (2026-10-05, by the project owner before the Phase 4 implementation began). Decides OCD-12 (Jira CM-T086). Sections 1 to 3 are implemented and tested in Phase 4; section 4 is accepted in principle and is confirmed or revised by the Phase 6 and Phase 11 tests
+- Status: **Accepted** (2026-10-05, by the project owner before the Phase 4 implementation began). Decides OCD-12 (Jira CM-T086). Sections 1 to 3 are implemented and tested in Phase 4. Section 4 is specified exactly and implemented for room creation, invitations, ADMIN grants and ownership transfers in Phase 6 (section 4.1, including the clarification for invited members that the project owner approved on 2026-10-06); key versions created by rekeys follow in Phase 11
 - Date: 2026-10-05
 - Related: [ADR-004](ADR-004-key-management.md), [ADR-007](ADR-007-asymmetric-key-wrapping.md), [ADR-012](ADR-012-room-safety-code.md), [ADR-013](ADR-013-rekey-state-machine.md); [crypto-decisions.md](../../crypto/crypto-decisions.md) CP-15 to CP-18, CP-26, CD-11, CD-23, CD-24; [cryptographic-architecture.md](../../crypto/cryptographic-architecture.md) sections 5, 7.5 and 7.6; T-25, T-29, T-32, T-36; L-07, L-09, L-23; AG-01, AG-03 in [architecture-gate-phase-0-5.md](../../security/architecture-gate-phase-0-5.md); CM-T025 to CM-T028, CM-T033 to CM-T036, CM-T050, CM-T053
 
@@ -52,6 +52,34 @@ The identity format above is decided now. The room statements are decided in pri
 5. **Verification rule.** A client uses key version v only if the creator's public identity verifies (binding signature and fingerprint), the key-version statement verifies under the creator's signing key, the creator's OWNER or ADMIN authority follows from a chain of signed grants back to the genesis statement, the recomputed commitment matches the signed one, and the client's own identity is in the signed recipient list. Otherwise it refuses the key, shows a security alert and reports `KEY_AUTHENTICATION_FAILED`.
 
 This is digital signatures over canonical, domain-separated statements, the same pattern used by signed group-state changes in established designs (for example MLS proposals and commits signed with credential keys). No new primitive or construction is introduced: the argument rests on the unforgeability of ECDSA and on SHA-256 and HKDF.
+
+#### 4.1 Phase 6 specification (CM-T033 to CM-T036)
+
+**Statements.** Each is the RFC 8785 serialization of a context built only by `packages/crypto/src/contexts.ts` (CP-15), signed with ECDSA P-256 in IEEE P1363 form (CP-26) by the identity it names as signer. Builders and verification: `packages/crypto/src/room-statements.ts`, shared by browsers and the API.
+
+| Context (`v` 1) | Fields | Signed by |
+|---|---|---|
+| `cm.room.genesis` | roomId, creatorUserId, creatorKeyId, suite | The room creator, at creation |
+| `cm.room.membership-grant` | roomId, subjectUserId, subjectKeyId, role (OWNER, ADMIN, MEMBER, VIEWER), grantorUserId, grantorKeyId | The inviter for an invitation; the OWNER for every ADMIN grant (AZ-10) and every ownership transfer (role OWNER, AZ-05) |
+| `cm.room.key-version` | roomId, keyVersion, commitment (32 bytes), previousCommitment (32 bytes, `null` exactly for version 1), suite, creatorUserId, creatorKeyId, recipients | The OWNER or ADMIN who created the version (version 1: the creator, with the creator as the only recipient) |
+
+`recipients` is a list of `{userId, keyId}` objects, 1 to 100 entries (CP-25), strictly ascending by user ID and then key ID, so each recipient set has exactly one signed form; the builder refuses any other order, a duplicate or an extra field.
+
+**Verification rule as implemented** (`packages/crypto/src/room-keys.ts`, `openRoomKey`). A browser uses key version v only if all of the following hold. Otherwise it refuses the key, shows a security alert, reports the version (AZ-29) and uses nothing derived from it.
+
+1. Every identity it relies on verifies (binding signature, fingerprint over both keys, key formats).
+2. The genesis statement verifies under the creator's signing key, for this room.
+3. The key-version statement verifies under the signing key of the identity it names as creator, for this room.
+4. Authority follows from signed statements alone. The genesis creator holds OWNER authority. The subject of an OWNER grant signed by an OWNER holds OWNER authority. The subject of an ADMIN grant signed by an OWNER holds ADMIN authority. The subject of a MEMBER or VIEWER grant signed by an OWNER or ADMIN may hold keys. Version 1 must be created by the genesis creator; a later version by an identity with OWNER or ADMIN authority.
+5. **This client is an authorized recipient**: its own user and identity key are in the signed recipient list of v, **or** it is the subject of a membership grant that verifies and whose grantor's authority follows from step 4. *Clarification approved by the project owner on 2026-10-06:* the version-1 statement is signed once, at creation, with the creator as its only recipient, and invited members receive envelopes for existing versions (DF-06). Read literally, the original wording ("the client's own identity is in the signed recipient list") would refuse every invited member. The grant is the signed authorization of an added recipient, so the statement field sets above stay exactly as section 4 lists them.
+6. Its own envelope opens under the label `cm.room.envelope {roomId, keyVersion, recipientUserId, recipientKeyId, suite}` with its private key.
+7. The decrypted key material reproduces the signed commitment (CD-24). For a version after 1 the material must not reproduce the previous commitment (reuse check), and if this client verified version v-1 itself, the signed previous commitment must equal it.
+
+A failure in steps 1 to 6, the reuse check or the previous-commitment check is `KEY_AUTHENTICATION_FAILED`; a commitment that does not match is `KEY_COMMITMENT_MISMATCH`. Raw key material exists only between steps 6 and 7 and while it is wrapped for an invitee, and is overwritten afterwards (L-15).
+
+**Server side.** The API verifies the genesis and version-1 statements under the creator's ACTIVE identity before it stores a room, and every grant under the grantor's ACTIVE identity before it stores an invitation, an ADMIN promotion or a transfer (422 `ROOM_STATEMENT_INVALID`, event `ROOM_STATEMENT_REJECTED`). This keeps invalid statements out of the database; members verify everything again, because a compromised server could skip the check (T-36). Storage: `rooms.creator_key_id` and `genesis_signature`; `room_key_versions.created_by_key_id`, `previous_commitment`, `recipient_user_ids`, `recipient_key_ids` and `statement_signature`; `invitations.grantor_key_id` and `grant_signature`; and the latest grant of each membership in `room_members` (`subject_key_id`, `grant_role`, `grantor_user_id`, `grantor_key_id`, `grant_signature`). The signed columns of rooms, key versions and invitations are write-once (database triggers). `GET /rooms/{roomId}/key-versions` serves the statements, the grants of the authority chain and the signers' public identities, retired ones included.
+
+**Limits recorded with the implementation.** Grants are statements, not revocable credentials: a demotion, a removal or a transfer away is not visible to the verification rule, so an earlier grant still counts as authority there (L-46; it matters from Phase 11, when members other than the creator sign key versions). A server that substitutes an identity under a user ID, the creator's included, passes the rule; only fingerprint comparison reveals it (T-25, L-07). An authorized OWNER or ADMIN colluding with the server can give members different, validly signed versions; only the Room Safety Code reveals that split view (T-29, L-22). The server can withhold statements or envelopes, which denies access but cannot make a client accept a key (T-32).
 
 ### 5. Complements kept
 
@@ -133,4 +161,12 @@ Accepted by the project owner on 2026-10-05, before any identity code was writte
 - `tests/e2e/vault.spec.ts`: a vault created in Chromium opens in Firefox and WebKit with the same fingerprint.
 - Negative controls NC-04-05 and NC-04-07 in `scripts/security/negative-controls.mjs`.
 
-Section 4 is confirmed or revised by the Phase 6 and Phase 11 tests. Review if a WebCrypto signature algorithm becomes unavailable in a supported engine, if Ed25519 becomes available in every engine CipherMesh tests, or if key transparency or MLS enters the scope.
+Section 4 is implemented in Phase 6 as specified in section 4.1 and confirmed by these tests:
+
+- `packages/crypto/src/room-keys.test.ts`: the `key-injection` suite (unsigned, forged, wrongly attributed and unauthorized versions; a version 1 made by anyone but the creator; a rekeyed version signed by a MEMBER; a commitment mismatch; a missing recipient; grants by people without authority, for another key, for another room or with a raised role; modified statement fields, suite, recipient order and room; a reused key; a forked previous commitment), OpenSSL verification of the hand-written statement bytes, and two documented limits (an authorized owner's split view, a substituted creator identity).
+- `packages/crypto/src/contexts.test.ts`: the exact statement bytes and the canonical recipient list.
+- `tests/authz/room-keys.test.ts` and `tests/authz/invitations.test.ts`: the API refuses invalid genesis, key-version and grant signatures and stores nothing; an envelope or key version written into the database is refused by the browser code.
+- `tests/e2e/room-keys.spec.ts`: verification in Chromium, Firefox and WebKit, envelopes made in one engine opened in the others, and the split-view harness.
+- The Phase 6 negative controls (NC-06-xx) in `scripts/security/negative-controls.mjs`.
+
+The rekey part (key versions signed by OWNERs and ADMINs other than the creator) is confirmed by the Phase 11 tests. Review if a WebCrypto signature algorithm becomes unavailable in a supported engine, if Ed25519 becomes available in every engine CipherMesh tests, or if key transparency or MLS enters the scope.

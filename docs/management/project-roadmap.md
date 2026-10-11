@@ -128,6 +128,9 @@ Phases 17 and 18 are separate for evidence purposes and can run back to back: th
 | Jira evidence | BOLA report; optional demonstration branch where removing a room check makes the suite fail (never merged) |
 
 ### Phase 6: Cryptographic Membership (M3, CM-T033 to CM-T036, CM-T085)
+
+Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceability.md](phase-06-traceability.md).
+
 | Aspect | Details |
 |---|---|
 | Goal | Room keys delivered cryptographically to exactly the authorized members |

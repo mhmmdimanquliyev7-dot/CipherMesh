@@ -80,6 +80,8 @@ Being honest about these limits is part of the design (see [limitations.md](limi
 
 Each gate fails closed with a stable error code. Gates never read role or profile information from the request body.
 
+**Enforced since Phase 6:** PC-03 for inviting and approving in RESTRICTED rooms (a step-up within 15 minutes), PC-04 (OWNER approval of ADMIN invitations, approver different from inviter), PC-05 (a confirmed fingerprint equal to the invitee's current one, required in RESTRICTED), PC-06 (the server sets the expiry), PC-07 (RESTRICTED invitations carry the current key version only) and PC-16 for invitations, approvals and acceptances. The values are code constants (`INVITATION_RULES` in `packages/shared/src/rooms.ts`) compared with the table above by `tests/security/profile-requirements.test.ts`. The versioned catalogue and the remaining gates are CM-T046 and CM-T047 (L-42).
+
 ## 7. Testing
 
 The policy test matrix (Jira CM-T049) generates, for every control and profile, one allowed and one denied request against a real database and asserts the status code, error code and audit event. The matrix is part of the security regression suite and runs on every pull request.

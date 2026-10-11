@@ -1,0 +1,33 @@
+EV-06-04: Phase 6 cross-browser results (Playwright, Chromium, Firefox, WebKit; one worker)
+Captured: 2026-10-11T07:35:40Z from the full pnpm test:e2e run on the Phase 6 candidate
+Redaction: test names, engines, durations and counts only.
+
+ok  5 [chromium] › tests\e2e\room-keys.spec.ts:66:1 › the room key is made and kept in the browser: verified after lock and unlock, never sent or stored (3.3s)
+ok  6 [chromium] › tests\e2e\room-keys.spec.ts:110:1 › an invited member verifies the room key through the signed grant and sees the same Safety Code (4.2s)
+ok  7 [chromium] › tests\e2e\room-keys.spec.ts:197:1 › a RESTRICTED room invites only after the fingerprint was compared, with a step-up (23.7s)
+ok  8 [chromium] › tests\e2e\room-keys.spec.ts:248:1 › envelopes made in Chromium open in Firefox and WebKit, with the same Safety Code (14.5s)
+ok  9 [chromium] › tests\e2e\room-keys.spec.ts:277:1 › the commitment and Safety Code derivations give the known answers in this engine (CP-24) (344ms)
+ok 10 [chromium] › tests\e2e\room-keys.spec.ts:391:1 › a split view made by an authorized owner with the server passes every check; only the Safety Codes differ (4.5s)
+ok 11 [chromium] › tests\e2e\rooms.spec.ts:24:1 › create, open after a reload, rename and delete a room, without CSP violations (3.2s)
+ok 12 [chromium] › tests\e2e\rooms.spec.ts:61:1 › an invited member is promoted, receives ownership, and the new owner removes the former one (5.7s)
+ok 31 [firefox] › tests\e2e\room-keys.spec.ts:66:1 › the room key is made and kept in the browser: verified after lock and unlock, never sent or stored (4.1s)
+ok 32 [firefox] › tests\e2e\room-keys.spec.ts:110:1 › an invited member verifies the room key through the signed grant and sees the same Safety Code (7.0s)
+-  33 [firefox] › tests\e2e\room-keys.spec.ts:197:1 › a RESTRICTED room invites only after the fingerprint was compared, with a step-up
+-  34 [firefox] › tests\e2e\room-keys.spec.ts:248:1 › envelopes made in Chromium open in Firefox and WebKit, with the same Safety Code
+ok 35 [firefox] › tests\e2e\room-keys.spec.ts:277:1 › the commitment and Safety Code derivations give the known answers in this engine (CP-24) (1.2s)
+-  36 [firefox] › tests\e2e\room-keys.spec.ts:391:1 › a split view made by an authorized owner with the server passes every check; only the Safety Codes differ
+ok 37 [firefox] › tests\e2e\rooms.spec.ts:24:1 › create, open after a reload, rename and delete a room, without CSP violations (4.7s)
+ok 38 [firefox] › tests\e2e\rooms.spec.ts:61:1 › an invited member is promoted, receives ownership, and the new owner removes the former one (7.4s)
+ok 57 [webkit] › tests\e2e\room-keys.spec.ts:66:1 › the room key is made and kept in the browser: verified after lock and unlock, never sent or stored (7.6s)
+ok 58 [webkit] › tests\e2e\room-keys.spec.ts:110:1 › an invited member verifies the room key through the signed grant and sees the same Safety Code (13.0s)
+-  59 [webkit] › tests\e2e\room-keys.spec.ts:197:1 › a RESTRICTED room invites only after the fingerprint was compared, with a step-up
+-  60 [webkit] › tests\e2e\room-keys.spec.ts:248:1 › envelopes made in Chromium open in Firefox and WebKit, with the same Safety Code
+ok 61 [webkit] › tests\e2e\room-keys.spec.ts:277:1 › the commitment and Safety Code derivations give the known answers in this engine (CP-24) (603ms)
+-  62 [webkit] › tests\e2e\room-keys.spec.ts:391:1 › a split view made by an authorized owner with the server passes every check; only the Safety Codes differ
+ok 63 [webkit] › tests\e2e\rooms.spec.ts:24:1 › create, open after a reload, rename and delete a room, without CSP violations (9.1s)
+ok 64 [webkit] › tests\e2e\rooms.spec.ts:61:1 › an invited member is promoted, receives ownership, and the new owner removes the former one (14.3s)
+
+  8 skipped
+  70 passed (4.2m)
+
+Skipped tests are single-engine tests by design: the RESTRICTED policy flow, the cross-engine test (it launches Firefox and WebKit itself from Chromium) and the split-view harness run once, from Chromium.

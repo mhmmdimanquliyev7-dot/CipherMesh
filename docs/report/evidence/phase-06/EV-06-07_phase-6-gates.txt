@@ -1,0 +1,26 @@
+EV-06-07: Phase 6 verification gates (CLAUDE.md section 10)
+Captured: 2026-10-11T08:48:50Z on branch feature/CM-T033-cryptographic-membership (Phase 6)
+Redaction: counts and exit codes only.
+Machine note: this Windows machine runs out of memory with parallel browsers, so Playwright ran with one worker (all three engines ran). Docker Desktop stopped during the pause and was restarted. The local database is the development PostgreSQL container; CI uses a throwaway service container.
+
+pnpm install --frozen-lockfile        exit 0
+pnpm format:check                     exit 0
+pnpm lint                             exit 0
+pnpm typecheck                        exit 0
+pnpm test                             exit 0   Test Files 71 passed (71); Tests 1734 passed (1734)
+pnpm test:coverage:crypto             exit 0   98.5% statements, 92.3% branches (gate 90%)
+pnpm test:coverage:authz              exit 0   97.3% statements, 98.3% branches
+pnpm build                            exit 0
+pnpm smoke:api                        exit 0
+pnpm test:e2e (three engines)         exit 0   70 passed, 8 skipped by design
+pnpm security:negative-controls       exit 0   59 of 59 caught; both baselines PASS (EV-06-08)
+pnpm audit:deps                       exit 0   No known vulnerabilities found (after next 16.3.8)
+pnpm sbom:generate                    exit 0
+pnpm db:check-schema                  exit 0   16 models, 231 classified fields
+pnpm db:drift                         exit 0   no drift
+pnpm db:status                        exit 0   all 7 migrations applied; migrations from zero are applied by every database test run
+git diff --check                      no whitespace errors in code (line-ending notices only)
+
+Notes:
+- pnpm test and the E2E run were repeated after fixes of test helpers (an IPv6 address overflow in newAddress()) and after adding room-format.test.ts; the numbers above are from the final runs. The typecheck gate was rerun after one test typing fix; format, lint and the affected unit file were rerun after it.
+- pnpm scan:secrets: see EV-06-09 and the commit record.
