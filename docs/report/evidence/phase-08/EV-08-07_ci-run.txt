@@ -1,0 +1,20 @@
+EV-08-07 CI run of the Phase 8 pull request (CM-T042)
+
+Pull request: https://github.com/mhmmdimanquliyev7-dot/CipherMesh/pull/26 (feature/CM-T042-encrypted-notes -> main, head 44aabf0)
+Workflow run: 38162650065
+
+Attempt 1: "Lint, types, tests, build, E2E" failed one test: [webkit] tests/e2e/files.spec.ts
+  "a changed object is an integrity error: nothing is shown or saved (EV-07-04)". The failure was in the shared
+  helper signedInWithVault, before any file or note code ran: the "Vault unlocked" heading did not appear within
+  90 seconds while WebKit derived the vault key (Argon2id, 64 MiB) on the CI runner. 101 other E2E tests passed,
+  including every note test in Chromium, Firefox and WebKit. Same mechanism as EV-07-11 (pull request #24,
+  attempt 1). The assertion was not changed.
+Attempt 2 (failed job rerun once): every job passed.
+
+Final checks:
+  Lint, types, tests, build, E2E        pass (10m39s)
+  Dependency audit                      pass
+  Secret scan (gitleaks, full history)  pass
+  GitGuardian Security Checks           pass
+
+Merged with a normal merge commit: faeb633a5a2839383a3c6c095c1c34e9c694affe (parents 111a193, 44aabf0), 2026-10-11T18:32:24Z.

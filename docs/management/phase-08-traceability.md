@@ -1,6 +1,6 @@
 # Phase 8 Traceability
 
-Status: implemented on 2026-10-11 (Prompt 10): CM-T042, verified on branch `feature/CM-T042-encrypted-notes`, created from `main` at `111a193` (the Phase 7 handoff merge, pull request #25). Merged through its pull request; the pull request number, merge commit and CI run are recorded here after the merge. Backlog item: [jira-backlog.md](jira-backlog.md) (CM-EPIC-08, CM-T042). Specification: [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md) section 6.2, [../architecture/data-flow.md](../architecture/data-flow.md) DF-12, [../architecture/data-model.md](../architecture/data-model.md) 4.12 and 5, [../security/authorization-model.md](../security/authorization-model.md) section 9.9, crypto-decisions CP-16, CP-28, CD-31.
+Status: implemented on 2026-10-11 (Prompt 10): CM-T042, verified on branch `feature/CM-T042-encrypted-notes`, created from `main` at `111a193` (the Phase 7 handoff merge, pull request #25). Merged into `main` through pull request #26, merge commit `faeb633` (`faeb633a5a2839383a3c6c095c1c34e9c694affe`; parents `111a193` and `44aabf0`). CI run 38162650065 passed every job on attempt 2; attempt 1 failed one Phase 7 test in WebKit while creating a vault (EV-08-07). Backlog item: [jira-backlog.md](jira-backlog.md) (CM-EPIC-08, CM-T042). Specification: [../crypto/cryptographic-architecture.md](../crypto/cryptographic-architecture.md) section 6.2, [../architecture/data-flow.md](../architecture/data-flow.md) DF-12, [../architecture/data-model.md](../architecture/data-model.md) 4.12 and 5, [../security/authorization-model.md](../security/authorization-model.md) section 9.9, crypto-decisions CP-16, CP-28, CD-31.
 
 ## 1. Work item
 
@@ -99,4 +99,4 @@ Each control writes one real defect into the working tree, runs the tests that m
 
 ## 7. Evidence
 
-In [../report/evidence/phase-08/](../report/evidence/phase-08/), synthetic data only: EV-08-01 (the stored note row with the ciphertext head, and the rendered note), EV-08-02 (the XSS corpus shown as text), EV-08-03 (canary scan), EV-08-04 (revision, conflict and tamper tests), EV-08-05 (gates and secret scans), EV-08-06 (negative controls). Pending: the CI run of the pull request (recorded after the merge) and the Jira history of CM-T042 (backlog not imported yet).
+In [../report/evidence/phase-08/](../report/evidence/phase-08/), synthetic data only: EV-08-01 (the stored note row with the ciphertext head, and the rendered note), EV-08-02 (the XSS corpus shown as text), EV-08-03 (canary scan), EV-08-04 (revision, conflict and tamper tests), EV-08-05 (gates and secret scans), EV-08-06 (negative controls). EV-08-07 is the CI run of pull request #26. Pending: the Jira history of CM-T042 (backlog not imported yet).
