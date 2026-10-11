@@ -34,6 +34,7 @@ import {
 } from './routes/registry';
 import { createReadinessProbe, PUBLIC_ROUTE_ALLOWLIST, systemRoutes } from './routes/system';
 import { fileRoutes } from './routes/files';
+import { noteRoutes } from './routes/notes';
 import { invitationRoutes } from './routes/invitations';
 import { roomRoutes } from './routes/rooms';
 import { vaultRoutes } from './routes/vault';
@@ -42,6 +43,7 @@ import { createRoomKeyService } from './rooms/keys';
 import { createRoomService } from './rooms/service';
 import { createObjectStore, type ObjectStore } from './storage/object-store';
 import { createFileService } from './files/service';
+import { createNoteService } from './notes/service';
 import { createVaultService, defaultVaultRateLimits, type VaultRateLimits, type VaultService } from './vault/service';
 
 export interface AppDependencies {
@@ -133,6 +135,8 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
     events,
     clock,
   });
+  // Encrypted notes (Phase 8): note ciphertext and wrapped NEKs in PostgreSQL, revisions in order.
+  const notes = createNoteService({ store: roomData.store, transaction: roomData.transaction, events, clock });
 
   const app = express();
   app.disable('x-powered-by');
@@ -159,6 +163,7 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
       ...roomRoutes(roomService, roomAccess, roomKeys, invitations, roomData.store),
       ...invitationRoutes(invitations),
       ...fileRoutes(files, roomData.store),
+      ...noteRoutes(notes, roomData.store),
       ...(testing?.routes ?? []),
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],

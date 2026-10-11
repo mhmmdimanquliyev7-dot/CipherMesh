@@ -277,3 +277,17 @@ Six room routes, all declared in the registry with their matrix action and liste
 | `POST /rooms/{roomId}/files/{fileId}/delete` | AZ-18 | `own` cell: the stored uploader decides for MEMBERs (OL-02, OL-04); the file is locked and the decision repeated on locked state; allowed while the room is REKEY_REQUIRED (only content writes are locked) |
 
 Error answers follow section 7: non-members, files of another room and unknown files are the same 404; `KEY_VERSION_STALE` and `REKEY_REQUIRED` are 409. PC-12 is a 403 with the reason `PROFILE_PC_12` in the security event. Storage never sees a session: presigned URLs are the only capability, and the API's storage credential can read and write objects of the content bucket only. The BOLA suite attacks all six routes with files of another room (`tests/authz/bola.test.ts`, 132 tests over 22 room routes).
+
+### 9.9 Encrypted notes (Phase 8, CM-T042)
+
+Five room routes, declared in the registry with their matrix action and listed in `tests/security/route-inventory.test.ts` and `tests/helpers/bola-cases.ts`. No matrix cell changed: AZ-19 to AZ-22 are used as specified in section 3.
+
+| Route | Action | Object rule |
+|---|---|---|
+| `GET /rooms/{roomId}/notes` | AZ-20 | The query filters by room ID and the caller's ACTIVE membership in an ACTIVE room; only live, unexpired notes; every role reads (no profile restriction for notes); reads audited at EXTENDED and FULL (PC-13) |
+| `POST /rooms/{roomId}/notes` | AZ-19 | Locks user, room, membership; REKEY_REQUIRED, KEY_VERSION_STALE, expiry (PC-08), unused note ID and the per-room note limit (D-08-01) on locked state |
+| `GET /rooms/{roomId}/notes/{noteId}` | AZ-20 | Loaded by note ID AND room ID AND membership; deleted and expired notes are the same 404 |
+| `POST /rooms/{roomId}/notes/{noteId}/update` | AZ-21 | `own` cell: the stored author decides for MEMBERs (OL-02, OL-04); the note is locked and the decision repeated on locked state; REKEY_REQUIRED and KEY_VERSION_STALE, then the expected revision (409 `REVISION_CONFLICT`) |
+| `POST /rooms/{roomId}/notes/{noteId}/delete` | AZ-22 | `own` cell as for updates; tombstone; allowed while the room is REKEY_REQUIRED (only content writes are locked) |
+
+Error answers follow section 7: non-members, notes of another room, deleted, expired and unknown notes are the same 404. A MEMBER who later becomes a VIEWER can no longer edit or delete their own notes (the role decides first). The BOLA suite attacks all five routes with notes of another room (`tests/authz/bola.test.ts`, 160 tests over 27 room routes).

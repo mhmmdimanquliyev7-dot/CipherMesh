@@ -133,6 +133,12 @@ Captured in Phase 6 (Prompt 08), with synthetic data only, in [evidence/phase-06
 |---|---|---|---|---|
 | EV-08-01 | Note ciphertext next to the rendered note | Query output and screenshot | Client-side encrypted notes | CRY |
 | EV-08-02 | XSS payload rendered as text | Screenshot | Safe rendering | APP |
+| EV-08-03 | Note canary scan report | Test output | No note plaintext in persistent server storage or logs | CRY, ISMS |
+| EV-08-04 | Revision, conflict and tamper tests | Test output | Revision binding and optimistic concurrency | CRY, APP |
+| EV-08-05 | Phase 8 verification gates | Command output | Release readiness of the phase | ISMS |
+| EV-08-06 | Phase 8 negative controls | Command output | The note tests detect real defects | ISMS |
+
+Captured in Phase 8 (Prompt 10), with synthetic data only, in [evidence/phase-08/](evidence/phase-08/): EV-08-01 (the stored note row, ciphertext head, next to the rendered note), EV-08-02 (an XSS corpus shown as text in Chromium), EV-08-03 (canary scan output), EV-08-04 (revision, conflict and tamper test output), EV-08-05 (gate results) and EV-08-06 (negative controls). The CI run of the pull request is recorded in the traceability file after the merge. Jira history items stay pending until the backlog is imported.
 
 ### Phase 9: Secrets
 | ID | Evidence | How to capture | Demonstrates | Tags |

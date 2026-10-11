@@ -478,6 +478,14 @@ sequenceDiagram
 
 Only the current revision is stored. A fresh key per revision keeps the rule "one DEK per item version" simple and removes any risk of IV reuse across edits.
 
+**As implemented in Phase 8** (differences from the diagram, none weakening it):
+- The update is `POST /api/rooms/{roomId}/notes/{noteId}/update` (every state change of the API is a POST through the CSRF gate, INV-19), with `expectedRevision`, `keyVersion`, `suite`, `wrappedNek`, `nekIv`, `ciphertext` and `contentIv`; the strict schema rejects any other field, including a revision, author, editor or expiry. Creation is `POST /api/rooms/{roomId}/notes` with a client-chosen `noteId`, the same ciphertext fields and `expiresAt`; it stores revision 1.
+- One transaction locks the editor's user row, the room, the membership and the note, re-checks AZ-21 (the stored author decides `own` for MEMBERs), requires the room key state ACTIVE (PC-16) and the current key version, compares the stored revision with `expectedRevision` (409 `REVISION_CONFLICT` otherwise), counts one more wrap under the key version (CP-16) and writes revision r conditionally. The guard trigger of migration `20261008000000_encrypted_notes` refuses any other transition. The API stores the SHA-256 of the ciphertext it received.
+- The expiry is fixed at creation (PC-08) and an edit cannot extend it. Expired and deleted notes are refused at read time (INV-14); the worker turns expired notes and the notes of rooms being deleted into tombstones.
+- `GET /notes` returns the room's live notes with their ciphertext (the title is inside it), 20 per page, newest first by creation time; reads are recorded at the EXTENDED and FULL audit levels (PC-13). Events go to the security log until the Phase 12 audit chain exists (`NOTE_CREATED`, `NOTE_UPDATED`, `NOTE_READ`, `NOTE_DELETED`).
+- `POST .../delete` (AZ-22) makes the note a tombstone (ciphertext and wrapped NEK NULL); it is allowed while the room is REKEY_REQUIRED.
+- The browser remembers, in memory only, the highest revision it has seen of each note and warns when a lower one is served (T-32).
+
 ## DF-13 Room Safety Code comparison
 
 ```mermaid

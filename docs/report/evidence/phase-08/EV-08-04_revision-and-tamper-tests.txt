@@ -1,0 +1,29 @@
+EV-08-04 Revision, conflict and tamper tests (Phase 8, CM-T042), 2026-10-11T18:07Z, synthetic data only.
+Command: npx vitest run --project notes --project unit packages/crypto/src/notes.test.ts tests/notes --reporter=verbose
+
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: format against an independent implementation > uses a fresh NEK and fresh IVs for every revision, even for identical text
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: round trips and limits > accepts revisions 1 to 2^31 - 1 and refuses anything else
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: tampering and substitution fail closed > refuses bit flips in the body ciphertext, its tag, its IV, the wrapped NEK and its IV
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: tampering and substitution fail closed > refuses a title change: title and body are one authenticated message
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: tampering and substitution fail closed > refuses truncated and extended ciphertext
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: tampering and substitution fail closed > refuses another revision: ciphertext moved to revision r + 1 or replayed as r - 1 fails authentication
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: tampering and substitution fail closed > refuses another note: a wrapped NEK or body moved between notes fails authentication
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: tampering and substitution fail closed > refuses another room or key version, and a key that is not the room key of that version
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: tampering and substitution fail closed > refuses a NEK wrapped for another item type, revision or key version (wrong wrapping context)
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: tampering and substitution fail closed > refuses an unsupported suite before any decryption
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: documents from a malicious member > refuses documents that authenticate but are not canonical version-1 notes
+ ✓ |unit| packages/crypto/src/notes.test.ts > encrypted notes: wire format > a record decoded for another room is refused by the room key check
+ ✓ |notes| tests/notes/notes-access.test.ts > AZ-19 to AZ-22: the matrix decides, the stored author decides "own" > a MEMBER updates and deletes only their own notes; another member's are refused unchanged
+ ✓ |notes| tests/notes/notes-access.test.ts > AZ-19 to AZ-22: the matrix decides, the stored author decides "own" > client-supplied revision, author or editor fields are refused by the schema
+ ✓ |notes| tests/notes/notes-access.test.ts > membership loss and key state (INV-07, PC-16) > a removed member loses all access; the room refuses new note content until a rekey, but reads and deletions work
+ ✓ |notes| tests/notes/notes-lifecycle.test.ts > revisions and optimistic concurrency (DF-12, T-32) > increments the revision, uses a fresh NEK, and records the editor
+ ✓ |notes| tests/notes/notes-lifecycle.test.ts > revisions and optimistic concurrency (DF-12, T-32) > refuses a stale revision with 409 and keeps the stored note intact
+ ✓ |notes| tests/notes/notes-lifecycle.test.ts > revisions and optimistic concurrency (DF-12, T-32) > accepts exactly one of two concurrent saves from the same revision; the other gets 409
+ ✓ |notes| tests/notes/notes-lifecycle.test.ts > revisions and optimistic concurrency (DF-12, T-32) > refuses a duplicate of a save that already succeeded
+ ✓ |notes| tests/notes/notes-lifecycle.test.ts > revisions and optimistic concurrency (DF-12, T-32) > binds the revision cryptographically: a served record with another revision fails authentication
+ ✓ |notes| tests/notes/notes-lifecycle.test.ts > revisions and optimistic concurrency (DF-12, T-32) > refuses a note moved to another note ID or room
+ ✓ |notes| tests/notes/notes-lifecycle.test.ts > revisions and optimistic concurrency (DF-12, T-32) > refuses expected revisions outside 1 .. 2^31 - 2, and an update of the last revision
+ ✓ |notes| tests/notes/notes-lifecycle.test.ts > revisions and optimistic concurrency (DF-12, T-32) > refuses a reused note ID, in this room or another
+
+ Test Files  3 passed (3)
+      Tests  45 passed (45)

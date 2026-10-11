@@ -1,9 +1,13 @@
-import { FILES } from '@ciphermesh/crypto/params';
+import { FILES, NOTES } from '@ciphermesh/crypto/params';
 import {
   FILE_LIMITS,
   FILE_QUOTAS,
   FILE_RULES,
   FILE_TAG_BYTES,
+  NOTE_LIMITS,
+  NOTE_LIST_PAGE_SIZE,
+  NOTE_RULES,
+  NOTE_TAG_BYTES,
   INVITATION_RULES,
   PROFILE_ACCESS_REQUIREMENTS,
   SECURITY_PROFILES,
@@ -152,5 +156,49 @@ describe('file rules used by the file routes', () => {
   it('are frozen', () => {
     for (const value of [FILE_RULES, FILE_RULES.RESTRICTED, FILE_LIMITS, FILE_QUOTAS])
       expect(Object.isFrozen(value)).toBe(true);
+  });
+});
+
+// Phase 8 (CM-T042): the note rules the API enforces, against the same table, and the note limits
+// against the parameter register (CP-28) and the crypto package.
+describe('note rules used by the note routes', () => {
+  const cellsOf = (id: string): string[] => controlRow(id).slice(2);
+  const DAY = 24 * 60 * 60_000;
+
+  it('match PC-08, the expiry of notes (the same row as files)', () => {
+    expect(controlRow('PC-08')[1]).toBe('Expiry of files and notes');
+    SECURITY_PROFILES.forEach((profile) => {
+      const { auditReads: _audit, ...expiry } = NOTE_RULES[profile];
+      const { viewerMayDownload: _viewer, auditDownloadUrls: _urls, ...fileExpiry } = FILE_RULES[profile];
+      expect(expiry, profile).toEqual(fileExpiry);
+    });
+    expect(NOTE_RULES.RESTRICTED.maxExpiryMs).toBe(30 * DAY);
+  });
+
+  it('match PC-13: note reads are audited at the EXTENDED and FULL levels', () => {
+    expect(PROFILES_DOC).toContain('| EXTENDED | BASELINE plus file download-URL issuance and note reads |');
+    SECURITY_PROFILES.forEach((profile, column) => {
+      const level = cellsOf('PC-13')[column];
+      expect(NOTE_RULES[profile].auditReads, profile).toBe(level === 'EXTENDED' || level === 'FULL');
+    });
+  });
+
+  it('match CP-28 of the parameter register and the crypto package', () => {
+    const register = readFileSync(new URL('../../docs/crypto/crypto-decisions.md', import.meta.url), 'utf8');
+    const row = register.split('\n').find((l) => l.startsWith('| CP-28 |')) ?? '';
+    expect(row).toContain('64 KiB');
+    expect(row).toContain('200');
+    expect(NOTE_LIMITS.maxDocumentBytes).toBe(64 * 1024);
+    expect(NOTES.maxDocumentBytes).toBe(NOTE_LIMITS.maxDocumentBytes);
+    expect(NOTE_LIMITS.maxCiphertextBytes).toBe(NOTE_LIMITS.maxDocumentBytes + NOTE_TAG_BYTES);
+    expect([NOTES.maxTitleLength, NOTES.maxRevision]).toEqual([NOTE_LIMITS.maxTitleLength, NOTE_LIMITS.maxRevision]);
+    expect(NOTE_LIMITS.maxRevision).toBe(2 ** 31 - 1);
+    // The largest update request (ciphertext as base64url plus the other fields) fits the 128 KiB body limit.
+    expect(Math.ceil((NOTE_LIMITS.maxCiphertextBytes * 4) / 3) + 1024).toBeLessThan(128 * 1024);
+    expect(NOTE_LIST_PAGE_SIZE).toBeLessThanOrEqual(20);
+  });
+
+  it('are frozen', () => {
+    for (const value of [NOTE_RULES, NOTE_RULES.RESTRICTED, NOTE_LIMITS]) expect(Object.isFrozen(value)).toBe(true);
   });
 });

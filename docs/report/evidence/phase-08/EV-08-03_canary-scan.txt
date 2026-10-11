@@ -1,0 +1,5 @@
+EV-08-03 Note canary scan (Phase 8, CM-T042), 2026-10-11T18:07Z, local PostgreSQL, synthetic data only.
+Command: npx vitest run --project notes tests/notes --reporter=verbose
+The test writes a random title canary and body canary into a note, edits it, reads it as a VIEWER, then searches every table (row_to_json), the API log and the security events for each canary as plain text, hex, base64, base64url and UTF-16LE hex.
+
+ ✓ |notes| tests/notes/notes-lifecycle.test.ts > client-side encrypted notes (DF-12) > finds no title or body canary in the database or the log (EV-08-01, INV-01)

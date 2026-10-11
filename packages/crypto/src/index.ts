@@ -74,6 +74,18 @@ export { sortRecipients, type RecipientRef } from './recipients';
 // Encrypted files (Phase 7, CM-T038, CM-T039).
 export { encryptFile, openFile, type EncryptedFile, type OpenedFile, type StoredFile } from './files';
 export { encryptedFileToWire, storedFileFromWire, type EncryptedFileWire } from './file-format';
-export { FILES, ROOM_KEYS, type RoomRole } from './params';
+// Encrypted notes (Phase 8, CM-T042).
+export {
+  encryptNote,
+  isNoteTitle,
+  noteDocumentBytes,
+  openNote,
+  type EncryptedNote,
+  type NoteContent,
+  type OpenedNote,
+  type StoredNote,
+} from './notes';
+export { noteCiphertextToWire, storedNoteFromWire, type NoteCiphertextWire, type StoredNoteWire } from './note-format';
+export { FILES, NOTES, ROOM_KEYS, type RoomRole } from './params';
 export { isDerivationRunning } from './kdf/derive';
 export type { Key } from './types';

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, inject, it } from 'vitest';
 import {
@@ -631,6 +631,104 @@ describe('encrypted file lifecycle (Phase 7, migration 20261007000000_encrypted_
     expect(
       await run("UPDATE encrypted_files SET object_deleted_at = now() + interval '1 hour' WHERE id = $1", [id]),
     ).toBe(SQLSTATE.integrityConstraintViolation);
+  });
+});
+
+describe('encrypted note lifecycle (Phase 8, migration 20261008000000_encrypted_notes)', () => {
+  it('bounds the ciphertext by CP-28: at most a 64 KiB document plus the tag', async () => {
+    const room = await insertRoom(api);
+    expect(await attempt('encrypted_notes', noteRow(room, { ciphertext: DUMMY.ciphertext(65_552) }))).toBe('none');
+    expect(await attempt('encrypted_notes', noteRow(room, { ciphertext: DUMMY.ciphertext(65_553) }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+    expect(await attempt('encrypted_notes', noteRow(room, { ciphertext: DUMMY.ciphertext(16) }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+  });
+
+  it('keeps identity write-once and moves the revision by exactly one, always with new key material', async () => {
+    const room = await insertRoom(api);
+    await insert(api, 'room_key_versions', versionRow(room, 2));
+    const row = noteRow(room);
+    await insert(api, 'encrypted_notes', row);
+    const id = row['id'];
+    const someoneElse = await insertUser(api);
+    // The content of the next revision, as an update writes it.
+    const next = (revision: number, keyVersion = 1): [string, unknown[]] => [
+      `UPDATE encrypted_notes SET revision = $2, key_version = $3, wrapped_dek = $4, dek_iv = $5, ciphertext = $6,
+              content_iv = $7, ciphertext_sha256 = $8, updated_by_id = $9 WHERE id = $1`,
+      [
+        id,
+        revision,
+        keyVersion,
+        randomBytes(48),
+        randomBytes(12),
+        randomBytes(64),
+        randomBytes(12),
+        randomBytes(32),
+        someoneElse,
+      ],
+    ];
+    const skipped = next(3);
+    const repeated = next(1);
+    const refused: [string, unknown[]][] = [
+      ['UPDATE encrypted_notes SET author_id = $2 WHERE id = $1', [someoneElse]],
+      ["UPDATE encrypted_notes SET created_at = now() - interval '1 day' WHERE id = $1", []],
+      // Content without a new revision, a revision without new content, a skipped or repeated revision.
+      ['UPDATE encrypted_notes SET ciphertext = $2 WHERE id = $1', [randomBytes(64)]],
+      ['UPDATE encrypted_notes SET wrapped_dek = $2 WHERE id = $1', [randomBytes(48)]],
+      ['UPDATE encrypted_notes SET updated_by_id = $2 WHERE id = $1', [someoneElse]],
+      ['UPDATE encrypted_notes SET revision = 2 WHERE id = $1', []],
+      [skipped[0], skipped[1].slice(1)],
+      [repeated[0], repeated[1].slice(1)],
+    ];
+    for (const [sql, values] of refused) {
+      expect(await run(sql, [id, ...values]), sql).toBe(SQLSTATE.integrityConstraintViolation);
+    }
+    const [revision2, values2] = next(2, 2);
+    expect(await run(revision2, values2)).toBe('none');
+    // The key version never moves back (revision 3 under version 1 after revision 2 under version 2).
+    const [back, backValues] = next(3, 1);
+    expect(await run(back, backValues)).toBe(SQLSTATE.integrityConstraintViolation);
+    // Reusing the previous revision's IV is refused.
+    const current = await api.query<{ dek_iv: Buffer }>('SELECT dek_iv FROM encrypted_notes WHERE id = $1', [id]);
+    const [reuse, reuseValues] = next(3, 2);
+    reuseValues[4] = current.rows[0]?.dek_iv;
+    expect(await run(reuse, reuseValues)).toBe(SQLSTATE.integrityConstraintViolation);
+    expect(await run(...next(3, 2))).toBe('none');
+  });
+
+  it('lets an expiry move only earlier, and makes a tombstone final', async () => {
+    const room = await insertRoom(api);
+    const row = noteRow(room, { expires_at: new Date(Date.now() + 2 * 86_400_000) });
+    await insert(api, 'encrypted_notes', row);
+    const id = row['id'];
+    expect(await run("UPDATE encrypted_notes SET expires_at = now() + interval '1 day' WHERE id = $1", [id])).toBe(
+      'none',
+    );
+    expect(await run("UPDATE encrypted_notes SET expires_at = now() + interval '3 days' WHERE id = $1", [id])).toBe(
+      SQLSTATE.integrityConstraintViolation,
+    );
+    expect(await run('UPDATE encrypted_notes SET expires_at = NULL WHERE id = $1', [id])).toBe(
+      SQLSTATE.integrityConstraintViolation,
+    );
+    // Deletion removes the ciphertext and the wrapped NEK, and nothing else about the revision.
+    expect(
+      await run(
+        'UPDATE encrypted_notes SET wrapped_dek = NULL, ciphertext = NULL, deleted_at = now(), revision = 2 WHERE id = $1',
+        [id],
+      ),
+    ).toBe(SQLSTATE.integrityConstraintViolation);
+    const tombstone =
+      'UPDATE encrypted_notes SET wrapped_dek = NULL, ciphertext = NULL, deleted_at = now() WHERE id = $1';
+    expect(await run(tombstone, [id])).toBe('none');
+    for (const sql of [
+      'UPDATE encrypted_notes SET deleted_at = NULL, wrapped_dek = $2, ciphertext = $3 WHERE id = $1',
+      "UPDATE encrypted_notes SET updated_at = now() + interval '1 hour' WHERE id = $1",
+    ]) {
+      const values = sql.includes('$2') ? [id, randomBytes(48), randomBytes(64)] : [id];
+      expect(await run(sql, values), sql).toBe(SQLSTATE.integrityConstraintViolation);
+    }
   });
 });
 

@@ -4,5 +4,6 @@ export * from './errors';
 export * from './files';
 export * from './http';
 export * from './identifiers';
+export * from './notes';
 export * from './product';
 export * from './rooms';

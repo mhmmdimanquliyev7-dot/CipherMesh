@@ -16,6 +16,10 @@ export function describeRoomError(error: unknown): string {
         return FILE_INTEGRITY_ERROR;
       case 'FILE_FORMAT_UNSUPPORTED':
         return 'This file was encrypted in a format this version of CipherMesh does not support. Nothing was opened.';
+      case 'NOTE_INTEGRITY_FAILED':
+        return NOTE_INTEGRITY_ERROR;
+      case 'NOTE_FORMAT_UNSUPPORTED':
+        return NOTE_UNSUPPORTED;
       default:
         return 'A cryptographic check failed. Nothing was used or sent.';
     }
@@ -26,6 +30,8 @@ export function describeRoomError(error: unknown): string {
     if (error.code === 'ROOM_KEY_MISSING') return KEY_MISSING;
     if (error.code === 'FILE_TOO_LARGE')
       return 'Files can be at most 50 MiB (they are encrypted in this browser in one piece).';
+    if (error.code === 'NOTE_TOO_LONG')
+      return 'This note is too long: a note can hold at most 64 KiB of text (title and body together).';
     if (error.code === 'STORAGE_TRANSFER_FAILED')
       return 'The encrypted file could not be transferred to or from storage. Check your connection and try again.';
   }
@@ -84,6 +90,13 @@ export function describeRoomError(error: unknown): string {
         return 'This upload was already completed or cancelled.';
       case 'STORAGE_UNAVAILABLE':
         return 'File storage is not available right now. Try again later.';
+      // Encrypted notes (Phase 8).
+      case 'REVISION_CONFLICT':
+        return NOTE_CONFLICT;
+      case 'NOTE_ID_UNAVAILABLE':
+        return 'That note identifier cannot be used. Please try again.';
+      case 'NOTE_LIMIT_REACHED':
+        return 'This room holds the most notes it can (1000). Delete notes you no longer need first.';
     }
   }
   return describeError(error);
@@ -92,6 +105,36 @@ export function describeRoomError(error: unknown): string {
 /** Any failed check of an encrypted file (CM-T039, T-07): nothing was shown or saved. */
 export const FILE_INTEGRITY_ERROR =
   'This file failed its integrity check: it was changed or damaged after it was encrypted. Nothing was shown or saved. Tell the room owner through another channel.';
+
+/** Any failed check of an encrypted note (CM-T042, T-07): nothing was shown. */
+export const NOTE_INTEGRITY_ERROR =
+  'This note failed its integrity check: it was changed or damaged after it was encrypted. Nothing was shown. Tell the room owner through another channel.';
+export const NOTE_UNSUPPORTED =
+  'This note was encrypted in a format this version of CipherMesh does not support. Nothing was shown.';
+/** A save refused because someone else saved first (DF-12): nothing was overwritten. */
+export const NOTE_CONFLICT =
+  'Someone else saved this note after you opened it, so your version was not saved and nothing was overwritten. Your text is still in the editor: copy what you need, then load the latest version.';
+/** The browser saw a newer revision earlier in this tab (T-32, L-10). */
+export const NOTE_ROLLBACK =
+  'The server returned an older version of this note than this tab saw before. It may be restoring old content. Reload the room, and tell the owner through another channel if it persists.';
+
+/** Encrypted notes (security-ui, L-09, L-11): what encryption does and does not cover. */
+export const NOTES_EXPLANATION =
+  'Notes are encrypted in your browser; the server stores only ciphertext. It sees who wrote or changed a note, when, its size and how often it changes. Anyone who can read a note can copy its text, and removing someone from the room does not take back what they already read.';
+
+/** Any authentication failure while opening a note (the generic crypto code included). */
+export function describeNoteError(error: unknown): string {
+  if (
+    isCryptoError(error) &&
+    (error.code === 'CRYPTO_AUTHENTICATION_FAILED' || error.code === 'CRYPTO_INVALID_INPUT')
+  ) {
+    return NOTE_INTEGRITY_ERROR;
+  }
+  if (error instanceof ApiError && error.code === 'KEY_VERSION_STALE') {
+    return 'The room key changed while you were editing. Reload the room and save again; your text is still in the editor.';
+  }
+  return describeRoomError(error);
+}
 
 /** Encrypted files (security-ui, L-11, L-14): what encryption does and does not cover. */
 export const FILES_EXPLANATION =

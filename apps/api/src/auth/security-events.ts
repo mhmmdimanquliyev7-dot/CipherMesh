@@ -78,6 +78,13 @@ export const SECURITY_EVENTS = [
   'FILE_UPLOAD_CANCELLED',
   'FILE_DOWNLOAD_ISSUED',
   'FILE_DELETED',
+  // Encrypted notes (Phase 8; PC-13: creation, updates and deletions at BASELINE, reads at EXTENDED
+  // and FULL). Details carry the room and note IDs, the revision, the key version and counts only:
+  // never a title, body, ciphertext or wrapped NEK.
+  'NOTE_CREATED',
+  'NOTE_UPDATED',
+  'NOTE_READ',
+  'NOTE_DELETED',
 ] as const;
 export type SecurityEventName = (typeof SECURITY_EVENTS)[number];
 

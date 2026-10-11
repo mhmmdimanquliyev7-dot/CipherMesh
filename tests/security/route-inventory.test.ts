@@ -93,6 +93,11 @@ describe('route inventory', () => {
       'POST /rooms/:roomId/files/:fileId/complete AZ-16-FILE-COMPLETE',
       'POST /rooms/:roomId/files/:fileId/download-url AZ-17-FILE-DOWNLOAD',
       'POST /rooms/:roomId/files/:fileId/delete AZ-18-FILE-DELETE',
+      'GET /rooms/:roomId/notes AZ-20-NOTE-LIST',
+      'POST /rooms/:roomId/notes AZ-19-NOTE-CREATE',
+      'GET /rooms/:roomId/notes/:noteId AZ-20-NOTE-READ',
+      'POST /rooms/:roomId/notes/:noteId/update AZ-21-NOTE-UPDATE',
+      'POST /rooms/:roomId/notes/:noteId/delete AZ-22-NOTE-DELETE',
     ]);
   });
 
@@ -138,6 +143,10 @@ describe('route inventory', () => {
       // Phase 7: the file list and one file's key material are reads; a download URL is a POST.
       '/rooms/:roomId/files',
       '/rooms/:roomId/files/:fileId',
+      // Phase 8: the note list and one note are reads (recorded at EXTENDED and FULL, PC-13, but
+      // never changing a row); creation, updates and deletion are POSTs.
+      '/rooms/:roomId/notes',
+      '/rooms/:roomId/notes/:noteId',
     ]);
   });
 
