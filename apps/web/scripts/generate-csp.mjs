@@ -4,7 +4,14 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { STATIC_SECURITY_HEADERS, buildCsp, extractInlineScripts, findInlineStyles, sha256Source } from './csp-lib.mjs';
+import {
+  STATIC_SECURITY_HEADERS,
+  buildCsp,
+  checkStorageOrigin,
+  extractInlineScripts,
+  findInlineStyles,
+  sha256Source,
+} from './csp-lib.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const outDir = join(root, 'out');
@@ -36,7 +43,10 @@ if (problems.length > 0) {
   throw new Error(`Inline styles would require 'unsafe-inline' in style-src:\n${problems.join('\n')}`);
 }
 
-const headers = { 'Content-Security-Policy': buildCsp([...hashes]), ...STATIC_SECURITY_HEADERS };
+// The object-storage origin browsers reach with presigned URLs (Phase 7). Deployments set
+// CM_STORAGE_ORIGIN at build time; the default is the local HTTPS storage proxy.
+const storageOrigin = checkStorageOrigin(process.env.CM_STORAGE_ORIGIN);
+const headers = { 'Content-Security-Policy': buildCsp([...hashes], storageOrigin), ...STATIC_SECURITY_HEADERS };
 await mkdir(metaDir, { recursive: true });
 await writeFile(join(metaDir, 'security-headers.json'), `${JSON.stringify(headers, null, 2)}\n`);
 console.log(`CSP generated for ${files.length} HTML files with ${hashes.size} inline script hashes.`);

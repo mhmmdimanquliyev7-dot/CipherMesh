@@ -20,6 +20,11 @@ const PRODUCTION_ENV = {
   TOTP_ENCRYPTION_KEY: randomBytes(32).toString('base64url'),
   TOTP_ENCRYPTION_KEY_ID: 'inventory-test',
   IDENTIFIER_HMAC_KEY: randomBytes(32).toString('base64url'),
+  // Object storage is required in production (Phase 7); never contacted here.
+  STORAGE_ENDPOINT: 'https://storage.ciphermesh.example',
+  STORAGE_BUCKET: 'cm-files',
+  STORAGE_ACCESS_KEY_ID: 'inventory-test-key',
+  STORAGE_SECRET_ACCESS_KEY: randomBytes(24).toString('base64url'),
 };
 
 function productionApp(testing?: Parameters<typeof createApp>[0]['testing']) {
@@ -81,6 +86,13 @@ describe('route inventory', () => {
       'POST /rooms/:roomId/invitations AZ-06-INVITATION-CREATE',
       'POST /rooms/:roomId/invitations/:invitationId/approve AZ-07-INVITATION-APPROVE',
       'POST /rooms/:roomId/invitations/:invitationId/revoke AZ-08-INVITATION-REVOKE',
+      // Phase 7 (CM-T037 to CM-T041): encrypted files of one room.
+      'GET /rooms/:roomId/files AZ-17-FILE-LIST',
+      'POST /rooms/:roomId/files AZ-16-FILE-UPLOAD',
+      'GET /rooms/:roomId/files/:fileId AZ-17-FILE-READ',
+      'POST /rooms/:roomId/files/:fileId/complete AZ-16-FILE-COMPLETE',
+      'POST /rooms/:roomId/files/:fileId/download-url AZ-17-FILE-DOWNLOAD',
+      'POST /rooms/:roomId/files/:fileId/delete AZ-18-FILE-DELETE',
     ]);
   });
 
@@ -123,6 +135,9 @@ describe('route inventory', () => {
       '/rooms/:roomId/members/:userId/identity',
       '/rooms/:roomId/invitations',
       '/invitations',
+      // Phase 7: the file list and one file's key material are reads; a download URL is a POST.
+      '/rooms/:roomId/files',
+      '/rooms/:roomId/files/:fileId',
     ]);
   });
 

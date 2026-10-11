@@ -9,18 +9,19 @@ import type { Person } from './rooms';
  * suite iterates over THIS table, and tests/security/bola-inventory.test.ts fails when it differs
  * from the registry in either direction, so a new room route cannot ship without a case here and
  * a removed route cannot leave a stale one. Phase 6 added the key-material, invitation, key-report
- * and Safety Code routes (CM-T033 to CM-T036, CM-T085).
+ * and Safety Code routes (CM-T033 to CM-T036, CM-T085); Phase 7 the file routes (CM-T037 to
+ * CM-T041), whose target is a file of the room.
  *
  * Attack classes (prompt 07C section 4):
  *   A  a member of room A addresses the existing room B
  *   B  the same request answers identically for a nonexistent room (non-disclosure)
- *   C  addressed room A, target object of room B (a member or an invitation; cross-room target)
+ *   C  addressed room A, target object of room B (a member, an invitation or a file)
  *   D  role variants: OWNER, ADMIN, MEMBER, VIEWER, outsider, PLATFORM_ADMIN, and people who are
  *      members of two rooms with different roles
  *   E  membership states: SUSPENDED, REMOVED, LEFT
  *   F  room states: DELETING, DELETED, REKEY_REQUIRED
- *   G  every denied mutation leaves rooms, memberships, invitations, key versions and envelopes
- *      byte-for-byte unchanged
+ *   G  every denied mutation leaves rooms, memberships, invitations, key versions, envelopes and
+ *      files byte-for-byte unchanged
  *   H  client-supplied identity (body, query, headers) never changes the outcome
  */
 export type Response = Awaited<ReturnType<Browser['request']>>;
@@ -33,6 +34,8 @@ export interface RoomRef {
   readonly userId?: string;
   /** The invitation ID in the path, for routes that name an invitation. */
   readonly invitationId?: string;
+  /** The file ID in the path, for routes that name a file (Phase 7). */
+  readonly fileId?: string;
 }
 
 export interface Extras {
@@ -52,10 +55,12 @@ export interface BolaCase {
   readonly targetsMember: boolean;
   /** The path names an invitation (`:invitationId`); it may belong to another room. */
   readonly targetsInvitation: boolean;
+  /** The path names a file (`:fileId`); it may belong to another room. */
+  readonly targetsFile?: boolean;
   /** The route requires a recent step-up, so attackers confirm their account first. */
   readonly stepUp: boolean;
   /** For targeted routes: which object of the room is the target. */
-  readonly target?: 'MEMBER' | 'ADMIN' | 'INVITATION';
+  readonly target?: 'MEMBER' | 'ADMIN' | 'INVITATION' | 'FILE';
   readonly classes: readonly AttackClass[];
   readonly send: (who: Person, ref: RoomRef, extras?: Extras) => Promise<Response>;
 }
@@ -75,6 +80,7 @@ const post =
 
 const member = (ref: RoomRef): string => ref.userId ?? randomUUID();
 const invitation = (ref: RoomRef): string => ref.invitationId ?? randomUUID();
+const file = (ref: RoomRef): string => ref.fileId ?? randomUUID();
 const b64 = (bytes: number): string => randomBytes(bytes).toString('base64url');
 
 /** Well-formed bodies that nobody signed: authorization must refuse them before anything else. */
@@ -86,6 +92,20 @@ const fillerInvitation = () => ({
   confirmedFingerprint: null,
   grantSignature: b64(64),
   envelopes: [{ keyVersion: 1, wrappedKey: b64(384) }],
+});
+/** A well-formed encrypted-file record (Phase 7) that no browser made; sizes as CP-19 allows. */
+const fillerUpload = () => ({
+  fileId: randomUUID(),
+  keyVersion: 1,
+  suite: 'CM1',
+  wrappedFek: b64(48),
+  fekIv: b64(12),
+  manifest: b64(80),
+  manifestIv: b64(12),
+  contentIv: b64(12),
+  ciphertextSize: 1024,
+  ciphertextSha256: b64(32),
+  expiresAt: null,
 });
 const fillerKeys = () => ({
   creatorKeyId: randomUUID(),
@@ -269,6 +289,73 @@ export const BOLA_CASES: readonly BolaCase[] = [
     classes: TARGETED_WRITE,
     send: post(
       (ref) => `/rooms/${ref.roomId}/invitations/${invitation(ref)}/revoke`,
+      () => ({}),
+    ),
+  },
+  // ---------------------------------------------------------------------- Phase 7: files
+  {
+    ...room,
+    key: 'GET /rooms/:roomId/files',
+    action: 'AZ-17',
+    mutates: false,
+    classes: READ,
+    send: get((ref) => `/rooms/${ref.roomId}/files`),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/files',
+    action: 'AZ-16',
+    mutates: true,
+    classes: WRITE,
+    send: post((ref) => `/rooms/${ref.roomId}/files`, fillerUpload),
+  },
+  {
+    ...room,
+    key: 'GET /rooms/:roomId/files/:fileId',
+    action: 'AZ-17',
+    mutates: false,
+    targetsFile: true,
+    target: 'FILE',
+    classes: ['A', 'B', 'C', 'D', 'E', 'F', 'H'],
+    send: get((ref) => `/rooms/${ref.roomId}/files/${file(ref)}`),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/files/:fileId/complete',
+    action: 'AZ-16',
+    mutates: true,
+    targetsFile: true,
+    target: 'FILE',
+    classes: TARGETED_WRITE,
+    send: post(
+      (ref) => `/rooms/${ref.roomId}/files/${file(ref)}/complete`,
+      () => ({}),
+    ),
+  },
+  {
+    ...room,
+    // Changes no row, but issues a storage capability: attacked like a mutation.
+    key: 'POST /rooms/:roomId/files/:fileId/download-url',
+    action: 'AZ-17',
+    mutates: true,
+    targetsFile: true,
+    target: 'FILE',
+    classes: TARGETED_WRITE,
+    send: post(
+      (ref) => `/rooms/${ref.roomId}/files/${file(ref)}/download-url`,
+      () => ({}),
+    ),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/files/:fileId/delete',
+    action: 'AZ-18',
+    mutates: true,
+    targetsFile: true,
+    target: 'FILE',
+    classes: TARGETED_WRITE,
+    send: post(
+      (ref) => `/rooms/${ref.roomId}/files/${file(ref)}/delete`,
       () => ({}),
     ),
   },

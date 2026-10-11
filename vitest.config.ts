@@ -64,6 +64,19 @@ export default defineConfig({
         },
       },
       {
+        // Encrypted file suites (Phase 7): the real API, PostgreSQL as cm_api and cm_worker, the
+        // real local object storage (`pnpm services:up && pnpm storage:bootstrap`), and files
+        // encrypted by packages/crypto. One file at a time, like authz (shared connection limit).
+        test: {
+          name: 'files',
+          include: ['tests/files/**/*.test.ts'],
+          fileParallelism: false,
+          globalSetup: ['tests/database/global-setup.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
         test: {
           name: 'database',
           include: ['tests/database/**/*.test.ts'],

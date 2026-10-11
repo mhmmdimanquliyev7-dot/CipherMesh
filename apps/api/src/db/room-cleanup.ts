@@ -11,9 +11,12 @@ import type { PrismaClient } from '../generated/prisma/client';
  * plaintext key material, which never reaches the server; deleting the envelopes removes the live
  * copies of the wrapped keys (backups keep them until their retention ends, L-12).
  *
- * It stays fail-safe: a room becomes DELETED only when no envelope, file, note or secret row is
- * left in it. Content arrives in Phases 7 to 9 with its own cleanup steps; until then such a room
- * stays DELETING and inaccessible rather than becoming DELETED with ciphertext left behind.
+ * It stays fail-safe: a room becomes DELETED only when no envelope, note or secret row is left in
+ * it, and every file is a tombstone whose storage object is gone (Phase 7: the file cleanup
+ * tombstones the files of DELETING rooms and deletes their objects first, file-cleanup.ts; the
+ * tombstone rows stay for audit, data-model 5). Notes and secrets arrive in Phases 8 and 9 with
+ * their own cleanup steps; until then such a room stays DELETING and inaccessible rather than
+ * becoming DELETED with ciphertext left behind.
  */
 export async function runRoomCleanup(prisma: PrismaClient): Promise<{
   roomsDeleted: number;
@@ -38,7 +41,7 @@ export async function runRoomCleanup(prisma: PrismaClient): Promise<{
         where: {
           ...deleting,
           envelopes: { none: {} },
-          files: { none: {} },
+          files: { none: { OR: [{ status: { not: 'DELETED' } }, { objectDeletedAt: null }] } },
           notes: { none: {} },
           secrets: { none: {} },
         },

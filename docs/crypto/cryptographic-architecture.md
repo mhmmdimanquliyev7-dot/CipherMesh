@@ -120,6 +120,8 @@ Rules:
 - The server stores the SHA-256 of the **ciphertext** as a storage-integrity reference. The SHA-256 of the **plaintext** exists only inside the encrypted manifest (CD-09).
 - On download, the browser authenticates the manifest and the content before showing or saving anything. A failed tag produces an integrity error and no plaintext.
 
+**Implemented in Phase 7** (`packages/crypto/src/files.ts`, `file-format.ts`; decisions CD-30, CP-19): `encryptFile` takes a verified `OpenedRoomKey` from `openRoomKey` and returns the wrapped FEK, the manifest and content ciphertext, their IVs and the ciphertext hash. Manifest format version 1 is the RFC 8785 serialization of `{name, sha256, size, type, v}`; unknown versions are refused (`FILE_FORMAT_UNSUPPORTED`) and any other shape is an integrity failure. `openFile` unwraps the FEK as a non-extractable, decrypt-only key, authenticates the manifest, and returns an object whose `decrypt` checks the ciphertext length and hash, the AES-GCM tag, and then the plaintext size and hash against the manifest. File names are limited to 255 characters without control or bidirectional-override characters; the MIME type is a lower-case `type/subtype` or empty. Tests check the format against an independent implementation (Node.js `crypto`) in both directions, bit flips in every stored part, and substitution across files, rooms, key versions and wrapping contexts (`files.test.ts`).
+
 ### 6.2 Notes
 Each save creates a fresh NEK for the new revision. The AAD contains the revision number, so ciphertext from another note or another revision fails authentication. Only the current revision is stored.
 

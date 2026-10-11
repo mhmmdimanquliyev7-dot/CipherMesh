@@ -9,6 +9,7 @@ import type {
   SecurityProfile,
 } from '../generated/prisma/enums';
 import { createAuthStore, type AuthStore } from './auth-store';
+import { fileStoreFunctions } from './file-store';
 import { invitationStoreFunctions } from './invitation-store';
 import { roomKeyStoreFunctions } from './room-key-store';
 
@@ -144,6 +145,7 @@ export function createRoomStore(db: Db) {
   return {
     ...roomKeyStoreFunctions(db),
     ...invitationStoreFunctions(db),
+    ...fileStoreFunctions(db, requireRekey),
 
     // ---------------------------------------------------------------------------------- creation
 

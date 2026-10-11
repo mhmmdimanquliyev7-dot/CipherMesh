@@ -142,8 +142,16 @@ export async function ensureRoles(admin) {
   await admin.query(`SET log_statement = 'none'`);
   // A failed statement is otherwise logged with its text, which would include the password.
   await admin.query(`SET log_min_error_statement = 'panic'`);
-  for (const key of /** @type {RoleKey[]} */ (Object.keys(ROLES))) {
-    await ensureRole(admin, key, roleUrl(key).password);
+  // Roles are cluster-wide, and several test projects prepare them at the same moment: unserialized
+  // ALTER ROLE statements on one role fail with "tuple concurrently updated" (seen in the Phase 7
+  // full run, when a fifth project joined). One advisory lock makes them take turns.
+  await admin.query('SELECT pg_advisory_lock(7_000_001)');
+  try {
+    for (const key of /** @type {RoleKey[]} */ (Object.keys(ROLES))) {
+      await ensureRole(admin, key, roleUrl(key).password);
+    }
+  } finally {
+    await admin.query('SELECT pg_advisory_unlock(7_000_001)');
   }
 }
 

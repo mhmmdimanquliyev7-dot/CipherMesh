@@ -1,0 +1,23 @@
+EV-07-04: tamper detection test output (CM-T039, T-07)
+Captured: 2026-10-11T13:10:33Z
+Screenshots: EV-07-04-tampered.png (integrity error, nothing saved), EV-07-04-download-ok.png (second member, identical bytes).
+
+ ✓ |files| tests/files/files-access.test.ts > tampering is detected in the browser and releases no plaintext (CM-T039, T-07, EV-07-04) > a bit flip in the stored object, the manifest or the wrapped FEK is an integrity error 1069ms
+ ✓ |files| tests/files/files-access.test.ts > tampering is detected in the browser and releases no plaintext (CM-T039, T-07, EV-07-04) > an object swapped with another file of the room is refused 536ms
+ Test Files  1 passed (1)
+      Tests  2 passed | 9 skipped (11)
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a bit flip in the wrapped FEK before any content is decrypted 1ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a bit flip in the wrapped FEK tag before any content is decrypted 0ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a bit flip in the FEK IV before any content is decrypted 0ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a bit flip in the manifest before any content is decrypted 0ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a bit flip in the manifest tag before any content is decrypted 1ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a bit flip in the manifest IV before any content is decrypted 1ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses bit flips in the content, its tag and its IV 4ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses truncated, extended or empty content and a record with another size 4ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a wrapped FEK moved to another file, and content or manifest of another file 2ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a file record moved to another room or key version 2ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a key that is not the room key of that version (different key material) 1ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses a FEK wrapped for another item type or revision (wrong wrapping context) 1ms
+ ✓ |unit| packages/crypto/src/files.test.ts > encrypted files: tampering and substitution fail closed > refuses an unsupported suite and malformed record values 0ms
+ Test Files  1 passed (1)
+      Tests  41 passed (41)

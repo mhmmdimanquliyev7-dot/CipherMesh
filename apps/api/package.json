@@ -18,6 +18,7 @@
     "@ciphermesh/validation": "workspace:*",
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
+    "aws4fetch": "1.0.20",
     "express": "5.2.1",
     "otpauth": "9.5.2",
     "pg": "catalog:",

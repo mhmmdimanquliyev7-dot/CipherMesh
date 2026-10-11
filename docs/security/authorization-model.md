@@ -262,3 +262,18 @@ Error codes added: `REKEY_REQUIRED` (409), `ROOM_STATEMENT_INVALID` (422), `ENVE
 **Concurrency.** Acceptance takes, in order, the invitee's user row, the invitee's identity row, the room, the invitation and the memberships; room administration takes the room first; account suspension takes the user row first; a vault reset takes the identity row first. No transaction takes these in the opposite order, so none can deadlock with an acceptance, and each re-checks on the state it locked. `tests/authz/invitation-concurrency.test.ts` forces the races: account disable, revocation, double acceptance, room deletion, member loss and vault reset against an acceptance.
 
 **What is not implemented:** re-sharing keys to a member (AZ-14, CM-T053), leaving a room (AZ-11, CM-T051), profile changes (AZ-03).
+
+### 9.8 Encrypted files (Phase 7, CM-T037 to CM-T041)
+
+Six room routes, all declared in the registry with their matrix action and listed in `tests/security/route-inventory.test.ts` and `tests/helpers/bola-cases.ts`:
+
+| Route | Action | Object rule |
+|---|---|---|
+| `GET /rooms/{roomId}/files` | AZ-17 | The query filters by room ID and the caller's ACTIVE membership in an ACTIVE room; only AVAILABLE, unexpired files; key material only where PC-12 allows |
+| `POST /rooms/{roomId}/files` | AZ-16 | Locks user, room, membership; REKEY_REQUIRED, KEY_VERSION_STALE, quota and expiry checks on locked state |
+| `GET /rooms/{roomId}/files/{fileId}` | AZ-17 | Loaded by file ID AND room ID AND membership; PC-12 |
+| `POST /rooms/{roomId}/files/{fileId}/complete` | AZ-16 | The file must be the caller's own pending upload (OL-04); room re-checked under lock |
+| `POST /rooms/{roomId}/files/{fileId}/download-url` | AZ-17 | As the read; presigned GET for one object key, 60 seconds (OL-07); audited at EXTENDED and FULL (PC-13) |
+| `POST /rooms/{roomId}/files/{fileId}/delete` | AZ-18 | `own` cell: the stored uploader decides for MEMBERs (OL-02, OL-04); the file is locked and the decision repeated on locked state; allowed while the room is REKEY_REQUIRED (only content writes are locked) |
+
+Error answers follow section 7: non-members, files of another room and unknown files are the same 404; `KEY_VERSION_STALE` and `REKEY_REQUIRED` are 409. PC-12 is a 403 with the reason `PROFILE_PC_12` in the security event. Storage never sees a session: presigned URLs are the only capability, and the API's storage credential can read and write objects of the content bucket only. The BOLA suite attacks all six routes with files of another room (`tests/authz/bola.test.ts`, 132 tests over 22 room routes).

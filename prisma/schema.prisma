@@ -789,6 +789,8 @@ model EncryptedFile {
   uploadedAt         DateTime?  @map("uploaded_at") @db.Timestamptz(3)
   /// class: META
   deletedAt          DateTime?  @map("deleted_at") @db.Timestamptz(3)
+  /// class: META (when the storage object of a DELETED file was removed; Phase 7)
+  objectDeletedAt    DateTime?  @map("object_deleted_at") @db.Timestamptz(3)
 
   room          Room           @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   keyVersionRef RoomKeyVersion @relation(fields: [roomId, keyVersion], references: [roomId, version], onDelete: Restrict, onUpdate: Restrict)
@@ -797,6 +799,8 @@ model EncryptedFile {
   @@index([roomId, status, createdAt])
   @@index([uploaderId])
   @@index([expiresAt], map: "encrypted_files_live_expiry_idx", where: raw("status <> 'DELETED' AND expires_at IS NOT NULL"))
+  @@index([createdAt], map: "encrypted_files_pending_idx", where: raw("status = 'PENDING_UPLOAD'"))
+  @@index([deletedAt], map: "encrypted_files_object_cleanup_idx", where: raw("status = 'DELETED' AND object_deleted_at IS NULL"))
   @@map("encrypted_files")
 }
 

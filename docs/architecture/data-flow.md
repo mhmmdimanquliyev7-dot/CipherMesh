@@ -340,6 +340,13 @@ sequenceDiagram
 
 The ciphertext hash comparison is an early storage-integrity check. The decisive integrity check is AES-GCM authentication.
 
+**As implemented in Phase 7** (differences from the diagrams, none weakening them):
+- The upload request carries `fileId`, `keyVersion`, `suite`, `wrappedFek`, `fekIv`, `manifest`, `manifestIv`, `contentIv`, `ciphertextSize`, `ciphertextSha256` and `expiresAt`; the strict schema rejects any other field. The response carries the row and the presigned PUT, which signs the exact content length. Quotas (CM-T041), the profile expiry rules (PC-08), the unused file ID, the current key version, the key state and one more wrap under the key version (CP-16) are checked in one transaction that holds the user, room and membership locks.
+- Completion is allowed to the uploader only. It asks storage for the object's size (HEAD) before the locks and checks the room again under them. A size mismatch, a completion after 15 minutes, a write-locked room or a stale key version cancels the upload: the row becomes a tombstone and the object is deleted.
+- `GET /files/{fileId}` returns the key material; `GET /files` lists readable files with their key material so the browser can decrypt names without one request per file; both withhold the key material from VIEWERs in RESTRICTED rooms (PC-12), and the download-URL route refuses them. Pending, deleted and expired files are in neither (INV-14).
+- Download URLs are issued by POST. The browser fetches the object with `credentials: 'omit'`; presigned URLs point to a host other than the application's (SF-07-01).
+- Delete tombstones the row in one transaction (wrapped FEK and manifest NULL) and then deletes the object; the worker retries failed object deletions (CM-T040).
+
 ## DF-09 Recipient-bound secret with burn-after-reading
 
 ```mermaid

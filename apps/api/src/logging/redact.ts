@@ -39,6 +39,9 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'recoveryCode',
   'recoveryCodes',
   'presignedUrl',
+  // Presigned storage URLs in file responses (Phase 7); also caught by value (X-Amz-Signature).
+  'uploadUrl',
+  'downloadUrl',
   'safetyCode',
   'credentials',
   'databaseUrl',

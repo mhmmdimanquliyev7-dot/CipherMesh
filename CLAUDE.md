@@ -24,7 +24,8 @@ It is one project that must show real depth in three subjects. Security depth ma
 - **Phase 4 (Cryptographic Identity and Vault): implemented, approved by the project owner and merged into `main` through pull request #10 (merge commit `9e13259`).** ADR-015 (OCD-12) was accepted before implementation. Traceability: `docs/management/phase-04-traceability.md`. Specification: `docs/crypto/vault.md`.
 - **Phase 5 (Secure Rooms and RBAC): implemented, verified and merged into `main` through pull request #13 (merge commit `bd4d2f6`).** CM-T029 central authorization and matrix, CM-T030 room lifecycle, CM-T031 membership administration and ownership transfer, CM-T032 BOLA and IDOR suite. No room cryptography exists yet. Traceability: `docs/management/phase-05-traceability.md`. Controls: `docs/security/authorization-model.md` section 9.
 - **Phase 6 (Cryptographic Membership): implemented, verified and merged into `main` through pull request #22 (merge commit `b3e9dd5`).** CM-T033 key version 1 and the owner envelope at room creation, CM-T034 invitations with pre-wrapped envelopes and signed grants, CM-T035 acceptance and OWNER approval, CM-T036 client-side verification of room keys (ADR-015 section 4.1) and cross-browser checks, CM-T085 the Room Safety Code. Room keys exist and are verified in the browser; no content is encrypted yet. Traceability: `docs/management/phase-06-traceability.md`. Specification: `docs/crypto/cryptographic-architecture.md` section 7, ADR-015 section 4.1.
-- Next phase: **Phase 7 (Encrypted Files)**, Prompt 09. Do not start it without explicit approval. Its branch starts from the updated `main` after the Phase 6 merge.
+- **Phase 7 (Encrypted Files): implemented and verified on `feature/CM-T037-encrypted-files`; merged into `main` only through its pull request (identifiers recorded in `docs/management/current-state.md` after the merge).** CM-T037 object storage adapter and presigned URLs, CM-T038 client-side file encryption and upload, CM-T039 download and authenticated decryption, CM-T040 deletion, expiry and the worker cleanup, CM-T041 limits, quotas and safe downloads. Files are one AES-256-GCM message of at most 50 MiB under a per-file FEK wrapped under RWK_v; ciphertext goes to the S3-compatible bucket through presigned URLs. Traceability: `docs/management/phase-07-traceability.md`. Controls: `docs/security/authorization-model.md` section 9.8, `docs/crypto/crypto-decisions.md` CD-30, LIB-09.
+- Next phase: **Phase 8 (Secure Notes)**, Prompt 10. Do not start it without explicit approval. Its branch starts from the updated `main` after the Phase 7 merge. Prompt 16.5 (complete UI/UX redesign and visual polish) is reserved and must not be done earlier.
 - Work is phase-gated. Finish one phase, report, and wait for approval before starting the next.
 - Phase details: `docs/management/project-roadmap.md`. Backlog: `docs/management/jira-backlog.md`.
 
@@ -187,6 +188,7 @@ Boundary rules: `apps/web` must not import `apps/api`. `packages/crypto` must no
 - `pnpm test` includes the `auth`, `vault`, `authz` and `database` suites. Run `pnpm security:negative-controls` before a phase sign-off that touches authentication or authorization (`--only=<prefix>` runs one phase's controls during the work).
 - Scripted edits (Python or sed) must assert that their anchor text exists; a silent non-match once left a documented test unwritten (database-security.md section 11).
 - New API routes go through the route registry (`apps/api/src/routes/registry.ts`). Never mount Express handlers directly.
+- Object storage is reached only through `apps/api/src/storage` (ESLint enforced; the S3 signer is imported nowhere else). Presigned URLs are on a different host than the application (SF-07-01), are never logged, stored or returned outside the file routes, and the browser sends them with `credentials: 'omit'`. File routes are listed in `tests/security/route-inventory.test.ts` and `tests/helpers/bola-cases.ts` (a file target needs `targetsFile`). `pnpm test` includes the `files` project, which needs the local storage (`pnpm services:up && pnpm storage:bootstrap`).
 
 ## 11. Documentation requirements
 
@@ -199,7 +201,7 @@ Boundary rules: `apps/web` must not import `apps/api`. `packages/crypto` must no
 
 ## 12. Git workflow
 
-- The repository was initialized locally in Phase 0.5 with a baseline commit on `main`. Its GitHub remote is `mhmmdimanquliyev7-dot/CipherMesh`, where a ruleset protects `main`. Phases 1 to 6 arrived through pull requests #1, #7, #8, #10, #13 and #22 with merge commits. New branches start from the updated `main`.
+- The repository was initialized locally in Phase 0.5 with a baseline commit on `main`. Its GitHub remote is `mhmmdimanquliyev7-dot/CipherMesh`, where a ruleset protects `main`. Phases 1 to 6 arrived through pull requests #1, #7, #8, #10, #13 and #22 with merge commits, and Phase 7 through its own pull request. New branches start from the updated `main`.
 - `main` is protected. Changes arrive only through pull requests with passing CI. No direct commits and no force pushes.
 - Branch names: `feature/CM-<n>-short-description`, `fix/CM-<n>-...`, `security/CM-<n>-...`, `docs/CM-<n>-...`, `infra/CM-<n>-...`.
 - Commit messages use Conventional Commits with the Jira key, for example `feat(api): add session revocation endpoint (CM-17)`.
@@ -235,5 +237,5 @@ An item is done only when all of the following hold:
 - Threat model: `docs/threat-model/threat-model.md`
 - Security: `docs/security/` (security-principles, authorization-model, security-policy-profiles, security-testing-plan, session-and-csrf, authentication-security, database-security, limitations, isms-control-mapping, architecture-review, architecture-gate-phase-0-5)
 - Cloud: `docs/cloud/` (service-models, shared-responsibility, deployment-architecture)
-- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap, github-repository-settings, phase-01-traceability, phase-02-traceability, phase-03-traceability, phase-04-traceability, phase-05-traceability, phase-06-traceability, current-state for session handoff)
+- Management: `docs/management/` (jira-workflow, jira-backlog, jira-backlog.csv, jira-import-guide, project-roadmap, github-repository-settings, phase-01-traceability, phase-02-traceability, phase-03-traceability, phase-04-traceability, phase-05-traceability, phase-06-traceability, phase-07-traceability, current-state for session handoff)
 - Report: `docs/report/evidence-plan.md`

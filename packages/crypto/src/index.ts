@@ -71,6 +71,9 @@ export {
   type RoomKeyMaterialWire,
 } from './room-format';
 export { sortRecipients, type RecipientRef } from './recipients';
-export { ROOM_KEYS, type RoomRole } from './params';
+// Encrypted files (Phase 7, CM-T038, CM-T039).
+export { encryptFile, openFile, type EncryptedFile, type OpenedFile, type StoredFile } from './files';
+export { encryptedFileToWire, storedFileFromWire, type EncryptedFileWire } from './file-format';
+export { FILES, ROOM_KEYS, type RoomRole } from './params';
 export { isDerivationRunning } from './kdf/derive';
 export type { Key } from './types';

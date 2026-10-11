@@ -146,6 +146,14 @@ class RoomKeys {
     return this.#opened.get(roomId)?.at(-1);
   }
 
+  /**
+   * A specific opened key version of the room (Phase 7): a file names the version that wrapped
+   * its FEK, which need not be the newest. Undefined when this tab holds no verified key for it.
+   */
+  version(roomId: string, keyVersion: number): OpenedRoomKey | undefined {
+    return this.#opened.get(roomId)?.find((k) => k.keyVersion === keyVersion);
+  }
+
   /** The Room Safety Code of the newest opened version, computed here (INV-18). */
   async safetyCode(roomId: string): Promise<SafetyCode | undefined> {
     const key = this.current(roomId);

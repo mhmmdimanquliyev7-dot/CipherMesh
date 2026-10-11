@@ -41,6 +41,60 @@ export async function decrypt(key: Key, sealed: Sealed, aad: CanonicalBytes): Pr
   return aesGcmDecryptWithIv(key, sealed.iv, sealed.ciphertext, aad);
 }
 
+/** AES-GCM parameters of a DEK wrap: the canonical `cm.dek.wrap` context is the AAD. */
+const dataKeyWrapParams = (iv: Bytes, aad: CanonicalBytes) => ({
+  name: AES_GCM.name,
+  iv,
+  additionalData: aad,
+  tagLength: AES_GCM.tagBytes * 8,
+});
+
+/**
+ * A fresh data-encryption key (DEK) from the platform CSPRNG: AES-256-GCM, usable only to encrypt.
+ * It is extractable only so that wrapDataKey can wrap it once (cryptographic-architecture section
+ * 16); callers drop it right after wrapping and never export it any other way.
+ */
+export async function generateDataKey(): Promise<Key> {
+  return guarded(CryptoErrorCode.UNAVAILABLE, () =>
+    subtle().generateKey({ name: AES_GCM.name, length: AES_GCM.keyBits }, true, ['encrypt']),
+  );
+}
+
+/**
+ * Wraps a DEK under a room wrapping key (RWK_v) with AES-256-GCM, a fresh IV and the canonical
+ * `cm.dek.wrap` context as AAD. The raw key bytes exist only inside WebCrypto.
+ */
+export async function wrapDataKey(dataKey: Key, wrappingKey: Key, aad: CanonicalBytes): Promise<Sealed> {
+  requireContext(aad);
+  const iv = randomBytes(AES_GCM.ivBytes);
+  const wrapped = await guarded(
+    CryptoErrorCode.INVALID_INPUT,
+    async () => new Uint8Array(await subtle().wrapKey('raw', dataKey, wrappingKey, dataKeyWrapParams(iv, aad))),
+  );
+  return { iv, ciphertext: wrapped };
+}
+
+/**
+ * Unwraps a DEK as a non-extractable key that can only decrypt. A wrong wrapping key, IV, AAD
+ * (another room, key version, item or item type) or any modified byte fails with
+ * AUTHENTICATION_FAILED, so a wrapped DEK cannot be moved into another context.
+ */
+export async function unwrapDataKey(sealed: Sealed, wrappingKey: Key, aad: CanonicalBytes): Promise<Key> {
+  requireContext(aad);
+  requireSealed(sealed);
+  return guarded(CryptoErrorCode.AUTHENTICATION_FAILED, () =>
+    subtle().unwrapKey(
+      'raw',
+      sealed.ciphertext,
+      wrappingKey,
+      dataKeyWrapParams(sealed.iv, aad),
+      { name: AES_GCM.name, length: AES_GCM.keyBits },
+      false,
+      ['decrypt'],
+    ),
+  );
+}
+
 /**
  * Wraps a private key in PKCS#8 form under an AES-GCM wrapping key. The PKCS#8 bytes are produced
  * inside the WebCrypto implementation and never appear in JavaScript; only the ciphertext does.

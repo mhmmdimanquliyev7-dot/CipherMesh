@@ -114,6 +114,8 @@ Subject tags: **CRY** Cryptography Fundamentals, **CLD** Cloud Security, **ISMS*
 | EV-06-05 | Room Safety Code shown in two members' browsers for the same key version | Screenshots side by side | Out-of-band key consistency check | CRY |
 | EV-06-06 | Test harness giving two browsers different keys: the commitment check passes, the Safety Codes differ | Test output and screenshots | What the commitment can and cannot detect | CRY |
 
+Captured in Phase 7 (Prompt 09), with synthetic data only, in [evidence/phase-07/](evidence/phase-07/): EV-07-01 (original file next to the stored object, hex heads), EV-07-02 (bucket objects with random names, listed by the administrator, standing in for the provider console until Phase 19), EV-07-03 (the file row), EV-07-04 (tampered object, screenshot and test output), EV-07-05 (canary scan output), EV-07-06 (presigned URL expiry), plus EV-07-07 (CP-19 benchmark), EV-07-08 (verification gates), EV-07-09 (negative controls), EV-07-10 (supply chain) and EV-07-11 (CI run).
+
 Captured in Phase 6 (Prompt 08), with synthetic data only, in [evidence/phase-06/](evidence/phase-06/): EV-06-01 (stored rows: lengths and hashes), EV-06-02 (RESTRICTED invitation screenshots), EV-06-03 (refusal tests), EV-06-04 (three-engine results), EV-06-05 and EV-06-06 (Safety Code screenshots), plus EV-06-07 (verification gates), EV-06-08 (negative controls), EV-06-09 (supply chain) and EV-06-10 (CI run). EV-06-05 shows the same code in two browsers; EV-06-06 shows a split view that every automatic check accepts and two different codes.
 
 ### Phase 7: Encrypted Files

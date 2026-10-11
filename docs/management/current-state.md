@@ -1,16 +1,15 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-11, end of Prompt 08 (Phase 6 implemented, verified and merged into `main`: CM-T033 to CM-T036 and CM-T085). The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-11, end of Prompt 09 (Phase 7 implemented and verified on `feature/CM-T037-encrypted-files`: CM-T037 to CM-T041; the pull request and merge identifiers are recorded by the post-merge handoff pull request). Phases 1 to 6 are merged into `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
 | Item | State |
 |---|---|
-| Completed | Phase 4 (pull request #10), Phase 5 (pull request #13, merge commit `bd4d2f6`) and **Phase 6 (CM-T033 to CM-T036, CM-T085), implemented and verified in Prompt 08**, merged through pull request #22 (merge commit `b3e9dd5`, parents `aaaaf99` and `ead6b8c`). CI run 38126199518 passed every job; GitGuardian, the dependency audit and the secret scan passed (EV-06-10). Traceability: [phase-06-traceability.md](phase-06-traceability.md) |
-| Phase 6 | Cryptographic Membership: key version 1 made in the browser at room creation (RKM_1, commitment, owner envelope, signed genesis and key-version statements), invitations with pre-wrapped envelopes and signed membership grants, OWNER approval, acceptance, client-side verification of room keys (ADR-015 section 4.1), the Room Safety Code. No file, note or secret encryption exists |
-| Branch | `feature/CM-T033-cryptographic-membership` (head `ead6b8c`), created from `main` at `aaaaf99`; it takes no further commits |
-| Next | **Prompt 09: Phase 7, Encrypted File System** (CM-T037 onward). It starts from the updated `main` after the Phase 6 merge, never from the Phase 6 branch. Do not start without explicit approval |
-| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 6. It is the baseline for Prompt 09 |
+| Completed on `main` | Phases 1 to 6 (pull requests #1, #7, #8, #10, #13, #22; Phase 6 merge commit `b3e9dd5`; last handoff PR #23, `c175d22`) |
+| Phase 7 | **Encrypted Files (CM-T037 to CM-T041), implemented and verified in Prompt 09** on `feature/CM-T037-encrypted-files`, created from `main` at `c175d22`. It is merged only through its pull request; the PR number, CI run and merge commit are recorded in [phase-07-traceability.md](phase-07-traceability.md) section 7 by the post-merge handoff |
+| Branch | `feature/CM-T037-encrypted-files`; no further commits after the PR is created except review fixes |
+| Next | **Prompt 10: Phase 8, Secure Notes** (CM-T042). It starts from the updated `main` after the Phase 7 merge. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Files panel only follows the current style |
 
 ## 2. Architecture implemented so far
 
@@ -91,6 +90,29 @@ Behaviour to know:
 - **Worker.** `pnpm worker:retention` expires invitations and, for rooms being deleted, revokes invitations, deletes envelopes and marks key versions DESTROYED before a room becomes DELETED.
 - **Dependency.** `next` 16.3.8 (GHSA-cjq9-62q9-8jv4); no other dependency changed.
 
+## 6b. Encrypted files (Phase 7, CM-T037 to CM-T041)
+
+| Part | Location |
+|---|---|
+| File format (FEK, manifest, wrap, `encryptFile`, `openFile`), wire layer | `packages/crypto/src/files.ts`, `file-format.ts`; DEK helpers `generateDataKey`, `wrapDataKey`, `unwrapDataKey` in `aead.ts`; constants `FILES` in `params.ts`; error codes `FILE_INTEGRITY_FAILED`, `FILE_FORMAT_UNSUPPORTED` |
+| Shared constants | `packages/shared/src/files.ts` (`FILE_LIMITS`, `FILE_QUOTAS`, `FILE_RULES` per profile, `PREVIEWABLE_IMAGE_TYPES`); error codes in `errors.ts` |
+| Schemas | `packages/validation/src/files.ts` (strict; no name, type, hash or key field) |
+| Object storage | `apps/api/src/storage/object-store.ts` (`aws4fetch`, LIB-09), config `STORAGE_*` in `config/env.ts` (API and worker), `scripts/storage/` (`pnpm storage:bootstrap`), compose identity file and CORS in `infrastructure/docker/compose.dev.yml` |
+| API | `apps/api/src/files/service.ts`, `routes/files.ts`, `db/file-store.ts` (part of the room store), worker `db/file-cleanup.ts` via `pnpm worker:retention` |
+| Database | migration `20261007000000_encrypted_files` (`object_deleted_at`, indexes, object-key CHECK, guard trigger); 232 classified fields |
+| Web | `apps/web/src/rooms/files.ts` (operations, name sanitizing), `file-panel.tsx` (the Files card in the room page); CSP `connect-src` gains the storage origin (`CM_STORAGE_ORIGIN`, default `https://localhost:4174`), `img-src` gains `blob:` |
+
+Routes (reviewed lists in `tests/security/route-inventory.test.ts`, BOLA table `tests/helpers/bola-cases.ts`): `GET /rooms/{roomId}/files` (AZ-17), `POST /rooms/{roomId}/files` (AZ-16), `GET /rooms/{roomId}/files/{fileId}` (AZ-17), `POST .../complete` (AZ-16), `POST .../download-url` (AZ-17), `POST .../delete` (AZ-18).
+
+Behaviour to know:
+- **Protocol.** One file is one AES-256-GCM message of at most 50 MiB (CP-19) under a fresh FEK; the manifest (RFC 8785 `{name, sha256, size, type, v}`) is a second message under the same FEK; the FEK is wrapped under RWK_v with `cm.dek.wrap` (itemType `file`, revision 0). No chunks, no resumable upload (L-47). Decrypting needs the key version the file names, so the web client holds every opened version (`roomKeys.version`).
+- **Lifecycle.** `PENDING_UPLOAD` (row, presigned PUT for the exact size) to `AVAILABLE` (uploader completes after HEAD confirms the size) to `DELETED` (tombstone: wrapped FEK and manifest NULL, object deleted at once or by the worker). A write-locked room cancels pending uploads. Abandoned uploads are reaped after 15 minutes; expired files are refused at read time.
+- **Quotas** (decision D-07-01): 1024 MiB per room, 2048 MiB per account, 5 pending uploads per account.
+- **Storage.** Local SeaweedFS with an administrator identity (`S3_*`, bucket creation only) and a runtime identity (`STORAGE_*`) that reads and writes objects of `cm-files` only. After pulling Phase 7, add the new variables of `.env.example` to your `.env`, run `pnpm services:up` (recreates only the storage container; the volume is kept), `pnpm storage:bootstrap` and `pnpm db:migrate`.
+- **Finding SF-07-01** (fixed): WebKit sent the session cookie to a storage endpoint on the application's host with another port. Presigned URLs must be on another host (the API refuses to start otherwise); the E2E storage endpoint is `localhost` while the app is `127.0.0.1`, and the proxy refuses any request with a cookie.
+- **Not done:** per-address rate limits for the file routes (Nginx, Phase 17), bucket lifecycle rules and versioning (Phase 19), audit rows for file events (Phase 12; events go to the log), a memory measurement of the 50 MiB limit and phone tests (L-47).
+- Test helper `tests/helpers/files.ts` (real storage, files encrypted by `packages/crypto`); `startAuthApi` accepts a storage double for failure tests; the `files` Vitest project runs one file at a time. `scripts/db/lib.mjs` now serializes role creation with an advisory lock (the parallel projects raced on `ALTER ROLE`).
+
 ## 7. Invariants every session must preserve
 
 All of CLAUDE.md section 6 (INV-01 to INV-19). For Phases 5 and 6 especially:
@@ -101,27 +123,30 @@ All of CLAUDE.md section 6 (INV-01 to INV-19). For Phases 5 and 6 especially:
 - **INV-09:** no unchained rows in `audit_events`.
 - Never weaken tests, grants, cookies or authorization to make something pass.
 
-## 8. Documents Prompt 09 must read
+## 8. Documents Prompt 10 must read
 
-- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 7); `docs/management/jira-backlog.md` (CM-T037 onward, CM-EPIC-07); [phase-06-traceability.md](phase-06-traceability.md).
+- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 8, CM-T042, DF-12); `docs/management/jira-backlog.md` (CM-T042, CM-EPIC-08); [phase-07-traceability.md](phase-07-traceability.md) (the file protocol is the pattern for notes: NEK, `cm.dek.wrap` itemType `note`, `cm.note.content` with the revision).
 - `docs/crypto/` (cryptographic-architecture sections 6 to 8, key-hierarchy, key-lifecycle, crypto-decisions CP-16, CP-19), ADR-015 section 4.1, `docs/architecture/data-model.md` (4.11, 4.12), `data-flow.md` (DF-07, DF-08).
 - `docs/security/authorization-model.md` (sections 3, 5 and 9.7), `security-policy-profiles.md` (PC-08, PC-12, PC-16), `limitations.md` (L-11, L-43, L-44, L-46), `docs/threat-model/threat-model.md` (T-01, T-02, T-07, T-11 and section 12).
 
 ## 9. Test counts
 
-Gates of Prompt 08 on the final Phase 6 code (2026-10-11, local PostgreSQL), recorded in EV-06-07 and phase-06-traceability.md:
+Gates of Prompt 09 on the final Phase 7 code (2026-10-11, local PostgreSQL and storage), recorded in EV-07-08 and phase-07-traceability.md section 6:
 
 | Gate | Result |
 |---|---|
-| `pnpm test` | 1734 tests in 71 files (Phase 5: 1516 in 66). `bola.test.ts` 98 tests over 16 room routes; `room-keys.test.ts` (crypto) 29, `room-format.test.ts` 6 |
-| `pnpm test:e2e` (three engines, one worker) | 70 passed, 8 skipped by design (single-engine tests) |
-| `pnpm security:negative-controls` | 59 of 59 caught (ten Phase 3, seventeen Phase 4, twenty-two Phase 5, ten Phase 6), both baselines pass. Run with `NODE_ENV` unset and only `DATABASE_URL` exported. One earlier run printed a failing Vitest baseline that did not recur; the harness now prints the failing tests |
-| `pnpm test:coverage:crypto` | 98.5% statements, 92.3% branches (gate 90%) |
+| `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 1876 tests in 75 files (Phase 6: 1734 in 71). New suites: `packages/crypto/src/files.test.ts` (41 tests), `tests/files` (33: upload 18, access 11, cleanup 4); extended: `bola.test.ts` 132 tests over 22 room routes (was 98 over 16), database constraints, storage configuration, file-rule drift, redaction and CSP tests |
+| `pnpm test:e2e` (three engines, one worker) | 83 passed, 10 skipped by design (single-engine tests); was 70 and 8. `files.spec.ts`: 5 tests, 13 results, 2 skipped (the cross-engine test runs once from Chromium) |
+| `pnpm security:negative-controls` | 69 of 69 caught (ten Phase 3, seventeen Phase 4, twenty-two Phase 5, ten Phase 6, ten Phase 7), both baselines pass, 38 source files restored byte for byte. One earlier full run printed a failing Vitest baseline whose failures were all `Timeout waiting for worker to respond` in heavy crypto tests (machine load); the same files then passed alone (1422 tests) and a full rerun was clean |
+| `pnpm test:coverage:crypto` | 98.7% statements, 93.2% branches (gate 90%) |
 | `pnpm test:coverage:authz` | 97.3% statements, 98.3% branches |
-| `pnpm audit:deps` | Pass after `next` 16.3.6 to 16.3.8 (GHSA-cjq9-62q9-8jv4 was published during the pause) |
-| `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, format, lint, typecheck, `db:check-schema`, `db:drift` | Pass |
+| `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, `db:validate`, `db:check-schema`, `db:drift` | Pass; migrations from zero are exercised by `tests/database/migrations.test.ts` |
+| `pnpm audit:deps` | Pass (no known vulnerabilities) |
+| Secret scan (gitleaks, all commits) | No leaks. The staged-change scan is run before the commit |
+| `pnpm bench:files` | 50 MiB in about 150 ms (Chromium, Firefox) to 0.9 s (WebKit); memory not measured (crypto-decisions section 9) |
 
-Local notes: the database suites need the local PostgreSQL container (Docker Desktop stops during long pauses; restart it and wait for healthy). Run E2E and the negative controls one at a time, E2E with `--workers=1`. The `cm_api` connection limit of 40 is shared by all projects; the `authz` project runs its files serially. The test helper `newAddress()` wraps inside 1..0xfffe (a start near 0xffff once overflowed the IPv6 group and tripped the per-address registration limit). Known timing-sensitive tests are listed in the memory notes: `vault.test.ts` KDF-busy test, the TOTP drift test and the cross-engine vault E2E; on a red CI run rerun the job once, find the mechanism and never loosen assertions.
+Local notes: the files suites need the local storage (`pnpm services:up && pnpm storage:bootstrap`); the database suites need the local PostgreSQL container (Docker Desktop stops during long pauses; restart it and wait for healthy). Run E2E and the negative controls one at a time, E2E with `--workers=1`. The `cm_api` connection limit of 40 is shared by all projects; the `authz` project runs its files serially. The test helper `newAddress()` wraps inside 1..0xfffe (a start near 0xffff once overflowed the IPv6 group and tripped the per-address registration limit). Known timing-sensitive tests are listed in the memory notes: `vault.test.ts` KDF-busy test, the TOTP drift test and the cross-engine vault E2E; on a red CI run rerun the job once, find the mechanism and never loosen assertions.
 
 ## 10. Known limitations and residual risks
 
@@ -129,6 +154,7 @@ Local notes: the database suites need the local PostgreSQL container (Docker Des
 - Phase 6: grants are statements, not revocable credentials (L-46); T-36 is mitigated (L-23 updated) but identity substitution (T-25, L-07), an authorized owner colluding with the server (L-22) and served code (L-02) remain.
 - Audit hash chain absent; table owner can bypass append-only (L-26); authentication, vault, room and invitation events only in the log (L-33).
 - Targeted login delay (L-30); in-memory rate limits per process (L-32); no Nginx yet; no TOTP key rotation tooling (L-31); TOTP is phishable (L-34); registration reveals taken emails (L-35); emails unverified (L-21).
+- Phase 7: files are at most 50 MiB, single-shot, no resumable upload, memory and phones not measured (L-47); removal does not take back downloaded files (L-48); backups keep deleted ciphertext (L-49); names and types come from the uploader (L-50).
 - Profile gates not yet checked on every room request (L-42); rooms from before Phase 6 stay keyless (L-43); a room that loses a member stays REKEY_REQUIRED until the rekey exists, and neither a re-enabled account nor a reset identity gets rooms back until CM-T053 (L-44); a reused room ID is refused with 409, and there is no room quota (L-45).
 - Full list: `docs/security/limitations.md`.
 
@@ -151,7 +177,7 @@ Local notes: the database suites need the local PostgreSQL container (Docker Des
 
 ## 13. Not implemented yet
 
-- File, note or secret encryption; object storage (Phases 7 to 9). No content is encrypted with room keys yet: `openRoomKey` returns RWK_v, and `cm.dek.wrap` is the context for wrapped DEKs.
+- Note and secret encryption (Phases 8 and 9). Files are encrypted since Phase 7 (section 6b); `cm.dek.wrap` already carries `note` as an item type.
 - Rekey, key-version retirement, leaving a room, re-sharing keys, the compromised-identity procedure (Phase 11).
 - The security policy engine (Phase 10), the audit hash chain (Phase 12), the Crypto Inspector or the Security Dashboard (Phases 13 and 14).
 - Deployment, Nginx or cloud resources (Phase 17 onward).
