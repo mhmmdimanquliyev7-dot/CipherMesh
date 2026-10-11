@@ -1,17 +1,17 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-11, end of Prompt 10 (Phase 8 implemented and verified on its feature branch: CM-T042; merged through its pull request, identifiers recorded below after the merge). Phases 1 to 7 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-11, end of Prompt 10 (Phase 8 implemented, verified and merged into `main`: CM-T042). Phases 1 to 8 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
 | Item | State |
 |---|---|
-| Completed on `main` | Phases 1 to 7 (pull requests #1, #7, #8, #10, #13, #22, #24). **Phase 7 (CM-T037 to CM-T041) was merged through pull request #24, merge commit `ce331c0`** (`ce331c0789fc2d3454005e077bcbe17818701844`; parents `c175d22` and `91d8340`). CI run 38143399418 passed every job on attempt 2 (attempt 1 had one unrelated WebKit vault timeout, EV-07-11); GitGuardian, the dependency audit and the secret scan passed. Traceability: [phase-07-traceability.md](phase-07-traceability.md) |
+| Completed on `main` | Phases 1 to 8 (pull requests #1, #7, #8, #10, #13, #22, #24, #26). **Phase 8 (CM-T042) was merged through pull request #26, merge commit `faeb633` (`faeb633a5a2839383a3c6c095c1c34e9c694affe`; parents `111a193` and `44aabf0`).** CI run 38162650065 passed every job on attempt 2 (attempt 1 had one unrelated WebKit vault-creation timeout in a Phase 7 file test, EV-08-07); GitGuardian, the dependency audit and the secret scan passed. Traceability: [phase-08-traceability.md](phase-08-traceability.md) |
 | Phase 7 | Encrypted Files: client-side AES-256-GCM files of at most 50 MiB with a per-file FEK wrapped under RWK_v, ciphertext in the S3-compatible bucket through presigned URLs, quotas, expiry, deletion and worker cleanup (section 6b) |
 | Phase 8 | Secure Notes (CM-T042): title and body as one AES-256-GCM message under a fresh NEK per revision, the revision bound in both contexts, optimistic concurrency with 409 on stale saves, AZ-19 to AZ-22, text-only rendering (section 6c). Traceability: [phase-08-traceability.md](phase-08-traceability.md) |
-| Branch | `feature/CM-T042-encrypted-notes`, created from `main` at `111a193` (the Phase 7 handoff merge, pull request #25). The Phase 7 branch takes no further commits |
-| Next | **Prompt 11: Phase 9, Burn Secrets** (CM-T043 to CM-T045; CM-T045 is a stretch item). It starts from the updated `main` after the Phase 8 merge and its handoff. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Notes panel only follows the current style |
-| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 7 until the Phase 8 pull request is merged; that merge is the baseline for Prompt 11 |
+| Branch | `feature/CM-T042-encrypted-notes` (head `44aabf0`) is merged and takes no further commits |
+| Next | **Prompt 11: Phase 9, Burn Secrets** (CM-T043 to CM-T045; CM-T045 is a stretch item). It starts from the updated `main` after this Phase 8 handoff is merged. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Notes panel only follows the current style |
+| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 8. After this handoff is merged it is the baseline for Prompt 11 |
 
 ## 2. Architecture implemented so far
 
@@ -194,8 +194,8 @@ Local notes: the files suites need the local storage (`pnpm services:up && pnpm 
 
 - Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including both coverage steps) as required checks, then capture EV-01-01 to EV-01-03.
 - Dependabot pull requests remain open (#2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24; the `next` update is covered by Phase 6, which pins 16.3.8).
-- Jira: import the backlog; move CM-T006 to CM-T041, CM-T085 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01, R-05-01 and SF-07-01 as `security-finding` items. Nothing is DONE yet.
-- Evidence still needing Jira or GitHub: EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 7. EV-07-01 to EV-07-11 are in `docs/report/evidence/phase-07/` (EV-07-11 is the CI run of pull request #24). EV-06-01 to EV-06-10 are in `docs/report/evidence/phase-06/` (EV-06-10 is the CI run of pull request #22).
+- Jira: import the backlog; move CM-T006 to CM-T042, CM-T085 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01, R-05-01 and SF-07-01 as `security-finding` items. Nothing is DONE yet.
+- Evidence still needing Jira or GitHub: the Jira history of CM-T042 (EV-08-01 to EV-08-07 are in `docs/report/evidence/phase-08/`; EV-08-07 is the CI run of pull request #26); EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 7. EV-07-01 to EV-07-11 are in `docs/report/evidence/phase-07/` (EV-07-11 is the CI run of pull request #24). EV-06-01 to EV-06-10 are in `docs/report/evidence/phase-06/` (EV-06-10 is the CI run of pull request #22).
 
 ## 13. Not implemented yet
 
