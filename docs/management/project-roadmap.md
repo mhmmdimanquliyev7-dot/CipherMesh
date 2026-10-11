@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)); Phase 4 implemented (2026-10-05, [phase-04-traceability.md](phase-04-traceability.md)), approved and merged into `main` through pull request #10. Phase 5 implemented (2026-10-06, CM-T029 to CM-T032, [phase-05-traceability.md](phase-05-traceability.md)), approved and merged into `main` through pull request #13. Phase 6 merged through pull request #22. Phase 7 implemented (2026-10-11, CM-T037 to CM-T041, [phase-07-traceability.md](phase-07-traceability.md)) and merged into `main` through pull request #24. Accepted roadmap addition: **Prompt 16.5, complete UI/UX redesign and visual polish**, which is reserved and not part of any earlier phase. Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
+Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)); Phase 4 implemented (2026-10-05, [phase-04-traceability.md](phase-04-traceability.md)), approved and merged into `main` through pull request #10. Phase 5 implemented (2026-10-06, CM-T029 to CM-T032, [phase-05-traceability.md](phase-05-traceability.md)), approved and merged into `main` through pull request #13. Phase 6 merged through pull request #22. Phase 7 implemented (2026-10-11, CM-T037 to CM-T041, [phase-07-traceability.md](phase-07-traceability.md)) and merged into `main` through pull request #24. Phase 8 implemented (2026-10-11, CM-T042, [phase-08-traceability.md](phase-08-traceability.md)) and merged through its pull request. Accepted roadmap addition: **Prompt 16.5, complete UI/UX redesign and visual polish**, which is reserved and not part of any earlier phase. Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
 
 ## 1. Principles
 
@@ -158,9 +158,9 @@ Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceabili
 | Goal | Encrypted notes with per-revision keys |
 | Dependencies | Phase 6 |
 | Deliverables | Note creation, reading, editing and deletion with optimistic concurrency |
-| Security checkpoint | Text-only rendering; revision bound in AAD; edit rights per the matrix |
+| Security checkpoint | Text-only rendering; revision bound in AAD; edit rights per the matrix. **Phase 8 status:** all met: notes render as plain text (XSS corpus in three engines, EV-08-02), the revision is in both the content and the wrapping context, AZ-19 to AZ-22 are enforced by the central authorizer with the stored author deciding `own`, and stale saves get 409 |
 | Tests | XSS corpus in notes; revision tamper tests; note canary scan |
-| Documentation updates | DF-12 confirmed or updated |
+| Documentation updates | DF-12 confirmed or updated. **Phase 8:** DF-12 confirmed, with the implemented route shape (`POST .../update` with `expectedRevision`) recorded |
 | Jira evidence | Note ciphertext in the database next to the rendered note |
 
 ### Phase 9: Burn Secrets (M3, CM-T043 to CM-T045)

@@ -1,0 +1,15 @@
+EV-08-05 Phase 8 verification gates (CM-T042), 2026-10-11, branch feature/CM-T042-encrypted-notes, local PostgreSQL 17 and object storage, Windows 11, Node 24.
+
+| Gate | Result |
+|---|---|
+| `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 1956 tests in 78 files (Phase 7: 1876 in 75). New suites: `packages/crypto/src/notes.test.ts` (20 tests), `tests/notes` (25: lifecycle 15, access 10); extended: `bola.test.ts` 160 tests over 27 room routes (was 132 over 22), database constraints (note bound and guard trigger), route inventory, BOLA inventory, profile and register drift, export surface |
+| `pnpm test:e2e` (three engines, one worker) | 102 passed, 12 skipped by design (single-engine tests); was 83 and 10. `notes.spec.ts`: 7 tests, 19 results, 2 skipped (the cross-engine test runs once from Chromium and drives Firefox and WebKit) |
+| `pnpm security:negative-controls` | 79 of 79 caught (ten Phase 3, seventeen Phase 4, twenty-two Phase 5, ten Phase 6, ten Phase 7, ten Phase 8), both baselines pass, 44 source files restored byte for byte |
+| `pnpm test:coverage:crypto` | 98.77% statements, 93.85% branches (gate 90%) |
+| `pnpm test:coverage:authz` | 97.26% statements, 98.3% branches |
+| `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, `db:validate`, `db:check-schema`, `db:drift` | Pass; migrations from zero are exercised by `tests/database/migrations.test.ts` (part of `pnpm test`) |
+| `pnpm audit:deps` | Pass (no known vulnerabilities); no dependency added or changed |
+| Secret scan (gitleaks 8.30.1, pnpm scan:secrets --staged) | All 57 commits: no leaks found. Staged Phase 8 changes: no leaks found |
+
+Logs were written to the git-ignored tmp/ directory and are not part of the repository.

@@ -1,6 +1,6 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-11, end of Prompt 09 (Phase 7 implemented, verified and merged into `main`: CM-T037 to CM-T041). Phases 1 to 7 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-11, end of Prompt 10 (Phase 8 implemented and verified on its feature branch: CM-T042; merged through its pull request, identifiers recorded below after the merge). Phases 1 to 7 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
@@ -8,9 +8,10 @@ Snapshot: 2026-10-11, end of Prompt 09 (Phase 7 implemented, verified and merged
 |---|---|
 | Completed on `main` | Phases 1 to 7 (pull requests #1, #7, #8, #10, #13, #22, #24). **Phase 7 (CM-T037 to CM-T041) was merged through pull request #24, merge commit `ce331c0`** (`ce331c0789fc2d3454005e077bcbe17818701844`; parents `c175d22` and `91d8340`). CI run 38143399418 passed every job on attempt 2 (attempt 1 had one unrelated WebKit vault timeout, EV-07-11); GitGuardian, the dependency audit and the secret scan passed. Traceability: [phase-07-traceability.md](phase-07-traceability.md) |
 | Phase 7 | Encrypted Files: client-side AES-256-GCM files of at most 50 MiB with a per-file FEK wrapped under RWK_v, ciphertext in the S3-compatible bucket through presigned URLs, quotas, expiry, deletion and worker cleanup (section 6b) |
-| Branch | `feature/CM-T037-encrypted-files` (head `91d8340`) is merged and takes no further commits |
-| Next | **Prompt 10: Phase 8, Secure Notes** (CM-T042). It starts from the updated `main` after the Phase 7 handoff merge, never from the Phase 7 branch. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Files panel only follows the current style |
-| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 7. It is the baseline for Prompt 10 |
+| Phase 8 | Secure Notes (CM-T042): title and body as one AES-256-GCM message under a fresh NEK per revision, the revision bound in both contexts, optimistic concurrency with 409 on stale saves, AZ-19 to AZ-22, text-only rendering (section 6c). Traceability: [phase-08-traceability.md](phase-08-traceability.md) |
+| Branch | `feature/CM-T042-encrypted-notes`, created from `main` at `111a193` (the Phase 7 handoff merge, pull request #25). The Phase 7 branch takes no further commits |
+| Next | **Prompt 11: Phase 9, Burn Secrets** (CM-T043 to CM-T045; CM-T045 is a stretch item). It starts from the updated `main` after the Phase 8 merge and its handoff. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Notes panel only follows the current style |
+| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 7 until the Phase 8 pull request is merged; that merge is the baseline for Prompt 11 |
 
 ## 2. Architecture implemented so far
 
@@ -22,7 +23,7 @@ Snapshot: 2026-10-11, end of Prompt 09 (Phase 7 implemented, verified and merged
 
 ## 3. Database state
 
-- PostgreSQL 17, Prisma 7.10.0 with the pg adapter. 16 tables, 231 classified fields (`/// class:`), seven migrations; the last is `20261006000000_room_statements` (Phase 6). No grant changed in Phase 6.
+- PostgreSQL 17, Prisma 7.10.0 with the pg adapter. 16 tables, 232 classified fields (`/// class:`), nine migrations; the last is `20261008000000_encrypted_notes` (Phase 8: the CP-28 ciphertext bound and the note guard trigger, no column or grant changes).
 - Roles `cm_migrator` (owner, never on the VM), `cm_api`, `cm_worker`, `cm_verifier`, with a tested grant matrix. `audit_events` is append-only; **the hash chain does not exist yet** (Phase 12).
 - Phase 6 columns: `rooms.creator_key_id` and `genesis_signature` (NULL only for rooms from before Phase 6); `room_key_versions.created_by_key_id`, `previous_commitment`, `recipient_user_ids`, `recipient_key_ids`, `statement_signature`; `invitations.grantor_key_id` and `grant_signature`; `room_members.subject_key_id`, `grant_role`, `grantor_user_id`, `grantor_key_id`, `grant_signature`. Composite foreign keys bind each signing key to its user, CHECKs enforce all-or-nothing grants and sizes, and triggers make the genesis, the key-version statement and the invitation grant write-once.
 - `rooms` and `room_members` exist since Phase 2; key versions, envelopes and invitations are written by the API since Phase 6.
@@ -114,6 +115,26 @@ Behaviour to know:
 - **Not done:** per-address rate limits for the file routes (Nginx, Phase 17), bucket lifecycle rules and versioning (Phase 19), audit rows for file events (Phase 12; events go to the log), a memory measurement of the 50 MiB limit and phone tests (L-47).
 - Test helper `tests/helpers/files.ts` (real storage, files encrypted by `packages/crypto`); `startAuthApi` accepts a storage double for failure tests; the `files` Vitest project runs one file at a time. `scripts/db/lib.mjs` now serializes role creation with an advisory lock (the parallel projects raced on `ALTER ROLE`).
 
+## 6c. Encrypted notes (Phase 8, CM-T042)
+
+| Part | Location |
+|---|---|
+| Note format (NEK per revision, document, wrap, `encryptNote`, `openNote`), wire layer | `packages/crypto/src/notes.ts`, `note-format.ts`; constants `NOTES` in `params.ts`; error codes `NOTE_INTEGRITY_FAILED`, `NOTE_FORMAT_UNSUPPORTED` |
+| Shared constants | `packages/shared/src/notes.ts` (`NOTE_LIMITS`, `NOTE_RULES` per profile, `NOTE_LIST_PAGE_SIZE`); error codes `REVISION_CONFLICT`, `NOTE_ID_UNAVAILABLE`, `NOTE_LIMIT_REACHED` |
+| Schemas | `packages/validation/src/notes.ts` (strict; no title, body, key, revision, author or editor field) |
+| API | `apps/api/src/notes/service.ts`, `routes/notes.ts`, `db/note-store.ts` (part of the room store), worker `db/note-cleanup.ts` via `pnpm worker:retention` (before the room cleanup, which now waits only for live notes) |
+| Database | migration `20261008000000_encrypted_notes` (ciphertext 17 to 65,552 bytes, trigger `cm_guard_encrypted_note_change`) |
+| Web | `apps/web/src/rooms/notes.ts` (operations, in-memory revision memory for T-32), `note-panel.tsx` (the Notes card in the room page); messages in `messages.ts` |
+
+Routes (reviewed lists in `tests/security/route-inventory.test.ts`, BOLA table `tests/helpers/bola-cases.ts` with `targetsNote`): `GET /rooms/{roomId}/notes` (AZ-20), `POST /rooms/{roomId}/notes` (AZ-19), `GET /rooms/{roomId}/notes/{noteId}` (AZ-20), `POST .../update` (AZ-21), `POST .../delete` (AZ-22).
+
+Behaviour to know:
+- **Protocol (CD-31, CP-28).** A revision is one AES-256-GCM message: the RFC 8785 document `{body, title, v: 1}` (at most 64 KiB; title 1 to 200 code units, no control characters) under a fresh NEK, AAD `cm.note.content` {roomId, noteId, revision}; the NEK is wrapped under RWK_v with `cm.dek.wrap` (itemType `note`, itemId the note ID, the same revision). Only canonical documents are accepted. Each save consumes one wrap of the key version (CP-16).
+- **Revisions.** Creation stores revision 1. An update names `expectedRevision`; the API locks user, room, membership and note, re-checks AZ-21, requires key state ACTIVE and the current key version, and writes revision expected + 1 only while the stored revision is still expected (409 `REVISION_CONFLICT`). Only the current revision is kept. The browser remembers the highest revision it saw in this tab and flags a lower one (T-32).
+- **Lifecycle.** Expiry fixed at creation (PC-08; CONFIDENTIAL and RESTRICTED require one). Deleted and expired notes are refused at read time; deletion is a tombstone (ciphertext and wrapped NEK NULL) and is allowed while the room is REKEY_REQUIRED. At most 1000 live notes per room (D-08-01). Reads are security events at EXTENDED and FULL (PC-13).
+- **UI.** A plain-text editor; note text is rendered as text only. A save conflict keeps the editor's text and offers to load the latest revision. Locking the vault discards every decrypted title and body at once.
+- **Decisions** D-08-01 to D-08-08 are in the traceability file; no new dependency.
+
 ## 7. Invariants every session must preserve
 
 All of CLAUDE.md section 6 (INV-01 to INV-19). For Phases 5 and 6 especially:
@@ -124,30 +145,29 @@ All of CLAUDE.md section 6 (INV-01 to INV-19). For Phases 5 and 6 especially:
 - **INV-09:** no unchained rows in `audit_events`.
 - Never weaken tests, grants, cookies or authorization to make something pass.
 
-## 8. Documents Prompt 10 must read
+## 8. Documents Prompt 11 must read
 
-- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 8, CM-T042, DF-12); `docs/management/jira-backlog.md` (CM-T042, CM-EPIC-08); [phase-07-traceability.md](phase-07-traceability.md) (the file protocol is the pattern for notes: NEK, `cm.dek.wrap` itemType `note`, `cm.note.content` with the revision).
-- `docs/crypto/` (cryptographic-architecture sections 6 to 8, key-hierarchy, key-lifecycle, crypto-decisions CP-16, CP-19), ADR-015 section 4.1, `docs/architecture/data-model.md` (4.11, 4.12), `data-flow.md` (DF-07, DF-08).
-- `docs/security/authorization-model.md` (sections 3, 5 and 9.7), `security-policy-profiles.md` (PC-08, PC-12, PC-16), `limitations.md` (L-11, L-43, L-44, L-46), `docs/threat-model/threat-model.md` (T-01, T-02, T-07, T-11 and section 12).
+- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 9, CM-T043 to CM-T045); `docs/management/jira-backlog.md` (CM-EPIC-08: CM-T043, CM-T044, CM-T045 stretch); [phase-08-traceability.md](phase-08-traceability.md) (the note protocol and its tests are the pattern for content routes; secrets differ: the SEK is RSA-OAEP-wrapped to the recipient's key, not under RWK_v).
+- `docs/crypto/` (cryptographic-architecture 6.3 and section 11, key-hierarchy, key-lifecycle section 2, crypto-decisions CD-06, CD-17, CP-02, CP-09), `docs/architecture/data-model.md` (4.13), `data-flow.md` (DF-09).
+- `docs/security/authorization-model.md` (sections 3 and 5: AZ-23 to AZ-26), `security-policy-profiles.md` (PC-09, PC-10, PC-11, PC-16), INV-13, INV-14 and INV-17 in CLAUDE.md, `limitations.md`, `docs/threat-model/threat-model.md` (secret-related threats and section 12).
 
 ## 9. Test counts
 
-Gates of Prompt 09 on the final Phase 7 code (2026-10-11, local PostgreSQL and storage), recorded in EV-07-08 and phase-07-traceability.md section 6:
+Gates of Prompt 10 on the final Phase 8 code (2026-10-11, local PostgreSQL and storage), recorded in EV-08-05 and phase-08-traceability.md section 5:
 
 | Gate | Result |
 |---|---|
 | `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | Pass |
-| `pnpm test` | 1876 tests in 75 files (Phase 6: 1734 in 71). New suites: `packages/crypto/src/files.test.ts` (41 tests), `tests/files` (33: upload 18, access 11, cleanup 4); extended: `bola.test.ts` 132 tests over 22 room routes (was 98 over 16), database constraints, storage configuration, file-rule drift, redaction and CSP tests |
-| `pnpm test:e2e` (three engines, one worker) | 83 passed, 10 skipped by design (single-engine tests); was 70 and 8. `files.spec.ts`: 5 tests, 13 results, 2 skipped (the cross-engine test runs once from Chromium) |
-| `pnpm security:negative-controls` | 69 of 69 caught (ten Phase 3, seventeen Phase 4, twenty-two Phase 5, ten Phase 6, ten Phase 7), both baselines pass, 38 source files restored byte for byte. One earlier full run printed a failing Vitest baseline whose failures were all `Timeout waiting for worker to respond` in heavy crypto tests (machine load); the same files then passed alone (1422 tests) and a full rerun was clean |
-| `pnpm test:coverage:crypto` | 98.7% statements, 93.2% branches (gate 90%) |
-| `pnpm test:coverage:authz` | 97.3% statements, 98.3% branches |
-| `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, `db:validate`, `db:check-schema`, `db:drift` | Pass; migrations from zero are exercised by `tests/database/migrations.test.ts` |
-| `pnpm audit:deps` | Pass (no known vulnerabilities) |
-| Secret scan (gitleaks, all commits) | No leaks. The staged-change scan is run before the commit |
-| `pnpm bench:files` | 50 MiB in about 150 ms (Chromium, Firefox) to 0.9 s (WebKit); memory not measured (crypto-decisions section 9) |
+| `pnpm test` | 1956 tests in 78 files (Phase 7: 1876 in 75). New suites: `packages/crypto/src/notes.test.ts` (20 tests), `tests/notes` (25: lifecycle 15, access 10); extended: `bola.test.ts` 160 tests over 27 room routes (was 132 over 22), database constraints (note bound and guard trigger), route inventory, BOLA inventory, profile and register drift, export surface |
+| `pnpm test:e2e` (three engines, one worker) | 102 passed, 12 skipped by design (single-engine tests); was 83 and 10. `notes.spec.ts`: 7 tests, 19 results, 2 skipped (the cross-engine test runs once from Chromium and drives Firefox and WebKit) |
+| `pnpm security:negative-controls` | 79 of 79 caught (ten Phase 3, seventeen Phase 4, twenty-two Phase 5, ten Phase 6, ten Phase 7, ten Phase 8), both baselines pass, 44 source files restored byte for byte |
+| `pnpm test:coverage:crypto` | 98.77% statements, 93.85% branches (gate 90%) |
+| `pnpm test:coverage:authz` | 97.26% statements, 98.3% branches |
+| `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, `db:validate`, `db:check-schema`, `db:drift` | Pass; migrations from zero are exercised by `tests/database/migrations.test.ts` (part of `pnpm test`) |
+| `pnpm audit:deps` | Pass (no known vulnerabilities); no dependency added or changed |
+| Secret scan (gitleaks) | Staged changes and all commits: see EV-08-05 |
 
-Local notes: the files suites need the local storage (`pnpm services:up && pnpm storage:bootstrap`); the database suites need the local PostgreSQL container (Docker Desktop stops during long pauses; restart it and wait for healthy). Run E2E and the negative controls one at a time, E2E with `--workers=1`. The `cm_api` connection limit of 40 is shared by all projects; the `authz` project runs its files serially. The test helper `newAddress()` wraps inside 1..0xfffe (a start near 0xffff once overflowed the IPv6 group and tripped the per-address registration limit). Known timing-sensitive tests are listed in the memory notes: `vault.test.ts` KDF-busy test, the TOTP drift test and the cross-engine vault E2E; on a red CI run rerun the job once, find the mechanism and never loosen assertions.
+Local notes: the files suites need the local storage (`pnpm services:up && pnpm storage:bootstrap`); the database suites need the local PostgreSQL container (Docker Desktop stops during long pauses; restart it and wait for healthy). Run E2E and the negative controls one at a time, E2E with `--workers=1`. The notes suites need only PostgreSQL (`pnpm test:notes`). The `cm_api` connection limit of 40 is shared by all projects; the `authz` project runs its files serially. The test helper `newAddress()` wraps inside 1..0xfffe (a start near 0xffff once overflowed the IPv6 group and tripped the per-address registration limit). Known timing-sensitive tests are listed in the memory notes: `vault.test.ts` KDF-busy test, the TOTP drift test and the cross-engine vault E2E; on a red CI run rerun the job once, find the mechanism and never loosen assertions.
 
 ## 10. Known limitations and residual risks
 
@@ -156,6 +176,7 @@ Local notes: the files suites need the local storage (`pnpm services:up && pnpm 
 - Audit hash chain absent; table owner can bypass append-only (L-26); authentication, vault, room and invitation events only in the log (L-33).
 - Targeted login delay (L-30); in-memory rate limits per process (L-32); no Nginx yet; no TOTP key rotation tooling (L-31); TOTP is phishable (L-34); registration reveals taken emails (L-35); emails unverified (L-21).
 - Phase 7: files are at most 50 MiB, single-shot, no resumable upload, memory and phones not measured (L-47); removal does not take back downloaded files (L-48); backups keep deleted ciphertext (L-49); names and types come from the uploader (L-50).
+- Phase 8: note metadata (authors, editors, revision counts, sizes, times) is visible to the server (L-51); only the current revision, no history or merge (L-52); authorship is the server's statement (L-53, L-09); removal does not take back notes already read (L-54); an older revision served under its own number is noticed only if this tab saw a newer one (L-10, T-32).
 - Profile gates not yet checked on every room request (L-42); rooms from before Phase 6 stay keyless (L-43); a room that loses a member stays REKEY_REQUIRED until the rekey exists, and neither a re-enabled account nor a reset identity gets rooms back until CM-T053 (L-44); a reused room ID is refused with 409, and there is no room quota (L-45).
 - Full list: `docs/security/limitations.md`.
 
@@ -178,7 +199,7 @@ Local notes: the files suites need the local storage (`pnpm services:up && pnpm 
 
 ## 13. Not implemented yet
 
-- Note and secret encryption (Phases 8 and 9). Files are encrypted since Phase 7 (section 6b); `cm.dek.wrap` already carries `note` as an item type.
+- Recipient-bound secrets and burn-after-reading (Phase 9). Files (Phase 7, section 6b) and notes (Phase 8, section 6c) are encrypted. Note version history, collaborative editing and Markdown are not planned for any phase.
 - Rekey, key-version retirement, leaving a room, re-sharing keys, the compromised-identity procedure (Phase 11).
 - The security policy engine (Phase 10), the audit hash chain (Phase 12), the Crypto Inspector or the Security Dashboard (Phases 13 and 14).
 - Deployment, Nginx or cloud resources (Phase 17 onward).

@@ -220,3 +220,17 @@ Each automated test is tagged with the threat IDs and control IDs it covers (for
 | Browser | `tests/e2e/files.spec.ts` | Upload and download with identical bytes in Chromium, Firefox and WebKit, no name or content in any request or browser storage, no cookie or Referer to storage, tamper detection, HTML and SVG never rendered, vault lock removes names, cross-engine decryption |
 
 The Phase 7 negative controls (NC-07-01 to NC-07-10) are listed in `scripts/security/negative-controls.mjs`. `pnpm test:files` runs the `files` project (needs `pnpm services:up` and `pnpm storage:bootstrap`); `pnpm bench:files` is the CP-19 benchmark.
+
+### 3.7 Encrypted note suites (Phase 8, CM-T042)
+
+| Suite | Location | What it proves |
+|---|---|---|
+| Note format and tampering | `packages/crypto/src/notes.test.ts` | The format against Node.js `crypto` in both directions; fresh NEKs and IVs per revision; empty body, Unicode and multi-line text; exactly the 64 KiB document limit and one byte more; title rules; revision bounds; bit flips in the ciphertext, tag, IVs and wrapped NEK; truncated and extended ciphertext; a body or wrapped NEK moved to another note, room, key version or revision; a NEK wrapped for another item type, revision or key version; unsupported suites and document versions; non-canonical documents from a malicious member; the wire format |
+| Lifecycle and revisions | `tests/notes/notes-lifecycle.test.ts` | Ciphertext only in the database, read by every role; canary scan (title and body in five encodings, every table and the log); revision increment, stale and duplicate saves refused with 409 and the stored note unchanged; exactly one of two concurrent saves wins; relabelled or replayed revisions fail authentication; reused note IDs; deletion, expiry at read time, worker tombstones, room deletion waits for note tombstones; the per-room note limit |
+| Access | `tests/notes/notes-access.test.ts` | AZ-19 to AZ-22 for every role, `own` decided by the stored author, a demoted author, strict schemas, removal (404 for the removed member, REKEY_REQUIRED for the others, reads and deletions still allowed), stale key versions, PC-08 in CONFIDENTIAL, PC-13 read audit, paging |
+| Database | `tests/database/constraints.test.ts` | The CP-28 ciphertext bound and the guard trigger: write-once identity, revision exactly plus one with new key material, key version never back, expiry only earlier, final tombstones |
+| BOLA | `tests/authz/bola.test.ts` | Five note routes attacked with notes of another room by every kind of caller |
+| Drift | `tests/security/profile-requirements.test.ts`, `route-inventory.test.ts`, `bola-inventory.test.ts` | `NOTE_RULES` against PC-08 and PC-13, `NOTE_LIMITS` against CP-28 and the crypto package; the reviewed route lists |
+| Browser | `tests/e2e/notes.spec.ts` | Chromium, Firefox and WebKit: only ciphertext and the wrapped NEK reach the API, no title or body in any request or browser storage, reading after a reload and vault unlock, a new revision read by another member, VIEWER controls, confirmed deletion, a save conflict that keeps the text, an XSS corpus rendered as text (EV-08-02), substituted ciphertext refused and a rolled-back revision flagged, vault lock removes note text, non-members get 404, cross-engine decryption |
+
+The Phase 8 negative controls (NC-08-01 to NC-08-10) are listed in `scripts/security/negative-controls.mjs`. `pnpm test:notes` runs the `notes` project (needs the local PostgreSQL).
