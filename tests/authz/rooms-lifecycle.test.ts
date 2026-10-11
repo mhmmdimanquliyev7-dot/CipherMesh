@@ -12,7 +12,6 @@ import {
   apiDatabase,
   createRoom,
   errorOf,
-  insertDummyEnvelope,
   memberships,
   mfaPersonWithVault,
   NOT_FOUND_BODY,
@@ -23,6 +22,8 @@ import {
   stepUp,
   type Person,
 } from '../helpers/rooms';
+import { insert, noteRow } from '../helpers/db-fixtures';
+import { creationBody, fillerKeys, vaultOf } from '../helpers/room-crypto';
 
 // CM-T030: room creation, listing, reading, renaming and deletion against the real API, with
 // real sessions and PostgreSQL as cm_api. Authorization comes from the central gate (CM-T029)
@@ -64,10 +65,11 @@ async function keyRows(roomId: string): Promise<number> {
 }
 
 describe('room creation (SS-04)', () => {
-  it('creates the room and the OWNER membership, and no key material', async () => {
+  it('creates the room, the OWNER membership, key version 1 and the owner envelope (CM-T033)', async () => {
     const owner = await personWithVault(api, db);
     const roomId = randomUUID();
-    const response = await create(owner, { roomId, name: '  Project  notes ', securityProfile: 'STANDARD' });
+    const body = await creationBody(owner, roomId, 'STANDARD', '  Project  notes ');
+    const response = await create(owner, body);
     expect(response.status).toBe(201);
     expect(response.body).toEqual({
       id: roomId,
@@ -87,9 +89,40 @@ describe('room creation (SS-04)', () => {
     expect(rows).toEqual([
       { security_profile: 'STANDARD', policy_version: 1, created_by_id: owner.userId, current_key_version: 1 },
     ]);
-    // Room keys arrive with Phase 6: no key version and no envelope exist.
-    expect(await keyRows(roomId)).toBe(0);
-    expect(api.events.some((e) => e.name === 'ROOM_CREATED' && e.details?.['roomId'] === roomId)).toBe(true);
+    // Phase 6 (DF-05): exactly one key version and one envelope, both for the creator's identity.
+    expect(await keyRows(roomId)).toBe(2);
+    const keyId = vaultOf(owner).identity.keyId;
+    const keys = body['keys'] as Record<string, string>;
+    const stored = await db.query(
+      `SELECT r.creator_key_id::text, encode(r.genesis_signature, 'hex') AS genesis,
+              v.version, v.status::text, v.created_by_key_id::text, v.previous_commitment,
+              v.recipient_user_ids::text[], v.recipient_key_ids::text[], encode(v.commitment, 'hex') AS commitment,
+              e.recipient_key_id::text AS envelope_key, e.status::text AS envelope_status,
+              encode(e.wrapped_key, 'hex') AS envelope
+         FROM rooms r JOIN room_key_versions v ON v.room_id = r.id JOIN key_envelopes e ON e.room_id = r.id
+        WHERE r.id = $1`,
+      [roomId],
+    );
+    const hex = (value: string): string => Buffer.from(value, 'base64url').toString('hex');
+    expect(stored.rows).toEqual([
+      {
+        creator_key_id: keyId,
+        genesis: hex(keys['genesisSignature'] ?? ''),
+        version: 1,
+        status: 'ACTIVE',
+        created_by_key_id: keyId,
+        previous_commitment: null,
+        recipient_user_ids: [owner.userId],
+        recipient_key_ids: [keyId],
+        commitment: hex(keys['commitment'] ?? ''),
+        envelope_key: keyId,
+        envelope_status: 'ACTIVE',
+        envelope: hex(keys['envelope'] ?? ''),
+      },
+    ]);
+    expect(
+      api.events.find((e) => e.name === 'ROOM_CREATED' && e.details?.['roomId'] === roomId)?.details,
+    ).toMatchObject({ keyVersion: 1 });
   });
 
   it.each([
@@ -108,7 +141,8 @@ describe('room creation (SS-04)', () => {
     ['a commitment', { commitment: 'AAAA' }],
   ])('refuses %s with a validation error and creates nothing', async (_label, change) => {
     const owner = await personWithVault(api, db);
-    const body = { roomId: randomUUID(), name: 'Valid name', securityProfile: 'STANDARD', ...change };
+    // A valid, signed body except for the one change, so each case fails for its own reason.
+    const body = { ...(await creationBody(owner, randomUUID(), 'STANDARD', 'Valid name')), ...change };
     const response = await create(owner, body);
     expect(response.status).toBe(400);
     expect(errorCode(response)).toBe('VALIDATION_FAILED');
@@ -118,7 +152,12 @@ describe('room creation (SS-04)', () => {
 
   it('requires an active vault (SS-04)', async () => {
     const noVault = await person(api);
-    const response = await create(noVault, { roomId: randomUUID(), name: 'Room', securityProfile: 'STANDARD' });
+    const response = await create(noVault, {
+      roomId: randomUUID(),
+      name: 'Room',
+      securityProfile: 'STANDARD',
+      keys: fillerKeys(randomUUID()),
+    });
     expect(response.status).toBe(403);
     expect(errorCode(response)).toBe('VAULT_SETUP_REQUIRED');
   });
@@ -126,7 +165,7 @@ describe('room creation (SS-04)', () => {
   it('requires an MFA-verified session for CONFIDENTIAL and RESTRICTED rooms (PC-01)', async () => {
     const plain = await personWithVault(api, db);
     for (const securityProfile of ['CONFIDENTIAL', 'RESTRICTED']) {
-      const response = await create(plain, { roomId: randomUUID(), name: 'Room', securityProfile });
+      const response = await create(plain, await creationBody(plain, randomUUID(), securityProfile));
       expect(response.status).toBe(403);
       expect(errorCode(response)).toBe('MFA_REQUIRED');
     }
@@ -139,7 +178,8 @@ describe('room creation (SS-04)', () => {
     const first = await personWithVault(api, db);
     const second = await personWithVault(api, db);
     const roomId = await createRoom(first);
-    const reuse = await create(second, { roomId, name: 'Takeover', securityProfile: 'STANDARD' });
+    // Validly signed by the second user for this room ID: refused only because the ID was used.
+    const reuse = await create(second, await creationBody(second, roomId, 'STANDARD', 'Takeover'));
     expect(reuse.status).toBe(409);
     expect(errorCode(reuse)).toBe('ROOM_ID_UNAVAILABLE');
     expect(await memberships(db, roomId)).toHaveLength(1);
@@ -158,7 +198,7 @@ describe('room creation: PC-02 maximum time since the last password authenticati
         local.clock.advance(25 * 60_000);
         expect((await who.browser.request('GET', '/auth/session')).status).toBe(200);
       }
-      const restricted = await create(who, { roomId: randomUUID(), name: 'Room', securityProfile: 'RESTRICTED' });
+      const restricted = await create(who, await creationBody(who, randomUUID(), 'RESTRICTED'));
       expect(restricted.status).toBe(401);
       expect(errorCode(restricted)).toBe('REAUTH_REQUIRED');
       expect(await createRoom(who, 'CONFIDENTIAL')).toEqual(expect.any(String));
@@ -166,7 +206,7 @@ describe('room creation: PC-02 maximum time since the last password authenticati
         local.clock.advance(25 * 60_000);
         expect((await who.browser.request('GET', '/auth/session')).status).toBe(200);
       }
-      const confidential = await create(who, { roomId: randomUUID(), name: 'Room', securityProfile: 'CONFIDENTIAL' });
+      const confidential = await create(who, await creationBody(who, randomUUID(), 'CONFIDENTIAL'));
       expect(errorCode(confidential)).toBe('REAUTH_REQUIRED');
       expect(await createRoom(who, 'STANDARD')).toEqual(expect.any(String));
     } finally {
@@ -392,14 +432,19 @@ describe('deleting a room (AZ-04, step-up in every profile)', () => {
     expect((await roomRow(db, roomId)).status).toBe('ACTIVE');
   });
 
-  it('is finished by the worker only when nothing is left to clean (fail-safe)', async () => {
+  it('is finished by the worker, which removes the key material first and keeps rooms with content (fail-safe)', async () => {
     const owner = await personWithVault(api, db);
     const empty = await createRoom(owner);
-    const withEnvelope = await createRoom(owner);
-    await insertDummyEnvelope(db, withEnvelope, owner.userId, owner.userId);
+    const withContent = await createRoom(owner);
+    // A DUMMY note row stands for content, whose own cleanup arrives with Phases 7 to 9.
+    await insert(
+      db,
+      'encrypted_notes',
+      noteRow({ roomId: withContent, ownerId: owner.userId, ownerKeyId: vaultOf(owner).identity.keyId }),
+    );
     await stepUp(api, owner);
     expect((await destroy(owner, empty)).status).toBe(200);
-    expect((await destroy(owner, withEnvelope)).status).toBe(200);
+    expect((await destroy(owner, withContent)).status).toBe(200);
     const active = await createRoom(owner);
 
     const worker = createDatabase({
@@ -414,8 +459,18 @@ describe('deleting a room (AZ-04, step-up in every profile)', () => {
       await worker.close();
     }
     expect((await roomRow(db, empty)).status).toBe('DELETED');
-    // An envelope is left: the room stays DELETING (and inaccessible) instead of DELETED.
-    expect((await roomRow(db, withEnvelope)).status).toBe('DELETING');
+    // Phase 6: the deleted rooms' envelopes are gone and their key versions DESTROYED (commitment kept).
+    for (const roomId of [empty, withContent]) {
+      const { rows } = await db.query<{ envelopes: number; status: string }>(
+        `SELECT (SELECT count(*)::int FROM key_envelopes WHERE room_id = $1) AS envelopes,
+                (SELECT status::text FROM room_key_versions WHERE room_id = $1 AND version = 1) AS status`,
+        [roomId],
+      );
+      expect(rows).toEqual([{ envelopes: 0, status: 'DESTROYED' }]);
+    }
+    // Content is left: the room stays DELETING (and inaccessible) instead of DELETED.
+    expect((await roomRow(db, withContent)).status).toBe('DELETING');
     expect((await roomRow(db, active)).status).toBe('ACTIVE');
+    expect(await keyRows(active)).toBe(2);
   });
 });

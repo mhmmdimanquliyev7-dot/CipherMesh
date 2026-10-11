@@ -19,14 +19,19 @@ import { Suspense, useCallback, useEffect, useState, type SyntheticEvent } from 
 import { StepUpForm } from '../../../components/step-up-form';
 import { Alert, Button, Card, Field, SecondaryButton } from '../../../components/ui';
 import { api, ApiError, formText } from '../../../lib/api';
+import { InviteCard, RoomInvitations } from '../../../rooms/invitations';
+import { RoomKeyPanel } from '../../../rooms/key-panel';
+import { roomKeys } from '../../../rooms/keys';
 import { describeRoomError, REKEY_NOTICE, ROOM_NAME_WARNING } from '../../../rooms/messages';
 import { assignableRoles, mayAttempt, ROLE_LABEL } from '../../../rooms/permissions';
 
 /**
- * One room (Phase 5, CM-T030, CM-T031). The static export has no per-room pages, so the room ID
- * travels in the query string and is validated before use (ADR-011). The page shows controls the
- * shared matrix allows for the user's role, as UX only; the API authorizes every request against
- * the stored membership and answers 404 to anyone who is not a member.
+ * One room (Phase 5, CM-T030, CM-T031; Phase 6, CM-T033 to CM-T036, CM-T085). The static export has
+ * no per-room pages, so the room ID travels in the query string and is validated before use
+ * (ADR-011). The page shows controls the shared matrix allows for the user's role, as UX only; the
+ * API authorizes every request against the stored membership and answers 404 to anyone who is not
+ * a member. The room key is opened and verified on this device (RoomKeyPanel); invitations and
+ * grants are made with the unlocked vault.
  */
 export default function RoomPage() {
   return (
@@ -64,6 +69,7 @@ function Room({ roomId }: { readonly roomId: string }) {
   const [missing, setMissing] = useState(false);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | undefined>();
   const [stepUp, setStepUp] = useState<PendingStepUp>();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -90,6 +96,7 @@ function Room({ roomId }: { readonly roomId: string }) {
       await action();
       if (done !== undefined) setMessage({ kind: 'info', text: done });
       if (reload) await load();
+      setRefreshKey((k) => k + 1);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'STEP_UP_REQUIRED') {
         setStepUp({ reason: stepUpReason, retry: () => act(action, stepUpReason, done, reload) });
@@ -129,11 +136,27 @@ function Room({ roomId }: { readonly roomId: string }) {
           }}
         />
       )}
+      <RoomKeyPanel roomId={roomId} profile={room.room.securityProfile} members={members} />
       <Members
         roomId={roomId}
         role={role}
         selfId={selfId}
         members={members}
+        onAction={(action, reason, done) => act(action, reason, done)}
+      />
+      {room.room.keyState === 'ACTIVE' ? (
+        <InviteCard
+          roomId={roomId}
+          role={role}
+          profile={room.room.securityProfile}
+          onAction={(action, reason, done) => act(action, reason, done)}
+        />
+      ) : null}
+      <RoomInvitations
+        roomId={roomId}
+        role={role}
+        selfId={selfId}
+        refreshKey={refreshKey}
         onAction={(action, reason, done) => act(action, reason, done)}
       />
       {mayAttempt('AZ-02', role) ? (
@@ -181,7 +204,9 @@ function Members({
 }) {
   return (
     <Card title="Members">
-      <p className="text-xs text-slate-500">Inviting members arrives with encrypted room keys in a later phase.</p>
+      <p className="text-xs text-slate-500">
+        Making someone an admin or the owner is signed with your identity key, so your vault must be unlocked.
+      </p>
       <ul className="divide-y divide-slate-800 rounded border border-slate-800" aria-label="Members">
         {members.map((member) => {
           const self = member.userId === selfId;
@@ -210,13 +235,13 @@ function Members({
                     type="button"
                     onClick={() =>
                       void onAction(async () => {
+                        // Granting ADMIN carries the OWNER's signed grant (ADR-015 section 4).
+                        const grant = to === 'ADMIN' ? await roomKeys.grant(roomId, member.userId, 'ADMIN') : undefined;
                         await api(
                           'POST',
                           `/rooms/${roomId}/members/${member.userId}/role`,
                           memberRoleChangedResponseSchema,
-                          {
-                            role: to,
-                          },
+                          grant === undefined ? { role: to } : { role: to, grant },
                         );
                       }, '')
                     }
@@ -234,7 +259,7 @@ function Members({
                             'POST',
                             `/rooms/${roomId}/members/${member.userId}/transfer-ownership`,
                             ownershipTransferredResponseSchema,
-                            {},
+                            { grant: await roomKeys.grant(roomId, member.userId, 'OWNER') },
                           );
                         },
                         'Transferring ownership needs a recent confirmation with your account password.',

@@ -12,7 +12,7 @@ An ADR records one significant decision: its context, the decision, the alternat
 | [ADR-004](ADR-004-key-management.md) | Key-management approach | Accepted (revised in Phase 0.5) |
 | [ADR-005](ADR-005-jira-cloud-management-saas.md) | Jira Cloud as management SaaS | Accepted |
 | [ADR-006](ADR-006-cloud-service-models.md) | IaaS, PaaS and SaaS architecture | Accepted (classification corrected in Phase 0.5; provider selection deferred) |
-| [ADR-007](ADR-007-asymmetric-key-wrapping.md) | RSA-OAEP-3072 for room-key distribution | Proposed (identity key and vault pair check implemented in Phase 4; room envelopes confirmed in Phase 6) |
+| [ADR-007](ADR-007-asymmetric-key-wrapping.md) | RSA-OAEP-3072 for room-key distribution | Accepted (Phase 6: room envelopes confirmed across Chromium, Firefox and WebKit) |
 | [ADR-008](ADR-008-server-side-sessions.md) | Opaque server-side sessions | Accepted (lifecycle and CSRF completed in Phase 0.5) |
 | [ADR-009](ADR-009-tamper-evident-audit-ledger.md) | Tamper-evident audit ledger | Accepted (trust model added in Phase 0.5) |
 | [ADR-010](ADR-010-browser-argon2id.md) | Argon2id in the browser for the Vault | Accepted (Phase 4: library, parameters and benchmark) |

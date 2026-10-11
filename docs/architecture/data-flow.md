@@ -25,8 +25,8 @@ All identifiers that appear inside cryptographic contexts (user, key, room, file
 | DF-03 Vault setup | Both public keys, binding signature, fingerprint, KDF parameters, salt | Both wrapped private keys with their IVs | Vault Passphrase, VRK, PKWKs, private keys |
 | DF-04a Passphrase change | Previous and new salt, KDF parameters, signature | Both re-wrapped private keys with new IVs | Old and new Vault Passphrase, VRKs, PKWKs, private keys |
 | DF-04b Vault reset | ID of the identity being replaced, new public identity, KDF parameters, salt | Both new wrapped private keys | Vault Passphrase, VRK, PKWKs, private keys |
-| DF-05 Room creation | Room name, profile, commitment | RKM envelope for the owner | RKM, RWK |
-| DF-06 Invitation | Invitee ID, role, confirmed fingerprint | RKM envelopes for the invitee | RKM |
+| DF-05 Room creation | Room name, profile, commitment | RKM envelope for the owner, genesis and key-version signatures | RKM, RWK |
+| DF-06 Invitation | Invitee ID and key ID, role, confirmed fingerprint | RKM envelopes for the invitee, the signed membership grant | RKM |
 | DF-07 and DF-08 Files | Sizes, ciphertext hash, expiry | File ciphertext, encrypted manifest, wrapped FEK | Filename, MIME type, plaintext hash, FEK |
 | DF-09 Secrets | Recipient ID, expiry, burn flag | Payload ciphertext (AES-256-GCM), wrapped SEK | SEK, secret plaintext |
 | DF-10 Member removal and rekey | Removal request, rekey start, new version number and commitment | New RKM envelopes for the snapshotted recipients | RKM |
@@ -224,7 +224,7 @@ sequenceDiagram
   B->>B: import RKM_1 as non-extractable HKDF key, derive RWK_1, zero RKM_1 bytes
 ```
 
-Phase 5 (CM-T030) implements the room part of this flow without key material: the browser chooses the room ID and posts it with the name and profile, and the API checks the account, the vault and the profile's entry requirements (PC-01, PC-02), then writes the room and the OWNER membership in one transaction. The commitment, the envelope and key version 1 join the request with CM-T033 (L-43).
+**Implemented in Phase 6 (CM-T033):** the browser chooses the room ID, creates RKM_1, computes the commitment, wraps RKM_1 to its own ACTIVE identity key under the label `cm.room.envelope`, and signs `cm.room.genesis` and the version-1 `cm.room.key-version` statement (recipients: the creator) with its identity signing key. `POST /api/rooms` carries the room ID, name, profile and a `keys` object of exactly five public or ciphertext values (`creatorKeyId`, `commitment`, `envelope`, `genesisSignature`, `keyVersionSignature`); a field for key material does not exist and would be rejected. The API checks the account (under a lock on the user row), the ACTIVE identity (under a lock on the identity row), the profile's entry requirements (PC-01, PC-02) and both signatures under the creator's signing key, then writes the room, the OWNER membership, key version 1 and the envelope in one transaction. A room without key data is refused. Rooms created before Phase 6 stay without a key version (L-43). The Room Safety Code and RWK_1 are derived in the browser only.
 
 ## DF-06 Invitation, approval and acceptance
 
@@ -268,6 +268,12 @@ Security notes:
 - If the invitee rotates their identity key before accepting, the invitation becomes invalid and must be reissued.
 - Invitations cannot be created while the room is REKEY_REQUIRED or REKEYING (409 `REKEY_REQUIRED`).
 - A rekey includes pending invitees in its recipient snapshot and wraps the new version for them, so their invitations stay valid.
+
+**Implemented in Phase 6 (CM-T034, CM-T035):**
+- The inviter's browser verifies the key versions it holds with the full rule of ADR-015 section 4.1 before it wraps them, wraps each to the invitee's verified identity (label naming the invitee's user and key) and signs a `cm.room.membership-grant`. The API verifies the grant under the inviter's ACTIVE signing key, the invitee's ACTIVE key, the role ceiling (AZ-06), the fingerprint (PC-05, required and equal to the current fingerprint in RESTRICTED rooms), the envelope set (the current version required; older versions only where PC-07 allows history), PC-16 and, in RESTRICTED rooms, a step-up (PC-03); it sets the expiry from the profile (PC-06) and the status PENDING_APPROVAL for an ADMIN's invitation in CONFIDENTIAL and RESTRICTED rooms (PC-04).
+- Acceptance locks, in order, the invitee's user row, the invitee's identity row, the room, the invitation and the memberships, then re-checks everything on that locked state: ACTIVE account, same identity key, room ACTIVE and not locked, the invitation PENDING and unexpired, the access requirements of the profile (PC-01, PC-02), no existing membership, the inviter still allowed to grant the role. It then creates the membership with the invitation's grant, makes the envelopes ACTIVE and increments the epoch. An account disable racing it either finishes first (acceptance refused) or waits and suspends the new membership.
+- The browser then fetches `GET key-versions` and `GET envelopes`, verifies and opens the key itself. PENDING envelopes are never served, and nothing about the acceptance makes a key usable.
+- A vault reset of the invitee revokes the invitations addressed to the old key and deletes their PENDING envelopes in the reset transaction. Declined, revoked and expired invitations lose their PENDING envelopes.
 
 ## DF-07 Encrypted file upload
 

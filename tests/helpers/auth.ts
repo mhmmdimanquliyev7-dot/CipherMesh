@@ -55,7 +55,13 @@ export function newIdentity(): { email: string; password: string; displayName: s
  * limits never leak between tests.
  */
 let addressCounter = randomInt(1, 0xffff);
-export const newAddress = (): string => `2001:db8::${(addressCounter += 1).toString(16)}`;
+// One IPv6 group holds at most four hex digits: past 0xffff the address would be invalid, the API
+// would key every later request as 'unknown', and the per-address limits would trip (observed as a
+// 429 on registration in a full run). The counter therefore wraps inside 1..0xfffe.
+export const newAddress = (): string => {
+  addressCounter = (addressCounter % 0xfffe) + 1;
+  return `2001:db8::${addressCounter.toString(16)}`;
+};
 
 interface Response {
   readonly status: number;

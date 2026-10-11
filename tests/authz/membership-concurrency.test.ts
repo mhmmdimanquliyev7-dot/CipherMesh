@@ -7,13 +7,13 @@ import {
   addMember,
   createRoom,
   memberships,
-  person,
   personWithVault,
   roomRow,
   stepUp,
   whileLocked,
   type Person,
 } from '../helpers/rooms';
+import { grantOrFiller } from '../helpers/room-crypto';
 
 // CM-T031 concurrency. A decision taken when a request arrives must not outlive a concurrent
 // change. Each test holds the room row lock itself, starts two requests, waits until PostgreSQL
@@ -32,7 +32,11 @@ beforeAll(async () => {
   api = await startAuthApi();
   db = await testDatabase(inject('databaseName')).connect('api');
   owner = await personWithVault(api, db);
-  [admin, admin2, member] = [await person(api), await person(api), await person(api)];
+  [admin, admin2, member] = [
+    await personWithVault(api, db),
+    await personWithVault(api, db),
+    await personWithVault(api, db),
+  ];
 });
 afterAll(async () => {
   await api.close();
@@ -51,12 +55,18 @@ async function staffedRoom(): Promise<string> {
 const racing = <T>(roomId: string, start: () => Promise<T>): Promise<T> =>
   whileLocked(db, 'SELECT id FROM rooms WHERE id = $1 FOR UPDATE', [roomId], start);
 
-const changeRole = (who: Person, roomId: string, target: Person, role: string) =>
-  who.browser.request('POST', `/rooms/${roomId}/members/${target.userId}/role`, { role });
+const changeRole = async (who: Person, roomId: string, target: Person, role: string) =>
+  who.browser.request(
+    'POST',
+    `/rooms/${roomId}/members/${target.userId}/role`,
+    role === 'ADMIN' ? { role, grant: await grantOrFiller(who, roomId, target, 'ADMIN') } : { role },
+  );
 const remove = (who: Person, roomId: string, target: Person) =>
   who.browser.request('POST', `/rooms/${roomId}/members/${target.userId}/remove`, {});
-const transfer = (who: Person, roomId: string, target: Person) =>
-  who.browser.request('POST', `/rooms/${roomId}/members/${target.userId}/transfer-ownership`, {});
+const transfer = async (who: Person, roomId: string, target: Person) =>
+  who.browser.request('POST', `/rooms/${roomId}/members/${target.userId}/transfer-ownership`, {
+    grant: await grantOrFiller(who, roomId, target, 'OWNER'),
+  });
 const statuses = (responses: readonly { status: number }[]) => responses.map((r) => r.status).sort();
 const roleOf = async (roomId: string, who: Person) =>
   (await memberships(db, roomId)).find((m) => m.user_id === who.userId && m.status !== 'REMOVED')?.role;

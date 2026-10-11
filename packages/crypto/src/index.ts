@@ -44,5 +44,33 @@ export {
   type VaultWire,
 } from './vault-format';
 export { createWorkerRunner, type KdfRunner } from './kdf/runner';
+// Room keys and signed room statements (Phase 6, CM-T033 to CM-T036, CM-T085).
+export {
+  computeSafetyCode,
+  createInitialRoomKey,
+  createInvitationKeys,
+  openRoomKey,
+  signMembershipGrant,
+  type InvitationKeys,
+  type OpenedRoomKey,
+  type RecipientAuthorization,
+  type RoomCreationKeys,
+  type RoomKeyBundle,
+  type SafetyCode,
+  type SignedGenesis,
+  type SignedKeyVersion,
+  type SignedMembershipGrant,
+} from './room-keys';
+export {
+  grantProofToWire,
+  invitationKeysToWire,
+  openRoomKeys,
+  roomCreationKeysToWire,
+  roomKeyBundlesFromWire,
+  type EnvelopeWire,
+  type RoomKeyMaterialWire,
+} from './room-format';
+export { sortRecipients, type RecipientRef } from './recipients';
+export { ROOM_KEYS, type RoomRole } from './params';
 export { isDerivationRunning } from './kdf/derive';
 export type { Key } from './types';

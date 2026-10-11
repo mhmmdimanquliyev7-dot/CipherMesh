@@ -7,6 +7,20 @@ import { z } from './zod';
  */
 export const uuidV4Schema = z.string().refine(isUuidV4, { message: 'Expected a UUID version 4' });
 
+/**
+ * Unpadded base64url of exactly or between the given byte lengths. The API decodes every value
+ * strictly afterwards (canonical form, exact size); this schema rejects the wrong alphabet and
+ * impossible lengths at the boundary.
+ */
+export function base64Url(minBytes: number, maxBytes: number = minBytes) {
+  const length = (bytes: number): number => Math.ceil((bytes * 4) / 3);
+  return z
+    .string()
+    .min(length(minBytes))
+    .max(length(maxBytes))
+    .regex(/^[A-Za-z0-9_-]*$/);
+}
+
 /** ISO 8601 UTC with milliseconds, the timestamp format of every API response. */
 export const isoTimestampSchema = z.iso.datetime({ offset: false, precision: 3 });
 

@@ -1,0 +1,17 @@
+EV-06-01: key material as stored for one synthetic Phase 6 room (lengths and SHA-256 prefixes only)
+Captured: 2026-10-11T07:35:31.363Z
+Redaction: no blob, key, passphrase or secret is printed.
+
+room 8fb3e7ee-18a2-4f61-a384-4dea0add5d11 profile STANDARD key_state ACTIVE current_key_version 1
+  genesis_signature: 64 bytes, sha256 b9d5f7b6ef09da39, creator_key_id 68e97272-0541-45e7-a19e-f34cc6896c88
+key version 1 status ACTIVE suite CM1 reasons {INITIAL}
+  commitment: 32 bytes, sha256 729ebf526f6c6758 (HKDF output, public)
+  previous_commitment: NULL (version 1)
+  statement_signature: 64 bytes, sha256 991ff646d79c63c1, created_by_key_id 68e97272-0541-45e7-a19e-f34cc6896c88
+  signed recipients: 1 (user IDs and key IDs, parallel arrays)
+envelope v1 recipient_key_id 68e97272-0541-45e7-a19e-f34cc6896c88 status ACTIVE algorithm RSA-OAEP-3072-SHA256: 384 bytes (RSA-OAEP-3072 ciphertext), sha256 becbb8e0bb3eaa80
+envelope v1 recipient_key_id 52a13b55-4f1f-4260-a0f2-caf69e5101a6 status ACTIVE algorithm RSA-OAEP-3072-SHA256: 384 bytes (RSA-OAEP-3072 ciphertext), sha256 a938ddfe1e0e5bcf
+member OWNER ACTIVE grant_role NULL (genesis is the authority) grant_signature NULL
+member MEMBER ACTIVE grant_role MEMBER grant_signature 64 bytes
+
+columns named like room key material, a Safety Code or RWK in the room tables: 0

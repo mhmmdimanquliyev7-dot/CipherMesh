@@ -61,8 +61,8 @@ const permittedFor = (role: RoomRole): RoomActionId[] =>
   ROOM_ACTION_IDS.filter((action) => !['deny', 'inherited'].includes(ROOM_ACTIONS[action].rules[role].kind));
 
 describe('room matrix catalogue', () => {
-  it('lists AZ-01 to AZ-30 with a cell for exactly the four room roles', () => {
-    expect(ROOM_ACTION_IDS).toEqual(Array.from({ length: 30 }, (_, i) => `AZ-${String(i + 1).padStart(2, '0')}`));
+  it('lists AZ-01 to AZ-31 with a cell for exactly the four room roles', () => {
+    expect(ROOM_ACTION_IDS).toEqual(Array.from({ length: 31 }, (_, i) => `AZ-${String(i + 1).padStart(2, '0')}`));
     for (const action of ROOM_ACTION_IDS) {
       expect(Object.keys(ROOM_ACTIONS[action].rules).sort()).toEqual([...ROOM_ROLES].sort());
     }
@@ -215,7 +215,7 @@ describe('decideRoomAction: membership is required, current and for this room (O
     },
   );
 
-  it.each(['AZ-31', 'AZ-00', 'AZ-1', 'PA-01', 'SS-04', '__proto__', 'constructor', 'toString', 'hasOwnProperty', ''])(
+  it.each(['AZ-32', 'AZ-00', 'AZ-1', 'PA-01', 'SS-04', '__proto__', 'constructor', 'toString', 'hasOwnProperty', ''])(
     'an undefined action %j is denied, even to the OWNER',
     (action) => {
       expect(decide(action as RoomActionId, member('OWNER'), EVERYTHING)).toEqual(denied('UNKNOWN_ACTION'));
@@ -338,12 +338,12 @@ describe('decideRoomAction: security-critical cells, asserted independently of t
 });
 
 describe('matrix helpers', () => {
-  it('recognises only the four room roles and the thirty room actions', () => {
+  it('recognises only the four room roles and the thirty-one room actions', () => {
     expect(ROOM_ROLES.every(isRoomRole)).toBe(true);
     for (const value of ['PLATFORM_ADMIN', 'USER', 'owner', '', undefined, 1, null])
       expect(isRoomRole(value)).toBe(false);
     expect(ROOM_ACTION_IDS.every(isRoomActionId)).toBe(true);
-    for (const value of ['AZ-31', 'PA-03', '__proto__', 'constructor', undefined, 7]) {
+    for (const value of ['AZ-32', 'PA-03', '__proto__', 'constructor', undefined, 7]) {
       expect(isRoomActionId(value)).toBe(false);
     }
   });
@@ -380,7 +380,7 @@ describe('matrix helpers', () => {
     expect(info('PA-01')).toMatchObject({ scope: 'platform', stepUpAlways: false });
     expect(info('PA-05')).toMatchObject({ scope: 'none' });
     expect(info('SS-04')).toMatchObject({ scope: 'self', stepUpAlways: false });
-    for (const unknown of ['AZ-31', 'PA-06', 'SS-00', 'XX-01', '__proto__', 'toString', '']) {
+    for (const unknown of ['AZ-32', 'PA-06', 'SS-00', 'XX-01', '__proto__', 'toString', '']) {
       expect(info(unknown)).toBeUndefined();
     }
   });

@@ -15,6 +15,7 @@ import {
   verifyPublicIdentity,
   type UnlockedVault,
   type VaultRecord,
+  type VerifiedIdentity,
 } from '@ciphermesh/crypto';
 import {
   directoryEntrySchema,
@@ -88,12 +89,25 @@ export type VaultView =
     };
 
 export interface DirectoryResult {
+  readonly userId: string;
   readonly displayName: string;
   readonly accountCreatedAt: string;
   readonly keyId: string;
   readonly keyCreatedAt: string;
   /** Recomputed in this browser after verifying the identity's binding signature. */
+  readonly fingerprint: string;
   readonly fingerprintGroups: readonly string[];
+  /** The verified public identity (public keys only), for wrapping room keys to it (Phase 6). */
+  readonly identity: VerifiedIdentity;
+}
+
+/** Thrown when an operation needs the unlocked keys and the vault is locked (or locks meanwhile). */
+export class VaultLocked extends Error {
+  readonly code = 'VAULT_LOCKED';
+  constructor() {
+    super('Unlock your vault first');
+    this.name = 'VaultLocked';
+  }
 }
 
 /** Thrown when the server requires a fresh step-up before a vault change. */
@@ -152,6 +166,8 @@ export class VaultController {
   #activitySinceSessionCheck = false;
   #started = false;
   #timers: ReturnType<typeof setInterval>[] = [];
+  /** Called whenever the private keys are dropped, so derived keys (room keys) are dropped too. */
+  readonly #dropListeners = new Set<() => void>();
 
   // ------------------------------------------------------------------ React subscription
   readonly subscribe = (listener: () => void): (() => void) => {
@@ -164,7 +180,7 @@ export class VaultController {
   #set(view: VaultView): void {
     // The private keys exist only while the view is 'unlocked'. Every other view drops them, so no
     // state (for example an error view) can hold keys in memory outside the auto-lock (CP-22).
-    if (view.kind !== 'unlocked') this.#unlocked = undefined;
+    if (view.kind !== 'unlocked') this.#dropKeys();
     this.#view = view;
     for (const listener of this.#listeners) listener();
   }
@@ -204,7 +220,7 @@ export class VaultController {
     );
     onUnauthenticated(() => {
       this.lock('session-ended');
-      this.#unlocked = undefined;
+      this.#dropKeys();
       this.#set({ kind: 'signed-out' });
     });
   }
@@ -250,7 +266,7 @@ export class VaultController {
   #applyLock(reason: LockReason): void {
     this.#generation += 1;
     this.#pendingLock = undefined;
-    this.#unlocked = undefined;
+    this.#dropKeys();
     const view = this.#view;
     if (view.kind === 'unlocked') {
       this.#set({ kind: 'locked', account: view.account, identity: view.identity, lockReason: reason });
@@ -274,6 +290,33 @@ export class VaultController {
     return generation === this.#generation;
   }
 
+  /** Drops the private keys and tells every holder of derived keys to drop them as well. */
+  #dropKeys(): void {
+    this.#unlocked = undefined;
+    for (const listener of this.#dropListeners) listener();
+  }
+
+  /** Registers a listener for every key drop (lock, sign-out, identity change). */
+  onKeysDropped(listener: () => void): () => void {
+    this.#dropListeners.add(listener);
+    return () => this.#dropListeners.delete(listener);
+  }
+
+  /**
+   * Runs room-key work (Phase 6) with the unlocked identity keys. The task never sees them
+   * outside this call, and its result is discarded if the vault locks meanwhile, so nothing
+   * derived from the keys outlives a lock. Throws VaultLocked when the vault is not unlocked.
+   */
+  async withUnlockedVault<T>(task: (vault: UnlockedVault) => Promise<T>): Promise<T> {
+    const unlocked = this.#unlocked;
+    if (unlocked === undefined || this.#view.kind !== 'unlocked') throw new VaultLocked();
+    return this.#run(async (generation) => {
+      const result = await task(unlocked);
+      if (!this.#current(generation)) throw new VaultLocked();
+      return result;
+    });
+  }
+
   // ------------------------------------------------------------------ loading
   /** Loads the account and the vault record. Never unlocks anything. */
   async refresh(): Promise<void> {
@@ -282,7 +325,7 @@ export class VaultController {
       const account = accountOf(info);
       const loaded = await this.#fetchRecord(account.userId);
       if (loaded === undefined) {
-        this.#unlocked = undefined;
+        this.#dropKeys();
         this.#set({ kind: 'not-configured', account });
         return;
       }
@@ -474,11 +517,14 @@ export class VaultController {
     const identity = await verifyPublicIdentity(publicIdentityFromWire(entry.identity, entry.user.id));
     const fingerprint = await computeFingerprint(identity.encryptionKeySpki, identity.signingKeySpki);
     return {
+      userId: entry.user.id,
       displayName: entry.user.displayName,
       accountCreatedAt: entry.user.accountCreatedAt,
       keyId: identity.keyId,
       keyCreatedAt: entry.identity.createdAt,
+      fingerprint,
       fingerprintGroups: formatFingerprint(fingerprint),
+      identity,
     };
   }
 
@@ -488,7 +534,7 @@ export class VaultController {
     try {
       await api('POST', '/auth/logout', statusOkResponseSchema);
     } finally {
-      this.#unlocked = undefined;
+      this.#dropKeys();
       this.#set({ kind: 'signed-out' });
     }
   }
@@ -512,6 +558,7 @@ export class VaultController {
 /** A stable code for any error, for messages; never the error text itself. */
 export function codeOf(error: unknown): string {
   if (error instanceof StepUpRequired) return 'STEP_UP_REQUIRED';
+  if (error instanceof VaultLocked) return 'VAULT_LOCKED';
   if (error instanceof ApiError) return error.code;
   if (typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string')
     return error.code;

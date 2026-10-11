@@ -16,6 +16,7 @@ describe('@ciphermesh/crypto export surface', () => {
         'CryptoError',
         'CryptoErrorCode',
         'PassphraseProblem',
+        'ROOM_KEYS',
         'SUITE',
         'VAULT_KDF',
         'VAULT_PASSPHRASE_POLICY',
@@ -23,16 +24,27 @@ describe('@ciphermesh/crypto export surface', () => {
         'changeVaultPassphrase',
         'checkVaultPassphrase',
         'computeFingerprint',
+        'computeSafetyCode',
+        'createInitialRoomKey',
+        'createInvitationKeys',
         'createVault',
         'createWorkerRunner',
         'formatFingerprint',
+        'grantProofToWire',
+        'invitationKeysToWire',
         'isBelowKdfTarget',
         'isCryptoError',
         'isDerivationRunning',
         'isFingerprint',
         'normalizeVaultPassphrase',
+        'openRoomKey',
+        'openRoomKeys',
         'publicIdentityFromWire',
         'rewrapToWire',
+        'roomCreationKeysToWire',
+        'roomKeyBundlesFromWire',
+        'signMembershipGrant',
+        'sortRecipients',
         'unlockVault',
         'upgradeVaultProtection',
         'vaultRecordFromWire',
@@ -46,7 +58,27 @@ describe('@ciphermesh/crypto export surface', () => {
     const names = Object.keys(serverSubset);
     expect(names).toContain('verifyPublicIdentity');
     expect(names).toContain('rewrapStatement');
-    for (const forbidden of ['createVault', 'unlockVault', 'createWorkerRunner', 'generateIdentity']) {
+    // Phase 6: the API rebuilds and verifies the signed room statements, but never opens,
+    // creates or shares room keys and has no Safety Code (INV-01, INV-18).
+    for (const builder of [
+      'genesisStatement',
+      'keyVersionStatement',
+      'membershipGrantStatement',
+      'verifyStatementBy',
+    ]) {
+      expect(names).toContain(builder);
+    }
+    for (const forbidden of [
+      'createVault',
+      'unlockVault',
+      'createWorkerRunner',
+      'generateIdentity',
+      'createInitialRoomKey',
+      'createInvitationKeys',
+      'openRoomKey',
+      'computeSafetyCode',
+      'signMembershipGrant',
+    ]) {
       expect(names).not.toContain(forbidden);
     }
   });
@@ -65,6 +97,9 @@ describe('@ciphermesh/crypto export surface', () => {
       'ecdsaVerifyRaw',
       'importAesGcmKeyForTest',
       'importRsaOaepPrivateKeyForTest',
+      // The Safety Code display mapping is a known-answer seam, not an API: codes come only from
+      // computeSafetyCode over an opened key.
+      'safetyCodeFromBits',
     ]) {
       expect(exported).not.toContain(seam);
     }

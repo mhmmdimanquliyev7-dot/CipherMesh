@@ -36,6 +36,26 @@ export const ErrorCode = {
   // Rooms (Phase 5). Room IDs are chosen by the creating browser because they enter the room's
   // cryptographic contexts from Phase 6 on (DF-05); an ID that was ever used is refused.
   ROOM_ID_UNAVAILABLE: 'ROOM_ID_UNAVAILABLE',
+  // Cryptographic membership (Phase 6, authorization-model.md section 7). The API checks shapes,
+  // signatures and identity bindings; it never sees room key material (INV-01, INV-04).
+  /** Invitations (and their approval and acceptance) while the room is REKEY_REQUIRED or REKEYING (PC-16). */
+  REKEY_REQUIRED: 'REKEY_REQUIRED',
+  /** A signed room statement (genesis, key version, membership grant) does not verify or does not match. */
+  ROOM_STATEMENT_INVALID: 'ROOM_STATEMENT_INVALID',
+  /** The envelopes of a request do not form the set the room and its profile require (PC-07). */
+  ENVELOPE_SET_INVALID: 'ENVELOPE_SET_INVALID',
+  /** The identity key a request names is not the user's current ACTIVE identity. */
+  IDENTITY_KEY_CHANGED: 'IDENTITY_KEY_CHANGED',
+  ALREADY_MEMBER: 'ALREADY_MEMBER',
+  /** The invitee already has an open invitation to this room. */
+  INVITATION_PENDING: 'INVITATION_PENDING',
+  /** The invitation is not in a state that allows the action (awaiting approval, closed, invalid). */
+  INVITATION_NOT_OPEN: 'INVITATION_NOT_OPEN',
+  INVITATION_EXPIRED: 'INVITATION_EXPIRED',
+  /** RESTRICTED invitations need a confirmed invitee fingerprint (PC-05). */
+  FINGERPRINT_REQUIRED: 'FINGERPRINT_REQUIRED',
+  /** The confirmed fingerprint differs from the invitee's current identity fingerprint (PC-05, T-25). */
+  FINGERPRINT_MISMATCH: 'FINGERPRINT_MISMATCH',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

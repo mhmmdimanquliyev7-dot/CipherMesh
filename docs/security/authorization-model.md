@@ -1,6 +1,6 @@
 # Authorization Model
 
-Status: Phase 0.5 baseline. Normative. The central module and the shared matrix are implemented since Phase 5 (CM-T029); section 9 records how. Related: [security-policy-profiles.md](security-policy-profiles.md), [../architecture/data-model.md](../architecture/data-model.md), [../threat-model/threat-model.md](../threat-model/threat-model.md) (T-05, T-06).
+Status: Phase 0.5 baseline. Normative. The central module and the shared matrix are implemented since Phase 5 (CM-T029); section 9 records how. Phase 6 added AZ-31 and the invitation and room-key routes (section 9.7). Related: [security-policy-profiles.md](security-policy-profiles.md), [../architecture/data-model.md](../architecture/data-model.md), [../threat-model/threat-model.md](../threat-model/threat-model.md) (T-05, T-06).
 
 ## 1. Principles
 
@@ -69,6 +69,7 @@ Legend: **Y** allowed, **N** denied, **own** only on items the caller created. P
 | AZ-28 | View room audit log | Y | Y | N | N | |
 | AZ-29 | Report a key-commitment mismatch | Y | Y | Y | Y | Creates a security event |
 | AZ-30 | Record a Room Safety Code comparison or report a mismatch | Y | Y | Y | Y | Stores the key version only, never the code (INV-18) |
+| AZ-31 | View the room's invitations | Y | Y | N | N | OL-11; added in Phase 6 (CM-T034) |
 
 ## 4. Platform and self-service actions
 
@@ -236,3 +237,28 @@ The decision describes the database state at the start of the request; nothing i
 **Concurrency.** Every room change locks the room row first, then the memberships it reads, and runs the decision again on that locked state (`reauthorizeRoomAction`), so the gate's decision never outlives a concurrent change; writes are conditional on the checked role and status. Account suspension locks the affected rooms in ID order before their memberships, the same order, so the two kinds of transaction cannot deadlock; it also updates the user row before reading memberships, so a concurrent room creation by that user either finishes first and is suspended, or sees the disabled account. An interactive transaction that runs longer than five seconds, for example while waiting for a lock, is rolled back and the request fails closed (500). `tests/authz/membership-concurrency.test.ts` forces each race by holding the room lock until both requests wait.
 
 **Events.** `ROOM_CREATED`, `ROOM_RENAMED`, `ROOM_DELETED`, `MEMBER_ROLE_CHANGED`, `MEMBER_REMOVED`, `MEMBER_SUSPENDED`, `OWNERSHIP_TRANSFERRED` and `REKEY_REQUIRED` (only when a room leaves ACTIVE), after the transaction commits. Details carry the room ID, roles, reason codes and counts, never the room name (T-28); they go to the application log until the Phase 12 ledger (L-33).
+
+### 9.7 Cryptographic membership (Phase 6, CM-T033 to CM-T036, CM-T085)
+
+Cryptographic proof does not replace authorization, and authorization does not replace cryptographic proof: both must succeed. The matrix is unchanged except for **AZ-31**, added because OL-11 lets the OWNER and ADMINs see the room's invitations and no action covered it. New and changed routes:
+
+| Route | Action | Notes |
+|---|---|---|
+| `POST /rooms` | SS-04 | Now carries key version 1 (section 9.6); statements verified before anything is stored |
+| `GET /rooms/{roomId}/key-versions` | AZ-15 | Genesis, signed key versions, the grants of the authority chain and the signers' public identities, for ACTIVE members |
+| `GET /rooms/{roomId}/envelopes` | AZ-12 | The caller's own ACTIVE envelopes only (OL-05); PENDING envelopes are never served |
+| `GET /rooms/{roomId}/members/{userId}/identity` | AZ-01 | The current public identity of an ACTIVE member, for signing grants |
+| `POST /rooms/{roomId}/key-reports`, `/safety-code` | AZ-29, AZ-30 | Key version and kind of problem only; no code field exists (INV-18) |
+| `GET /rooms/{roomId}/invitations` | AZ-31 | OWNER and ADMIN |
+| `POST /rooms/{roomId}/invitations` | AZ-06 | `targetRoles` with the requested role; blocked while REKEY_REQUIRED or REKEYING (PC-16); PC-03 step-up in RESTRICTED rooms |
+| `POST /rooms/{roomId}/invitations/{invitationId}/approve` | AZ-07 | OWNER only; the approver differs from the inviter (database CHECK and service rule) |
+| `POST /rooms/{roomId}/invitations/{invitationId}/revoke` | AZ-08 | OWNER any, ADMIN own (`own` cell, invitation loaded by ID and room ID, OL-02); allowed while the room is locked |
+| `GET /invitations`, `POST /invitations/{invitationId}/accept`, `/decline` | SS-03 | Self-service; every invitation is loaded by ID and invitee = session user (OL-11); another user's invitation is the generic 404 |
+| `POST /rooms/{roomId}/members/{userId}/role` | AZ-10 | Granting ADMIN needs the OWNER's signed grant for the member's ACTIVE identity (422 `ROOM_STATEMENT_INVALID`, 409 `IDENTITY_KEY_CHANGED`) |
+| `POST /rooms/{roomId}/members/{userId}/transfer-ownership` | AZ-05 | Needs the OWNER's signed OWNER grant for the new owner's ACTIVE identity |
+
+Error codes added: `REKEY_REQUIRED` (409), `ROOM_STATEMENT_INVALID` (422), `ENVELOPE_SET_INVALID` (422), `IDENTITY_KEY_CHANGED` (409), `ALREADY_MEMBER`, `INVITATION_PENDING`, `INVITATION_NOT_OPEN`, `INVITATION_EXPIRED`, `FINGERPRINT_REQUIRED`, `FINGERPRINT_MISMATCH`. Profile gates applied now because they are normative and assigned to Phase 6: PC-03 for inviting and approving in RESTRICTED rooms, PC-04 to PC-07 and PC-16; PC-01 and PC-02 at acceptance as at creation. The remaining gates (L-42) wait for the policy engine.
+
+**Concurrency.** Acceptance takes, in order, the invitee's user row, the invitee's identity row, the room, the invitation and the memberships; room administration takes the room first; account suspension takes the user row first; a vault reset takes the identity row first. No transaction takes these in the opposite order, so none can deadlock with an acceptance, and each re-checks on the state it locked. `tests/authz/invitation-concurrency.test.ts` forces the races: account disable, revocation, double acceptance, room deletion, member loss and vault reset against an acceptance.
+
+**What is not implemented:** re-sharing keys to a member (AZ-14, CM-T053), leaving a room (AZ-11, CM-T051), profile changes (AZ-03).

@@ -1,23 +1,61 @@
+import { isCryptoError } from '@ciphermesh/crypto';
 import { ApiError, describeError } from '../lib/api';
 
 /** Text for the stable error codes of the room routes. Never reveals more than the code. */
 export function describeRoomError(error: unknown): string {
+  if (isCryptoError(error)) {
+    switch (error.code) {
+      case 'KEY_AUTHENTICATION_FAILED':
+        return KEY_REFUSED;
+      case 'KEY_COMMITMENT_MISMATCH':
+        return KEY_MISMATCH;
+      case 'CRYPTO_UNAVAILABLE':
+        return 'This browser does not provide the cryptography CipherMesh requires.';
+      default:
+        return 'A cryptographic check failed. Nothing was used or sent.';
+    }
+  }
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    if (error.code === 'VAULT_LOCKED')
+      return 'Unlock your vault first. Room keys are created and opened in this browser.';
+    if (error.code === 'ROOM_KEY_MISSING') return KEY_MISSING;
+  }
   if (error instanceof ApiError) {
     switch (error.code) {
       case 'NOT_FOUND':
-        return 'This room or member does not exist, or you are not a member of the room.';
+        return 'This room, member or invitation does not exist, or you cannot see it.';
       case 'FORBIDDEN':
         return 'Your role in this room does not allow this action.';
       case 'VAULT_SETUP_REQUIRED':
-        return 'Set up your vault before creating a room.';
+        return 'Set up your vault first.';
       case 'MFA_REQUIRED':
         return 'This security profile needs a session verified with an authentication code. Turn on two-step sign-in in Account, then sign in again.';
       case 'REAUTH_REQUIRED':
-        return 'Sign in again to create a room with this security profile.';
+        return 'This security profile needs a recent sign-in. Sign in again.';
       case 'ROOM_ID_UNAVAILABLE':
         return 'That room identifier cannot be used. Please try again.';
       case 'VALIDATION_FAILED':
-        return 'Use a room name of 1 to 100 characters without control characters.';
+        return 'The request was not accepted. Check the values and try again.';
+      case 'REKEY_REQUIRED':
+        return 'This room is locked until its key is rotated, so no one can be invited or join now.';
+      case 'ROOM_STATEMENT_INVALID':
+        return 'The server could not verify the signed room statement. Nothing was changed.';
+      case 'ENVELOPE_SET_INVALID':
+        return 'The room keys for this invitation do not match what the room requires.';
+      case 'IDENTITY_KEY_CHANGED':
+        return 'That identity key is no longer current (the vault was reset). Look the person up again.';
+      case 'ALREADY_MEMBER':
+        return 'This person is already a member of the room.';
+      case 'INVITATION_PENDING':
+        return 'This person already has an open invitation to the room.';
+      case 'INVITATION_NOT_OPEN':
+        return 'This invitation cannot be used now. It may wait for approval, or it was closed.';
+      case 'INVITATION_EXPIRED':
+        return 'This invitation has expired. Ask for a new one.';
+      case 'FINGERPRINT_REQUIRED':
+        return 'This room requires you to compare and confirm the fingerprint first.';
+      case 'FINGERPRINT_MISMATCH':
+        return "The fingerprint you confirmed is not this person's current fingerprint. Do not invite them; compare again.";
     }
   }
   return describeError(error);
@@ -29,4 +67,24 @@ export const ROOM_NAME_WARNING =
 
 /** Shown for a room in REKEY_REQUIRED or REKEYING (ADR-013); the rekey itself arrives in a later phase. */
 export const REKEY_NOTICE =
-  'A member left this room. Until an owner or admin completes a key rotation, new content cannot be added. Key rotation arrives in a later phase.';
+  'A member left this room. Until an owner or admin completes a key rotation, new content cannot be added and no one can be invited. Key rotation arrives in a later phase.';
+
+/** security-ui.md 2.6: a refused key is never used, and the refusal is reported. */
+export const KEY_REFUSED =
+  'The room key could not be verified on this device and was not used. This can indicate tampering on the server. The event was reported; tell the room owner through another channel.';
+export const KEY_MISMATCH =
+  "The room key you received does not match the room's signed record. It was not used, and the event was reported.";
+export const KEY_MISSING =
+  'There is no room key for your current identity in this room, for example after a vault reset. An owner or admin has to share the key with you again.';
+
+/** The Room Safety Code panel (security-ui.md 2.3, ADR-012, L-22). */
+export const SAFETY_CODE_GUIDANCE =
+  'Compare these words with each member in person or on a voice or video call. Do not paste them into CipherMesh or a group chat before everyone has read their own.';
+export const SAFETY_CODE_EXPLANATION =
+  'The Safety Code checks that you and another member hold the same room key. Comparing it over a channel you trust can reveal that members were given different keys. It does not show who else holds the key, it cannot detect a key everyone received from an attacker, and it only helps if you compare it.';
+export const SAFETY_CODE_MISMATCH =
+  'Your codes differ: you hold different room keys. This can indicate an attack involving the server. Stop adding content to this room and alert the owner through another channel. A mismatch report holding only the key version was sent.';
+
+/** Fingerprint comparison while inviting (security-ui.md 2.2, PC-05, L-18, T-25, T-35). */
+export const FINGERPRINT_GUIDANCE =
+  'Ask the person to read their fingerprint to you (shown in their Vault page) over a channel where you recognise them, and compare all 64 characters. CipherMesh cannot check that you compared; it only checks that what you confirm is their current key.';

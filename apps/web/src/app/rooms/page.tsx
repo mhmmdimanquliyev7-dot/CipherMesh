@@ -1,20 +1,22 @@
 'use client';
 
 import { ROOM_NAME_MAX_LENGTH, SECURITY_PROFILES } from '@ciphermesh/shared';
-import { roomListResponseSchema, roomSummarySchema, type RoomSummary } from '@ciphermesh/validation';
+import { roomListResponseSchema, type RoomSummary } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { Alert, Button, Card, Field, SecondaryButton } from '../../components/ui';
 import { api, ApiError, formText } from '../../lib/api';
+import { roomKeys } from '../../rooms/keys';
 import { describeRoomError, REKEY_NOTICE, ROOM_NAME_WARNING } from '../../rooms/messages';
 import { PROFILE_DESCRIPTION, ROLE_LABEL } from '../../rooms/permissions';
+import { useVault } from '../../vault/use-vault';
 
 /**
- * Rooms (Phase 5, CM-T030): the rooms the signed-in user belongs to, and room creation. The list
- * and every permission come from the API, which filters by the user's memberships; this page only
- * shows what it answers. Rooms hold no content yet: client-side encrypted files, notes and secrets
- * arrive in later phases, and members join through invitations from Phase 6 on.
+ * Rooms (Phase 5, CM-T030; Phase 6, CM-T033): the rooms the signed-in user belongs to, and room
+ * creation. The list and every permission come from the API, which filters by the user's
+ * memberships. Creating a room creates its first room key in this browser, so it needs the
+ * unlocked vault; only the commitment, signatures and the owner's envelope are sent (DF-05).
  */
 export default function RoomsPage() {
   const router = useRouter();
@@ -48,10 +50,10 @@ export default function RoomsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Rooms</h1>
       <p className="max-w-3xl text-sm text-slate-400">
-        A room groups people with roles. Its security profile records how sensitive the room is: creating a CONFIDENTIAL
-        or RESTRICTED room already needs a session verified with an authentication code, and the profile&apos;s other
-        rules are enforced from a later phase on. Client-side encrypted files, notes and secrets are not available yet,
-        and members join through invitations, which also arrive in a later phase.
+        A room groups people with roles and has its own room key, created in your browser and shared with each member as
+        an envelope that only their identity can open. Its security profile records how sensitive the room is: a
+        CONFIDENTIAL or RESTRICTED room needs a session verified with an authentication code. Members join through
+        invitations. Client-side encrypted files, notes and secrets arrive in later phases.
       </p>
       {error === undefined ? null : <Alert kind="error">{error}</Alert>}
       <CreateRoom
@@ -103,6 +105,7 @@ export default function RoomsPage() {
 }
 
 function CreateRoom({ onCreated }: { readonly onCreated: (roomId: string) => void }) {
+  const vault = useVault();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [vaultMissing, setVaultMissing] = useState(false);
@@ -114,13 +117,8 @@ function CreateRoom({ onCreated }: { readonly onCreated: (roomId: string) => voi
     setError(undefined);
     setVaultMissing(false);
     try {
-      // The browser chooses the room ID: from Phase 6 on it enters the room's key contexts (DF-05).
-      const created = await api('POST', '/rooms', roomSummarySchema, {
-        roomId: crypto.randomUUID(),
-        name: formText(form, 'name'),
-        securityProfile: formText(form, 'securityProfile'),
-      });
-      onCreated(created.id);
+      // The browser chooses the room ID and creates key version 1 for it (DF-05, CM-T033).
+      onCreated(await roomKeys.createRoom(formText(form, 'name'), formText(form, 'securityProfile')));
     } catch (e) {
       setVaultMissing(e instanceof ApiError && e.code === 'VAULT_SETUP_REQUIRED');
       setError(describeRoomError(e));
@@ -164,7 +162,15 @@ function CreateRoom({ onCreated }: { readonly onCreated: (roomId: string) => voi
             ) : null}
           </Alert>
         )}
-        <Button type="submit" disabled={busy}>
+        {vault.kind === 'unlocked' ? null : (
+          <Alert kind="info">
+            Unlock your vault to create a room: its room key is created in this browser.{' '}
+            <Link className="underline" href="/vault">
+              Go to your vault
+            </Link>
+          </Alert>
+        )}
+        <Button type="submit" disabled={busy || vault.kind !== 'unlocked'}>
           Create room
         </Button>
       </form>

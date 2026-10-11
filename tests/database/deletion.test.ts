@@ -125,6 +125,11 @@ describe('retention deletes by the worker', () => {
       reasons: '{MANUAL}',
       created_by_operation_id: operationId,
       created_by_id: room.ownerId,
+      created_by_key_id: room.ownerKeyId,
+      previous_commitment: DUMMY.digest(),
+      recipient_user_ids: [room.ownerId],
+      recipient_key_ids: [room.ownerKeyId],
+      statement_signature: DUMMY.signature(),
     });
 
     const purged = await worker.query('DELETE FROM rekey_operations WHERE id = $1 AND closed_at IS NOT NULL', [

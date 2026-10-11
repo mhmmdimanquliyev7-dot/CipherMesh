@@ -39,6 +39,26 @@ export const HKDF = Object.freeze({ name: 'HKDF', hash: 'SHA-256', saltBytes: 32
 /** CP-07: SHA-256. */
 export const SHA256_BYTES = 32;
 
+/**
+ * Room keys (cryptographic-architecture section 7, ADR-015 section 4, Phase 6). RKM_v is 32 random
+ * bytes (CP-23) and is only an HKDF input; RKC_v is a 32-byte HKDF output (CP-03). A key-version
+ * statement lists at most 100 recipients, the member bound of CP-25. The Room Safety Code shows the
+ * first 66 bits of RSC_v as six 11-bit word indices or 20 decimal digits (CP-24).
+ */
+export const ROOM_KEYS = Object.freeze({
+  materialBytes: 32,
+  commitmentBytes: 32,
+  maxRecipients: 100,
+  envelopeAlgorithm: 'RSA-OAEP-3072-SHA256',
+  safetyCodeWords: 6,
+  safetyCodeBitsPerWord: 11,
+  safetyCodeDigits: 20,
+});
+
+/** Room roles as they appear in signed membership grants (authorization-model section 2.1). */
+export const ROOM_ROLES = Object.freeze(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'] as const);
+export type RoomRole = (typeof ROOM_ROLES)[number];
+
 export interface Argon2idParameters {
   readonly memoryKiB: number;
   readonly iterations: number;

@@ -1,4 +1,4 @@
-import { PROFILE_ACCESS_REQUIREMENTS, SECURITY_PROFILES } from '@ciphermesh/shared';
+import { INVITATION_RULES, PROFILE_ACCESS_REQUIREMENTS, SECURITY_PROFILES } from '@ciphermesh/shared';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
@@ -42,5 +42,52 @@ describe('profile access requirements used by room creation', () => {
   it('are frozen', () => {
     expect(Object.isFrozen(PROFILE_ACCESS_REQUIREMENTS)).toBe(true);
     expect(Object.isFrozen(PROFILE_ACCESS_REQUIREMENTS.RESTRICTED)).toBe(true);
+  });
+});
+
+// Phase 6 (CM-T034, CM-T035): the invitation rules the API enforces, against the same table.
+describe('invitation rules used by the invitation routes', () => {
+  const cellsOf = (id: string): string[] => controlRow(id).slice(2);
+
+  it('match PC-04, OWNER approval of invitations created by an ADMIN', () => {
+    SECURITY_PROFILES.forEach((profile, column) => {
+      expect(['Yes', 'No']).toContain(cellsOf('PC-04')[column]);
+      expect(INVITATION_RULES[profile].adminInvitationNeedsApproval, profile).toBe(cellsOf('PC-04')[column] === 'Yes');
+    });
+  });
+
+  it('match PC-05, the fingerprint confirmation', () => {
+    const expected: Record<string, string> = {
+      Optional: 'optional',
+      'Optional, prompted': 'prompted',
+      Required: 'required',
+    };
+    SECURITY_PROFILES.forEach((profile, column) => {
+      expect(INVITATION_RULES[profile].fingerprintConfirmation, profile).toBe(expected[cellsOf('PC-05')[column] ?? '']);
+    });
+  });
+
+  it('match PC-06, the invitation validity set by the server', () => {
+    SECURITY_PROFILES.forEach((profile, column) => {
+      const match = /^(\d+) (days|hours)$/.exec(cellsOf('PC-06')[column] ?? '');
+      expect(match, profile).not.toBeNull();
+      const hours = Number(match?.[1]) * (match?.[2] === 'days' ? 24 : 1);
+      expect(INVITATION_RULES[profile].validityMs, profile).toBe(hours * 60 * 60_000);
+    });
+  });
+
+  it('match PC-07, the key history given to new members', () => {
+    const expected: Record<string, string> = {
+      'All retained versions': 'all-retained',
+      'Current version only': 'current-only',
+    };
+    SECURITY_PROFILES.forEach((profile, column) => {
+      expect(INVITATION_RULES[profile].keyHistory, profile).toBe(expected[cellsOf('PC-07')[column] ?? '']);
+    });
+  });
+
+  it('are frozen', () => {
+    expect(Object.isFrozen(INVITATION_RULES)).toBe(true);
+    expect(Object.isFrozen(INVITATION_RULES.RESTRICTED)).toBe(true);
   });
 });

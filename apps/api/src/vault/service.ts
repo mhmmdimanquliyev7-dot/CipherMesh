@@ -363,8 +363,10 @@ export function createVaultService(deps: VaultDependencies) {
      * identity becomes SUPERSEDED and loses both encrypted private keys; its public keys stay for
      * audit. Other sessions are revoked, because they may hold the old private keys in memory, and
      * the current session is rotated (session-and-csrf.md section 4). All in one transaction.
-     * When rooms exist (Phase 6, CM-T053), the same transaction also deletes the old identity's
-     * envelopes, invalidates its pending invitations and increments the membership epochs.
+     * Since Phase 6 (CM-T034) the same transaction revokes the open invitations addressed to the
+     * old identity and deletes their PENDING envelopes: they name a key that no longer exists, so
+     * they could never be opened. Deleting the old identity's ACTIVE envelopes and re-sharing to
+     * the new identity belong to the identity-reset procedure of Phase 11 (CM-T053, AZ-14).
      */
     async resetVault(actor: Actor, supersedesKeyId: string, wire: VaultWire, meta: RequestMeta) {
       limit(limits.write, actor.userId);
@@ -372,15 +374,27 @@ export function createVaultService(deps: VaultDependencies) {
       await verifyUploadedIdentity(actor, meta, record.identity);
       const now = clock();
       // Any thrown error rolls the whole transaction back: no half-reset identity can remain.
-      const outcome = await deps.transaction(async ({ vault, auth }) => {
+      const outcome = await deps.transaction(async ({ vault, auth, invitations }) => {
+        // Locks the old identity row first: an invitation acceptance or creation that holds it
+        // finishes first (and its invitation is then no longer open), or waits and is refused.
         if (!(await vault.supersede(actor.userId, supersedesKeyId, now))) return undefined;
+        const invalidated = await invitations.invalidateInvitationsForKey(actor.userId, supersedesKeyId);
         if ((await vault.insertIdentity(identityRow(record, now))) === 'CONFLICT') throw conflict();
         const otherSessionsRevoked = await auth.revokeUserSessions(actor.userId, 'VAULT_RESET', now, actor.sessionId);
         const session: IssuedSession | undefined = await rotateSession(auth, actor, now);
         if (session === undefined) throw new HttpError(401, ErrorCode.UNAUTHENTICATED, 'Authentication required');
-        return { otherSessionsRevoked, session };
+        return { otherSessionsRevoked, session, invalidated };
       });
       if (outcome === undefined) throw conflict();
+      for (const invitation of outcome.invalidated) {
+        events.record({
+          name: 'INVITATION_INVALIDATED',
+          outcome: 'SUCCESS',
+          actorUserId: actor.userId,
+          requestId: meta.requestId,
+          details: { roomId: invitation.roomId, invitationId: invitation.id, reason: 'INVITEE_KEY_CHANGED' },
+        });
+      }
       events.record({
         name: 'VAULT_RESET',
         outcome: 'SUCCESS',

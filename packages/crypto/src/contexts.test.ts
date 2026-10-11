@@ -49,6 +49,25 @@ const SAMPLES: { readonly [N in ContextName]: ContextFields<N> } = {
   'cm.room.dek-wrap-key': { roomId: ROOM, keyVersion: 1 },
   'cm.room.commitment': { roomId: ROOM, keyVersion: 1 },
   'cm.room.safety-code': { roomId: ROOM, keyVersion: 1 },
+  'cm.room.genesis': { roomId: ROOM, creatorUserId: USER, creatorKeyId: KEY_ID, suite: 'CM1' },
+  'cm.room.membership-grant': {
+    roomId: ROOM,
+    subjectUserId: USER,
+    subjectKeyId: KEY_ID,
+    role: 'MEMBER',
+    grantorUserId: FILE,
+    grantorKeyId: ROOM,
+  },
+  'cm.room.key-version': {
+    roomId: ROOM,
+    keyVersion: 1,
+    commitment: B64(32),
+    previousCommitment: null,
+    suite: 'CM1',
+    creatorUserId: USER,
+    creatorKeyId: KEY_ID,
+    recipients: [{ userId: USER, keyId: KEY_ID }],
+  },
   'cm.dek.wrap': { roomId: ROOM, keyVersion: 2, itemType: 'file', itemId: FILE, revision: 0 },
   'cm.file.content': { roomId: ROOM, fileId: FILE },
   'cm.file.manifest': { roomId: ROOM, fileId: FILE },
@@ -139,6 +158,62 @@ describe('canonical contexts (CP-15, cryptographic-architecture section 8)', () 
     expect(() =>
       contextBytes('cm.dek.wrap', { roomId: ROOM, keyVersion: 1, itemType: 'note', itemId: FILE, revision: 3 }),
     ).not.toThrow();
+  });
+
+  it('serializes the signed key-version statement exactly, with the recipient list as sorted objects', () => {
+    const fields = {
+      ...SAMPLES['cm.room.key-version'],
+      // USER (4b0c...) sorts before FILE (7a8b...).
+      recipients: [
+        { userId: USER, keyId: KEY_ID },
+        { userId: FILE, keyId: ROOM },
+      ],
+    };
+    expect(text(contextBytes('cm.room.key-version', fields))).toBe(
+      `{"commitment":"${B64(32)}","creatorKeyId":"${KEY_ID}","creatorUserId":"${USER}","ctx":"cm.room.key-version",` +
+        `"keyVersion":1,"previousCommitment":null,"recipients":[{"keyId":"${KEY_ID}","userId":"${USER}"},` +
+        `{"keyId":"${ROOM}","userId":"${FILE}"}],"roomId":"${ROOM}","suite":"CM1","v":1}`,
+    );
+    // A previous commitment is a 32-byte value or null; a grant names a room role.
+    expect(() =>
+      contextBytes('cm.room.key-version', { ...fields, keyVersion: 2, previousCommitment: B64(32) }),
+    ).not.toThrow();
+    invalid(() => contextBytes('cm.room.key-version', { ...fields, previousCommitment: B64(31) }));
+    invalid(() => contextBytes('cm.room.key-version', { ...fields, commitment: B64(33) }));
+    invalid(() =>
+      contextBytes('cm.room.membership-grant', { ...SAMPLES['cm.room.membership-grant'], role: 'SUPERUSER' as never }),
+    );
+  });
+
+  it('accepts a recipient list only in its one canonical form', () => {
+    const base = SAMPLES['cm.room.key-version'];
+    // Sorted by user ID, then key ID: c (USER, 7a8b...) < b (USER, 8f14...) < a (FILE user 7a8b...).
+    const a = { userId: FILE, keyId: ROOM };
+    const b = { userId: USER, keyId: KEY_ID };
+    const c = { userId: USER, keyId: FILE };
+    expect(() => contextBytes('cm.room.key-version', { ...base, recipients: [c, b, a] })).not.toThrow();
+    // Unsorted, duplicated, empty, oversized, malformed or extended entries are refused.
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: [a, b] }));
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: [b, c] }));
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: [a, a] }));
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: [] }));
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: 'x' as never }));
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: [null] as never }));
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: [{ userId: USER }] as never }));
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: [{ ...a, role: 'OWNER' }] as never }));
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: [{ userId: 'x', keyId: KEY_ID }] }));
+    invalid(() =>
+      contextBytes('cm.room.key-version', {
+        ...base,
+        recipients: [Object.assign(Object.create({ injected: true }) as object, a)] as never,
+      }),
+    );
+    const many = Array.from({ length: 101 }, (_, i) => ({
+      userId: `00000000-0000-4000-8000-${i.toString(16).padStart(12, '0')}`,
+      keyId: KEY_ID,
+    }));
+    invalid(() => contextBytes('cm.room.key-version', { ...base, recipients: many }));
+    expect(() => contextBytes('cm.room.key-version', { ...base, recipients: many.slice(0, 100) })).not.toThrow();
   });
 
   it('a UUID that is not version 4 is refused (identifiers in contexts are UUIDv4, CD-08)', () => {

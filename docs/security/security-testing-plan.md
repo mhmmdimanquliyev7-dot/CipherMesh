@@ -44,7 +44,7 @@ All scanning and testing targets only CipherMesh infrastructure, following the c
 | `session` | Cookie attributes, fixation, every rotation and invalidation event, idle and absolute expiry, logout, session limit ([session-and-csrf.md](session-and-csrf.md)) | T-08 |
 | `csrf` | `Sec-Fetch-Site` and `Origin` checks, the custom request header, content types, login CSRF, side-effect-free GETs, `Origin` behaviour under `no-referrer` in three engines | T-13 |
 | `auth-abuse` | Rate limits, backoff, TOTP attempt limits, replay, recovery-code reuse | T-09, T-10, T-30 |
-| `crypto-invariants` | Known-answer tests, tamper tests, context separation, IV uniqueness, commitment checks, the RSA wrapper rejecting anything but 32-byte keys. **Phase 4:** implemented as the `packages/crypto` unit suites listed in section 3.3 (commitment checks follow in Phase 6) | T-07, T-29 |
+| `crypto-invariants` | Known-answer tests, tamper tests, context separation, IV uniqueness, commitment checks, the RSA wrapper rejecting anything but 32-byte keys. **Phase 4:** implemented as the `packages/crypto` unit suites listed in section 3.3. **Phase 6:** commitment, envelope-binding and statement tests in `room-keys.test.ts`, `room-format.test.ts` and `contexts.test.ts` (section 3.5) | T-07, T-29 |
 | `projection` | Responses contain only allowlisted fields; forbidden field names never appear | T-15 |
 | `log-redaction` | Canary secrets sent through every endpoint never appear in logs | T-15, T-16 |
 | `canary-scan` | After E2E runs, canary strings are absent from database dumps and bucket objects | T-01, T-02, T-28 |
@@ -134,6 +134,24 @@ A global setup creates one database per test run as the local or CI container ad
 | `client` | Lazy connection, readiness with real and unreachable databases, no query logging, no URLs or row values in errors and logs | T-15, T-16 |
 | `seed` | Synthetic data only, idempotent, refuses production, remote hosts and other roles | T-16 |
 
+### 3.5 Cryptographic membership suites (Phase 6, CM-T033 to CM-T036, CM-T085)
+
+| Suite | Location | What it proves |
+|---|---|---|
+| `key-injection` and commitment checks | `packages/crypto/src/room-keys.test.ts` | The ADR-015 section 4.1 rule: unsigned, forged, wrongly attributed and unauthorized versions; a version 1 by anyone but the creator; a rekeyed version signed by a MEMBER; a commitment mismatch; a missing recipient; grants by people without authority, for another key, room or role; modified fields, suite, recipient order; key reuse; a forked previous commitment; bounded bundle sizes. OpenSSL verifies the hand-written statement bytes. Two limits are documented as tests: an authorized owner's split view passes every check, and a substituted creator identity passes |
+| Envelope binding | `room-keys.test.ts` | An envelope opens only for the intended recipient key, room, version and purpose; a modified byte, a wrong size or a foreign label fails closed |
+| Safety Code (`safety-code`) | `room-keys.test.ts`, `tests/e2e/room-keys.spec.ts` | Word-list checksum, known-answer vectors for the derivation and the word mapping (Node.js, OpenSSL and the three browser engines); same code for every holder; changes with key, version and room; never in a request, URL, storage or log; a split view gives different codes while every automatic check passes |
+| Wire layer | `room-format.test.ts` | Strict decoding of server data, fail-closed behaviour, skipped versions, chain opening and the forked previous commitment |
+| Contexts | `contexts.test.ts` | Exact bytes of the three statements and the canonical recipient list |
+| Room creation, keys and statements through the API | `tests/authz/room-keys.test.ts` | Invalid genesis, key-version and grant signatures are refused and store nothing; the key package has no field for key material; no table or log holds RKM_1 in any encoding; a key version or envelope written into the database is refused by the browser code (T-36, T-29) |
+| Invitations | `tests/authz/invitations.test.ts` | Role ceilings, grant binding to invitee user, key and role, duplicates, the envelope set and PC-07, PC-04 to PC-06, PC-05 fingerprints, PC-03, PC-16, revoke, decline, expiry, invalidation by a vault reset, acceptance only by the invitee |
+| Invitation concurrency | `tests/authz/invitation-concurrency.test.ts` | Real overlapping transactions: account disable, revocation, double acceptance, room deletion, member loss and vault reset against an acceptance; the final state is always valid and a disabled account never keeps an ACTIVE membership |
+| BOLA | `tests/authz/bola.test.ts`, `tests/security/bola-inventory.test.ts` | 98 tests over 16 room routes, with invitation targets of another room and a snapshot that now includes invitations, key versions and envelopes |
+| Database | `tests/database/constraints.test.ts`, `privileges.test.ts` | Genesis, grant and key-version constraints, composite foreign keys, write-once triggers, grants unchanged |
+| Browser | `tests/e2e/room-keys.spec.ts`, `rooms.spec.ts` | The room key is made, verified and held in the browser in Chromium, Firefox and WebKit; locking clears it; invitation, acceptance, RESTRICTED fingerprint flow with step-up, cross-engine envelopes, the split-view harness |
+
+The Phase 6 negative controls (NC-06-01 to NC-06-10) are listed in `scripts/security/negative-controls.mjs`.
+
 ## 4. Canary scan design
 
 1. E2E fixtures create content that contains a unique random canary string in filenames, file content, note titles and bodies, and secrets.
@@ -151,7 +169,7 @@ This is the automated proof of invariants INV-01 and INV-16, and a strong piece 
 - **Commitment:** an envelope with the wrong RKM is rejected and reported. A test documents the limit: a harness that serves a different commitment together with a matching envelope passes this check, and only the Safety Code comparison reveals it.
 - **RSA input restriction:** the RSA wrapper accepts only 32-byte keys, and a lint rule forbids direct RSA-OAEP `encrypt` calls outside `packages/crypto` (INV-17).
 - **Room Safety Code:** known-answer vectors for HKDF output and word mapping, including the numeric form; context separation from RWK_v and RKC_v.
-- **Cross-browser:** Playwright runs the crypto suite in Chromium, Firefox and WebKit, including OAEP labels and unwrapping into HKDF keys (OCD-01). **Phase 4:** the vault flows run in all three engines, and a vault created in Chromium is opened in Firefox and WebKit; envelope interoperability follows in Phase 6.
+- **Cross-browser:** Playwright runs the crypto suite in Chromium, Firefox and WebKit, including OAEP labels and unwrapping into HKDF keys (OCD-01). **Phase 4:** the vault flows run in all three engines, and a vault created in Chromium is opened in Firefox and WebKit; envelope interoperability was confirmed in Phase 6: envelopes made in Chromium open in Firefox and WebKit, and the commitment and Safety Code derivations give the same known answers in all three engines (`tests/e2e/room-keys.spec.ts`).
 - **Parameter floors:** vault creation and unlock refuse Argon2id parameters below the floor, and since Phase 4 above the ceiling; the API rejects them too.
 
 ## 6. CI gates

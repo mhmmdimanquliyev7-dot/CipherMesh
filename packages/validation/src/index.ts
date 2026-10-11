@@ -7,3 +7,4 @@ export * from './schemas';
 export * from './auth';
 export * from './vault';
 export * from './rooms';
+export * from './room-keys';

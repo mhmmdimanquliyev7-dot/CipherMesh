@@ -1,7 +1,18 @@
 import { canonicalBytes, type CanonicalValue } from './canonical';
 import { fromBase64Url } from './encoding';
+import { compareRecipients, type RecipientRef } from './recipients';
 import { CryptoError, CryptoErrorCode } from './errors';
-import { ECDSA, RSA_OAEP, SUITE, VAULT_KDF, VAULT_VERSION, WRAPPED_KEY_BYTES } from './params';
+import {
+  ECDSA,
+  ROOM_KEYS,
+  ROOM_ROLES,
+  RSA_OAEP,
+  SUITE,
+  VAULT_KDF,
+  VAULT_VERSION,
+  WRAPPED_KEY_BYTES,
+  type RoomRole,
+} from './params';
 import type { Bytes } from './types';
 
 /**
@@ -43,6 +54,10 @@ interface FieldKinds {
   readonly signingSpki: string;
   readonly wrappedEncryptionKey: string;
   readonly wrappedSigningKey: string;
+  readonly roomRole: RoomRole;
+  readonly commitment: string;
+  readonly optionalCommitment: string | null;
+  readonly recipients: readonly RecipientRef[];
 }
 type FieldKind = keyof FieldKinds;
 
@@ -121,6 +136,39 @@ const CONTEXTS = {
   'cm.room.dek-wrap-key': { v: 1, fields: { roomId: 'uuid', keyVersion: 'keyVersion' } },
   'cm.room.commitment': { v: 1, fields: { roomId: 'uuid', keyVersion: 'keyVersion' } },
   'cm.room.safety-code': { v: 1, fields: { roomId: 'uuid', keyVersion: 'keyVersion' } },
+  // Signed room statements (ADR-015 section 4, Phase 6). Each is signed with the ECDSA identity
+  // key of the user it names as creator or grantor; room-statements.ts builds and verifies them.
+  /** The root of the room's authority chain, signed by the room creator. */
+  'cm.room.genesis': {
+    v: 1,
+    fields: { roomId: 'uuid', creatorUserId: 'uuid', creatorKeyId: 'uuid', suite: 'suite' },
+  },
+  /** A membership grant, signed by the inviter, or by the OWNER for ADMIN and OWNER grants. */
+  'cm.room.membership-grant': {
+    v: 1,
+    fields: {
+      roomId: 'uuid',
+      subjectUserId: 'uuid',
+      subjectKeyId: 'uuid',
+      role: 'roomRole',
+      grantorUserId: 'uuid',
+      grantorKeyId: 'uuid',
+    },
+  },
+  /** A key version, signed by the OWNER or ADMIN who created it (room creation or rekey). */
+  'cm.room.key-version': {
+    v: 1,
+    fields: {
+      roomId: 'uuid',
+      keyVersion: 'keyVersion',
+      commitment: 'commitment',
+      previousCommitment: 'optionalCommitment',
+      suite: 'suite',
+      creatorUserId: 'uuid',
+      creatorKeyId: 'uuid',
+      recipients: 'recipients',
+    },
+  },
   'cm.dek.wrap': {
     v: 1,
     fields: {
@@ -173,8 +221,29 @@ function isBase64UrlOf(value: unknown, min: number, max: number): boolean {
   }
 }
 
+const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID_V4.test(v);
+
+/**
+ * The recipient list of a key-version statement has one canonical form: 1 to 100 entries, each
+ * exactly {userId, keyId}, strictly ascending by user ID and then key ID, so each set has one
+ * byte representation (no duplicates, no reordering). Callers sort with sortRecipients().
+ */
+function isRecipientList(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length < 1 || value.length > ROOM_KEYS.maxRecipients) return false;
+  let previous: RecipientRef | undefined;
+  for (const entry of value as unknown[]) {
+    if (typeof entry !== 'object' || entry === null || Object.getPrototypeOf(entry) !== Object.prototype) return false;
+    const keys = Object.keys(entry);
+    const { userId, keyId } = entry as Record<string, unknown>;
+    if (keys.length !== 2 || !isUuid(userId) || !isUuid(keyId)) return false;
+    if (previous !== undefined && compareRecipients(previous, { userId, keyId }) >= 0) return false;
+    previous = { userId, keyId };
+  }
+  return true;
+}
+
 const VALIDATORS: Readonly<Record<FieldKind, (value: unknown) => boolean>> = {
-  uuid: (v) => typeof v === 'string' && UUID_V4.test(v),
+  uuid: isUuid,
   suite: (v) => v === SUITE,
   purpose: (v) => v === 'encryption' || v === 'signing',
   fingerprint: (v) => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v),
@@ -192,6 +261,10 @@ const VALIDATORS: Readonly<Record<FieldKind, (value: unknown) => boolean>> = {
   signingSpki: (v) => isBase64UrlOf(v, ECDSA.spkiBytes, ECDSA.spkiBytes),
   wrappedEncryptionKey: (v) => isBase64UrlOf(v, WRAPPED_KEY_BYTES.encryption.min, WRAPPED_KEY_BYTES.encryption.max),
   wrappedSigningKey: (v) => isBase64UrlOf(v, WRAPPED_KEY_BYTES.signing.min, WRAPPED_KEY_BYTES.signing.max),
+  roomRole: (v) => typeof v === 'string' && (ROOM_ROLES as readonly string[]).includes(v),
+  commitment: (v) => isBase64UrlOf(v, ROOM_KEYS.commitmentBytes, ROOM_KEYS.commitmentBytes),
+  optionalCommitment: (v) => v === null || isBase64UrlOf(v, ROOM_KEYS.commitmentBytes, ROOM_KEYS.commitmentBytes),
+  recipients: isRecipientList,
 };
 
 /**
@@ -212,7 +285,11 @@ export function contextBytes<N extends ContextName>(name: N, fields: ContextFiel
     const kind = spec.fields[key];
     const value = given[key];
     if (kind === undefined || !VALIDATORS[kind](value)) throw new CryptoError(CryptoErrorCode.INVALID_INPUT);
-    object[key] = value as CanonicalValue;
+    // Recipient entries are copied field by field, so only the validated fields are serialized.
+    object[key] =
+      kind === 'recipients'
+        ? (value as readonly RecipientRef[]).map((r) => ({ userId: r.userId, keyId: r.keyId }))
+        : (value as CanonicalValue);
   }
   return canonicalBytes(object) as CanonicalBytes;
 }

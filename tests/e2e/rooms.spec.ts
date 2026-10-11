@@ -1,63 +1,25 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import pg from 'pg';
+import { collectCspViolations, login, readableStorage } from './helpers';
 import {
-  collectCspViolations,
-  login,
-  newUser,
-  newVaultPassphrase,
-  readableStorage,
-  register,
-  useDistinctClientAddress,
-  type TestUser,
-} from './helpers';
+  acceptThroughUi,
+  confirmAccount,
+  createRoomThroughUi,
+  inviteThroughUi,
+  openRoomThroughUi,
+  signedInWithVault,
+  verifiedSafetyCode,
+} from './room-helpers';
 
-// Rooms in the browser (Phase 5, CM-T030, CM-T031) in Chromium, Firefox and WebKit, against the
-// built static export under the production CSP and the real API:
+// Rooms in the browser (Phase 5, CM-T030, CM-T031; Phase 6) in Chromium, Firefox and WebKit,
+// against the built static export under the production CSP and the real API:
 // - the room page works as a static page with the room ID in the query string, including a reload
 //   and a direct visit (ADR-011);
 // - the room-name warning is shown, deletion and ownership transfer ask for a step-up;
 // - the controls follow the user's role, and the API's answers are what the page shows.
-// Room creation needs a vault (SS-04), so each test creates one through the UI first. The second
-// member of a room joins through a database fixture, because invitations arrive in Phase 6.
-
-const PASSPHRASE_FIELD = 'Vault Passphrase (not your account password)';
-
-async function confirmAccount(page: Page, user: TestUser): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Confirm your account' })).toBeVisible();
-  await page.getByLabel('Account password').fill(user.password);
-  await page.getByRole('button', { name: 'Confirm account' }).click();
-}
-
-/** Registers, signs in and creates a vault through the UI. */
-async function signedInWithVault(page: Page): Promise<TestUser> {
-  const user = newUser();
-  await useDistinctClientAddress(page);
-  await register(page, user);
-  await login(page, user);
-  await page.getByRole('link', { name: 'Vault', exact: true }).click();
-  await confirmAccount(page, user);
-  const passphrase = newVaultPassphrase();
-  await page.getByLabel(PASSPHRASE_FIELD).fill(passphrase);
-  await page.getByLabel('Repeat the Vault Passphrase').fill(passphrase);
-  await page.getByLabel('I understand that CipherMesh cannot recover a lost Vault Passphrase.').check();
-  await page.getByRole('button', { name: 'Create vault' }).click();
-  await expect(page.getByRole('heading', { name: 'Vault unlocked' })).toBeVisible({ timeout: 60_000 });
-  return user;
-}
-
-/** Creates a room on the Rooms page; returns its ID from the room page's URL. */
-async function createRoomThroughUi(page: Page, name: string): Promise<string> {
-  await page.getByRole('link', { name: 'Rooms', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Rooms', exact: true })).toBeVisible();
-  await expect(page.getByText('Room names are not encrypted')).toBeVisible();
-  await page.getByLabel('Room name').fill(name);
-  await page.getByLabel('Security profile').selectOption('STANDARD');
-  await page.getByRole('button', { name: 'Create room' }).click();
-  await expect(page).toHaveURL(/\/rooms\/room\?id=[0-9a-f-]{36}$/);
-  await expect(page.getByRole('heading', { name })).toBeVisible();
-  return new URL(page.url()).searchParams.get('id') ?? '';
-}
+// Room creation needs an unlocked vault: the room key is created in the browser (CM-T033). Since
+// Phase 6 the second member joins through a real invitation with an envelope, and granting ADMIN
+// or ownership is signed with the owner's identity key (ADR-015 section 4).
 
 test('create, open after a reload, rename and delete a room, without CSP violations', async ({ page }) => {
   test.setTimeout(180_000);
@@ -96,40 +58,33 @@ test('create, open after a reload, rename and delete a room, without CSP violati
   expect(await readableStorage(page)).not.toContain(user.password);
 });
 
-test('an owner promotes a member, transfers ownership, and the new owner removes the former one', async ({
+test('an invited member is promoted, receives ownership, and the new owner removes the former one', async ({
   page,
   browser,
 }) => {
-  test.setTimeout(240_000);
-  await signedInWithVault(page);
+  test.setTimeout(300_000);
+  await signedInWithVault(page, 'First Owner');
   const roomId = await createRoomThroughUi(page, 'Team room');
+  await verifiedSafetyCode(page);
 
   const otherContext = await browser.newContext({ ignoreHTTPSErrors: true });
   const other = await otherContext.newPage();
-  const second = { ...newUser(), name: 'Second Member' };
-  await useDistinctClientAddress(other);
-  await register(other, second);
-  await login(other, second);
+  const second = await signedInWithVault(other, 'Second Member');
   const secondId = await other.evaluate(async () => {
     const response = await fetch('/api/auth/session', { credentials: 'same-origin' });
     return ((await response.json()) as { user: { id: string } }).user.id;
   });
-  // Invitations arrive in Phase 6; until then a second member joins through a fixture.
-  const db = new pg.Client({ connectionString: process.env['DATABASE_URL'] });
-  await db.connect();
-  try {
-    await db.query(
-      "INSERT INTO room_members (room_id, user_id, role, first_key_version) VALUES ($1, $2, 'MEMBER', 1)",
-      [roomId, secondId],
-    );
-  } finally {
-    await db.end();
-  }
+  await openRoomThroughUi(page, 'Team room');
+  await inviteThroughUi(page, second, 'Member', false);
+  await acceptThroughUi(other, 'Team room');
+  await verifiedSafetyCode(other);
 
-  await page.reload();
+  // Reopened inside the app: a page reload would start without the unlocked vault (memory only).
+  await openRoomThroughUi(page, 'Team room');
   const row = page.getByTestId(`member-${secondId}`);
   await expect(row).toContainText('Second Member');
   await expect(row).toContainText('Member');
+  // Granting ADMIN is signed in this browser with the owner's identity key.
   await row.getByRole('button', { name: 'Make admin' }).click();
   await expect(row).toContainText('Admin');
   // The vault setup's step-up is still fresh, so the transfer needs no new confirmation.

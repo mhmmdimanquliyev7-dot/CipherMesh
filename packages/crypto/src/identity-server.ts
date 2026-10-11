@@ -11,6 +11,18 @@ export { computeFingerprint, isFingerprint } from './fingerprint';
 export { verifyStatement } from './signing';
 export { fromBase64Url, toBase64Url } from './encoding';
 export { isAcceptableKdf, SUITE, VAULT_KDF, VAULT_VERSION, type Argon2idParameters } from './params';
+// Signed room statements (Phase 6, ADR-015 section 4): the API rebuilds and verifies exactly the
+// bytes browsers sign. Builders and public-key verification only; no room key material.
+export {
+  genesisStatement,
+  keyVersionStatement,
+  membershipGrantStatement,
+  verifyStatementBy,
+  type GenesisStatement,
+  type KeyVersionStatement,
+  type MembershipGrantStatement,
+} from './room-statements';
+export { sortRecipients, type RecipientRef } from './recipients';
 export {
   isNotWeaker,
   kdfFromWire,

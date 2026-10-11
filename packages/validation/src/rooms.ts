@@ -1,20 +1,21 @@
 import {
   ASSIGNABLE_ROOM_ROLES,
-  isUuidV4,
   MEMBER_LIST_PAGE_SIZE,
   ROOM_LIST_PAGE_SIZE,
   ROOM_NAME_MAX_LENGTH,
   ROOM_ROLES,
   SECURITY_PROFILES,
 } from '@ciphermesh/shared';
+import { grantProofSchema, roomCreationKeysSchema } from './room-keys';
 import { isoTimestampSchema, uuidV4Schema } from './schemas';
 import { z } from './zod';
 
 /**
  * Room request and response schemas (Phase 5, CM-T030, CM-T031). Every request object is strict,
  * so a role, owner, user, status or key field is rejected rather than ignored (OL-03, OL-04, mass
- * assignment). No request carries key material: room keys arrive with their own schemas in
- * Phase 6. Responses are the explicit projections the API may send.
+ * assignment). No request carries key material: since Phase 6, room creation carries key version
+ * 1 as public values and ciphertext only (room-keys.ts). Responses are the explicit projections the
+ * API may send.
  */
 
 /** Unicode NFKC and trimmed, like display names. Disallowed characters are refused, not stripped. */
@@ -46,28 +47,9 @@ const keyStateSchema = z.enum(['ACTIVE', 'REKEY_REQUIRED', 'REKEYING']);
 export const roomParamsSchema = z.strictObject({ roomId: uuidV4Schema });
 export const roomMemberParamsSchema = z.strictObject({ roomId: uuidV4Schema, userId: uuidV4Schema });
 
-// Keyset pagination (OL-08): the cursor is the sort key of the last item returned,
-// `<ISO 8601 UTC timestamp with milliseconds>_<UUIDv4>`. It names nothing the caller has not seen.
-const CURSOR = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)_(.+)$/;
-
-export function parseListCursor(value: string): { readonly at: Date; readonly id: string } | undefined {
-  const match = CURSOR.exec(value);
-  if (match === null) return undefined;
-  const [, iso = '', id = ''] = match;
-  const at = new Date(iso);
-  return !Number.isNaN(at.getTime()) && at.toISOString() === iso && isUuidV4(id) ? { at, id } : undefined;
-}
-
-export function formatListCursor(at: Date, id: string): string {
-  return `${at.toISOString()}_${id}`;
-}
-
-export const listCursorSchema = z
-  .string()
-  .max(64)
-  .refine((v) => parseListCursor(v) !== undefined, { message: 'Invalid cursor' });
-
-export const listQuerySchema = z.strictObject({ cursor: listCursorSchema.optional() });
+// Keyset pagination (OL-08) lives in list.ts; re-exported here for the room routes.
+export { formatListCursor, listCursorSchema, listQuerySchema, parseListCursor } from './list';
+import { listCursorSchema } from './list';
 
 // ------------------------------------------------------------------------------------- requests
 
@@ -75,12 +57,26 @@ export const roomCreateRequestSchema = z.strictObject({
   roomId: uuidV4Schema,
   name: roomNameSchema,
   securityProfile: securityProfileSchema,
+  /** Key version 1, created in the browser (CM-T033, DF-05). Required: no new room is keyless. */
+  keys: roomCreationKeysSchema,
 });
 
 export const roomRenameRequestSchema = z.strictObject({ name: roomNameSchema });
 
-/** OWNER is not assignable: ownership changes only through a transfer (AZ-05). */
-export const memberRoleChangeRequestSchema = z.strictObject({ role: z.enum(ASSIGNABLE_ROOM_ROLES) });
+/**
+ * OWNER is not assignable: ownership changes only through a transfer (AZ-05). Granting ADMIN
+ * carries the OWNER's signed membership grant for the member's identity key (ADR-015 section 4);
+ * other roles carry none.
+ */
+export const memberRoleChangeRequestSchema = z
+  .strictObject({ role: z.enum(ASSIGNABLE_ROOM_ROLES), grant: grantProofSchema.optional() })
+  .refine((body) => (body.role === 'ADMIN') === (body.grant !== undefined), {
+    message: 'A grant is required exactly for the ADMIN role',
+    path: ['grant'],
+  });
+
+/** AZ-05: the OWNER's signed grant of the OWNER role to the new owner's identity key (ADR-015). */
+export const ownershipTransferRequestSchema = z.strictObject({ grant: grantProofSchema });
 
 // ------------------------------------------------------------------------------------ responses
 
