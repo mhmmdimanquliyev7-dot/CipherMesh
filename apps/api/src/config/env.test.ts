@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig } from './env';
+import { ConfigError, loadConfig, loadWorkerConfig } from './env';
 
 const CANARY_PASSWORD = 'canary-db-password-123';
 const LOCAL_DB = `postgresql://cm_api:${CANARY_PASSWORD}@127.0.0.1:55432/ciphermesh`;
@@ -12,11 +12,19 @@ const KEYS = {
   IDENTIFIER_HMAC_KEY: randomBytes(32).toString('base64url'),
 };
 const valid = { NODE_ENV: 'development', APP_ORIGIN: 'https://localhost:8443', DATABASE_URL: LOCAL_DB, ...KEYS };
+const CANARY_STORAGE_SECRET = 'canary-storage-secret-0123456789';
+const STORAGE = {
+  STORAGE_ENDPOINT: 'https://storage.example.org',
+  STORAGE_BUCKET: 'cm-files',
+  STORAGE_ACCESS_KEY_ID: 'runtime-key-1',
+  STORAGE_SECRET_ACCESS_KEY: CANARY_STORAGE_SECRET,
+};
 const production = {
   NODE_ENV: 'production',
   APP_ORIGIN: 'https://example.org',
   DATABASE_URL: `${REMOTE_DB}?sslmode=verify-full`,
   ...KEYS,
+  ...STORAGE,
 };
 
 function problemsOf(env: Record<string, string | undefined>): string[] {
@@ -147,6 +155,113 @@ describe('loadConfig', () => {
         expect(String(error)).not.toContain(CANARY_PASSWORD);
         expect(String(error)).not.toContain('db.ciphermesh.example');
       }
+    });
+  });
+
+  describe('object storage (Phase 7, CM-T037)', () => {
+    const LOCAL_STORAGE = { ...STORAGE, STORAGE_ENDPOINT: 'http://127.0.0.1:8333' };
+
+    it('is optional outside production and absent unless configured', () => {
+      expect(loadConfig(valid).storage).toBeNull();
+      const storage = loadConfig({ ...valid, ...LOCAL_STORAGE }).storage;
+      expect(storage).toMatchObject({
+        endpoint: 'http://127.0.0.1:8333',
+        publicEndpoint: 'http://127.0.0.1:8333',
+        region: 'us-east-1',
+        bucket: 'cm-files',
+        accessKeyId: 'runtime-key-1',
+      });
+      expect(storage?.secretAccessKey.reveal()).toBe(CANARY_STORAGE_SECRET);
+      expect(inspect(storage)).not.toContain(CANARY_STORAGE_SECRET);
+      expect(JSON.stringify(storage)).not.toContain(CANARY_STORAGE_SECRET);
+    });
+
+    it('keeps a separate public endpoint for presigned URLs', () => {
+      const storage = loadConfig({
+        ...valid,
+        ...LOCAL_STORAGE,
+        STORAGE_PUBLIC_ENDPOINT: 'https://127.0.0.1:4174',
+      }).storage;
+      expect(storage?.publicEndpoint).toBe('https://127.0.0.1:4174');
+    });
+
+    it('is required in production, all or nothing everywhere', () => {
+      const { STORAGE_ENDPOINT: _e, STORAGE_SECRET_ACCESS_KEY: _s, ...partial } = STORAGE;
+      expect(problemsOf({ ...production, ...Object.fromEntries(Object.keys(STORAGE).map((k) => [k, ''])) })).toEqual(
+        Object.keys(STORAGE),
+      );
+      expect(problemsOf({ ...valid, ...partial })).toEqual(['STORAGE_ENDPOINT', 'STORAGE_SECRET_ACCESS_KEY']);
+      expect(problemsOf({ ...valid, STORAGE_PUBLIC_ENDPOINT: 'https://127.0.0.1:4174' })).toEqual(Object.keys(STORAGE));
+      expect(loadConfig(production).storage?.endpoint).toBe('https://storage.example.org');
+    });
+
+    it.each([
+      ['production over http', { ...production, STORAGE_ENDPOINT: 'http://storage.example.org' }, 'STORAGE_ENDPOINT'],
+      [
+        'production presigning http URLs',
+        { ...production, STORAGE_PUBLIC_ENDPOINT: 'http://storage.example.org' },
+        'STORAGE_PUBLIC_ENDPOINT',
+      ],
+      [
+        'production over http to loopback',
+        { ...production, STORAGE_ENDPOINT: 'http://127.0.0.1:8333' },
+        'STORAGE_ENDPOINT',
+      ],
+      [
+        'development over http to a remote host',
+        { ...valid, ...STORAGE, STORAGE_ENDPOINT: 'http://storage.example.org' },
+        'STORAGE_ENDPOINT',
+      ],
+      [
+        'an endpoint with a path',
+        { ...valid, ...LOCAL_STORAGE, STORAGE_ENDPOINT: 'http://127.0.0.1:8333/bucket' },
+        'STORAGE_ENDPOINT',
+      ],
+      [
+        'an endpoint with credentials',
+        { ...valid, ...LOCAL_STORAGE, STORAGE_ENDPOINT: 'http://a:b@127.0.0.1:8333' },
+        'STORAGE_ENDPOINT',
+      ],
+      [
+        'a bucket name with a path',
+        { ...valid, ...LOCAL_STORAGE, STORAGE_BUCKET: 'cm-files/../other' },
+        'STORAGE_BUCKET',
+      ],
+      [
+        'a short secret',
+        { ...valid, ...LOCAL_STORAGE, STORAGE_SECRET_ACCESS_KEY: 'short' },
+        'STORAGE_SECRET_ACCESS_KEY',
+      ],
+    ])('rejects %s', (_label, env, variable) => {
+      expect(problemsOf(env)).toContain(variable);
+    });
+
+    it('refuses presigned URLs on the application host, whatever the port (SF-07-01)', () => {
+      const app = { ...valid, APP_ORIGIN: 'https://127.0.0.1:4173', ...LOCAL_STORAGE };
+      expect(problemsOf({ ...app, STORAGE_PUBLIC_ENDPOINT: 'https://127.0.0.1:4174' })).toEqual([
+        'STORAGE_PUBLIC_ENDPOINT',
+      ]);
+      expect(problemsOf({ ...app, STORAGE_ENDPOINT: 'http://127.0.0.1:8333' })).toEqual(['STORAGE_ENDPOINT']);
+      expect(problemsOf({ ...app, STORAGE_PUBLIC_ENDPOINT: 'https://localhost:4174' })).toEqual([]);
+      expect(problemsOf({ ...production, STORAGE_ENDPOINT: 'https://example.org:9000' })).toEqual(['STORAGE_ENDPOINT']);
+    });
+
+    it('never echoes the storage secret in its error', () => {
+      try {
+        loadConfig({ ...production, STORAGE_ENDPOINT: 'http://storage.example.org' });
+        expect.unreachable();
+      } catch (error) {
+        expect(String(error)).toContain('STORAGE_ENDPOINT');
+        expect(String(error)).not.toContain(CANARY_STORAGE_SECRET);
+      }
+    });
+
+    it('applies the same rules to the worker', () => {
+      const worker = { NODE_ENV: 'development', WORKER_DATABASE_URL: LOCAL_DB.replace('cm_api', 'cm_worker') };
+      expect(loadWorkerConfig(worker).storage).toBeNull();
+      expect(loadWorkerConfig({ ...worker, ...LOCAL_STORAGE }).storage?.bucket).toBe('cm-files');
+      expect(() => loadWorkerConfig({ ...worker, NODE_ENV: 'production' })).toThrow(ConfigError);
+      expect(() => loadWorkerConfig({ ...worker, STORAGE_BUCKET: 'cm-files' })).toThrow(/STORAGE_ENDPOINT/);
     });
   });
 

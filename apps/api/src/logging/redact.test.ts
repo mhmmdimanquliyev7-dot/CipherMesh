@@ -21,6 +21,8 @@ const SENSITIVE_FIELDS = [
   'totpSecret',
   'recoveryCode',
   'presignedUrl',
+  'uploadUrl',
+  'downloadUrl',
   'session_token',
   'Session-Token',
   'clientSecret',
@@ -184,6 +186,16 @@ describe('redact', () => {
     const output = redact({ err: error }) as { err: { name: string; message: string } };
     expect(output.err.name).toBe('Error');
     expect(output.err.message).toBe(REDACTED);
+  });
+
+  it('redacts the presigned storage URLs the file routes issue (Phase 7, CM-T037)', () => {
+    // The form the API issues: SigV4 query authentication with a signed content-length.
+    const upload =
+      'https://127.0.0.1:4174/cm-files/f/abc?X-Amz-Expires=300&X-Amz-Date=20261011T100000Z&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=key%2F20261011%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-SignedHeaders=content-length%3Bhost&X-Amz-Signature=00ff';
+    expect(redact({ upload: { url: upload, expiresAt: '2026-10-11T10:05:00.000Z' } })).toEqual({
+      upload: { url: REDACTED, expiresAt: '2026-10-11T10:05:00.000Z' },
+    });
+    expect(redact({ msg: `PUT ${upload} failed` })).toEqual({ msg: REDACTED });
   });
 
   it('supports additional sensitive fields', () => {

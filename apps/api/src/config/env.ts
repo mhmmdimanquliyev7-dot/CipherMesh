@@ -33,6 +33,27 @@ export interface AppConfig {
    * (TB-04). 0 locally; 1 behind the single Nginx hop in production (Phase 17).
    */
   readonly trustProxyHops: 0 | 1;
+  /**
+   * Object storage for encrypted file content (Phase 7, CM-T037), or null outside production
+   * when it is not configured: the file routes then answer STORAGE_UNAVAILABLE.
+   */
+  readonly storage: StorageConfig | null;
+}
+
+/**
+ * The S3-compatible object storage the API and the worker use (ADR-006, deployment-architecture).
+ * The credential is the runtime one, scoped to the content bucket (read and write objects only);
+ * the emulator's administrator credential (S3_*) is used only by `pnpm storage:bootstrap`.
+ */
+export interface StorageConfig {
+  /** Origin the API and the worker call for HEAD and DELETE. */
+  readonly endpoint: string;
+  /** Origin written into presigned URLs, which browsers reach (the page's CSP connect-src allows it). */
+  readonly publicEndpoint: string;
+  readonly region: string;
+  readonly bucket: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: SecretValue;
 }
 
 const BODY_LIMIT_BYTES = 128 * 1024;
@@ -52,7 +73,100 @@ const envSchema = z.object({
   TOTP_ENCRYPTION_KEY_ID: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/),
   IDENTIFIER_HMAC_KEY: z.string().refine(isKey32, { message: 'must be 32 random bytes, base64url encoded' }),
   TRUST_PROXY_HOPS: z.enum(['0', '1']).default('0'),
+  ...storageFields(),
 });
+
+/** The storage variables, shared by the API and the worker. Cross-field rules: storageRules(). */
+function storageFields() {
+  const origin = z.string().refine(isOrigin, { message: 'must be an origin such as https://storage.example' });
+  return {
+    STORAGE_ENDPOINT: origin.optional(),
+    STORAGE_PUBLIC_ENDPOINT: origin.optional(),
+    STORAGE_REGION: z
+      .string()
+      .regex(/^[a-z0-9-]{1,32}$/)
+      .default('us-east-1'),
+    STORAGE_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/)
+      .optional(),
+    STORAGE_ACCESS_KEY_ID: z
+      .string()
+      .regex(/^[A-Za-z0-9._-]{3,128}$/)
+      .optional(),
+    STORAGE_SECRET_ACCESS_KEY: z.string().min(16).max(256).optional(),
+  };
+}
+
+const STORAGE_REQUIRED = ['STORAGE_ENDPOINT', 'STORAGE_BUCKET', 'STORAGE_ACCESS_KEY_ID', 'STORAGE_SECRET_ACCESS_KEY'];
+
+/**
+ * Storage is all or nothing, required in production, and reached over TLS except on loopback in
+ * development (CP-21). Problems name the variable, never its value.
+ */
+function storageRules(env: Readonly<Record<string, string>>): { variable: string; problem: string }[] {
+  const isProduction = env['NODE_ENV'] === 'production';
+  const configured = STORAGE_REQUIRED.some((name) => env[name] !== undefined);
+  const problems: { variable: string; problem: string }[] = [];
+  if (configured || isProduction || env['STORAGE_PUBLIC_ENDPOINT'] !== undefined) {
+    for (const name of STORAGE_REQUIRED) {
+      if (env[name] === undefined) problems.push({ variable: name, problem: 'required with object storage' });
+    }
+  }
+  // SF-07-01: browsers send the session cookie by host, not by port, and one tested engine sent it
+  // to another port of the application's host even for requests without credentials. Presigned
+  // URLs must therefore point to another host, never to the application's own.
+  const appOrigin = env['APP_ORIGIN'];
+  const publicEndpoint = env['STORAGE_PUBLIC_ENDPOINT'] ?? env['STORAGE_ENDPOINT'];
+  if (
+    appOrigin !== undefined &&
+    publicEndpoint !== undefined &&
+    isOrigin(appOrigin) &&
+    isOrigin(publicEndpoint) &&
+    new URL(appOrigin).hostname === new URL(publicEndpoint).hostname
+  ) {
+    problems.push({
+      variable: env['STORAGE_PUBLIC_ENDPOINT'] === undefined ? 'STORAGE_ENDPOINT' : 'STORAGE_PUBLIC_ENDPOINT',
+      problem: 'must not be on the application host (cookies are not isolated by port)',
+    });
+  }
+  for (const name of ['STORAGE_ENDPOINT', 'STORAGE_PUBLIC_ENDPOINT']) {
+    const value = env[name];
+    if (value === undefined || !isOrigin(value)) continue;
+    const url = new URL(value);
+    if (url.protocol === 'https:') continue;
+    if (isProduction) problems.push({ variable: name, problem: 'must use https in production' });
+    else if (!LOOPBACK_HOSTS.has(url.hostname)) {
+      problems.push({ variable: name, problem: 'must use https for a non-local host' });
+    }
+  }
+  return problems;
+}
+
+interface StorageEnv {
+  readonly STORAGE_ENDPOINT?: string | undefined;
+  readonly STORAGE_PUBLIC_ENDPOINT?: string | undefined;
+  readonly STORAGE_REGION: string;
+  readonly STORAGE_BUCKET?: string | undefined;
+  readonly STORAGE_ACCESS_KEY_ID?: string | undefined;
+  readonly STORAGE_SECRET_ACCESS_KEY?: string | undefined;
+}
+
+function storageConfigOf(e: StorageEnv): StorageConfig | null {
+  const endpoint = e.STORAGE_ENDPOINT;
+  const bucket = e.STORAGE_BUCKET;
+  const accessKeyId = e.STORAGE_ACCESS_KEY_ID;
+  const secret = e.STORAGE_SECRET_ACCESS_KEY;
+  if (endpoint === undefined || bucket === undefined || accessKeyId === undefined || secret === undefined) return null;
+  return Object.freeze({
+    endpoint,
+    publicEndpoint: e.STORAGE_PUBLIC_ENDPOINT ?? endpoint,
+    region: e.STORAGE_REGION,
+    bucket,
+    accessKeyId,
+    secretAccessKey: new SecretValue(secret),
+  });
+}
 
 /** 32 bytes in canonical unpadded base64url (43 characters). */
 function isKey32(value: string): boolean {
@@ -79,6 +193,7 @@ function productionRules(env: Readonly<Record<string, string>>): { variable: str
   if (env['TOTP_ENCRYPTION_KEY'] !== undefined && env['TOTP_ENCRYPTION_KEY'] === env['IDENTIFIER_HMAC_KEY']) {
     problems.push({ variable: 'IDENTIFIER_HMAC_KEY', problem: 'must differ from TOTP_ENCRYPTION_KEY' });
   }
+  problems.push(...storageRules(env));
   return problems;
 }
 
@@ -160,6 +275,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
       identifierHmacKey: new SecretValue(e.IDENTIFIER_HMAC_KEY),
     }),
     trustProxyHops: e.TRUST_PROXY_HOPS === '1' ? 1 : 0,
+    storage: storageConfigOf(e),
   });
 }
 
@@ -168,18 +284,24 @@ export interface WorkerConfig {
   readonly isProduction: boolean;
   readonly logLevel: LogLevel;
   readonly database: { readonly url: SecretValue };
+  /** Object storage, for deleting the objects of deleted, expired and abandoned files (CM-T040). */
+  readonly storage: StorageConfig | null;
 }
 
 export const WORKER_DATABASE_ROLE = 'cm_worker';
 
 export function loadWorkerConfig(env: Readonly<Record<string, string | undefined>>): WorkerConfig {
+  const present = Object.fromEntries(
+    Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined && entry[1] !== ''),
+  );
   const result = z
     .object({
       NODE_ENV: z.enum(['development', 'test', 'production']),
       LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
       WORKER_DATABASE_URL: z.string().min(1),
+      ...storageFields(),
     })
-    .safeParse(env);
+    .safeParse(present);
   if (!result.success) {
     throw new ConfigError(
       result.error.issues.map((issue) => ({
@@ -190,11 +312,16 @@ export function loadWorkerConfig(env: Readonly<Record<string, string | undefined
   }
   const isProduction = result.data.NODE_ENV === 'production';
   const problem = checkDatabaseUrl(result.data.WORKER_DATABASE_URL, isProduction, WORKER_DATABASE_ROLE);
-  if (problem !== undefined) throw new ConfigError([{ variable: 'WORKER_DATABASE_URL', problem }]);
+  const problems = [
+    ...(problem === undefined ? [] : [{ variable: 'WORKER_DATABASE_URL', problem }]),
+    ...storageRules(present),
+  ];
+  if (problems.length > 0) throw new ConfigError(problems);
   return Object.freeze({
     isProduction,
     logLevel: result.data.LOG_LEVEL,
     database: Object.freeze({ url: new SecretValue(result.data.WORKER_DATABASE_URL) }),
+    storage: storageConfigOf(result.data),
   });
 }
 

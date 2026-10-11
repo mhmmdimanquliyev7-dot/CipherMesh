@@ -571,6 +571,69 @@ describe('CHECK constraints: what the database refuses to store', () => {
   });
 });
 
+describe('encrypted file lifecycle (Phase 7, migration 20261007000000_encrypted_files)', () => {
+  it('accepts only server-generated object keys and an object deletion marker on tombstones', async () => {
+    const room = await insertRoom(api);
+    for (const objectKey of [
+      `rooms/${randomUUID()}`,
+      'f/short',
+      `f/${'a'.repeat(42)}/`,
+      `report.pdf-${'a'.repeat(40)}`,
+    ]) {
+      expect(await attempt('encrypted_files', fileRow(room, { object_key: objectKey })), objectKey).toBe(
+        SQLSTATE.checkViolation,
+      );
+    }
+    expect(await attempt('encrypted_files', fileRow(room, { object_deleted_at: new Date() }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+  });
+
+  it('keeps identity columns write-once, lets key material only disappear and DELETED stay final', async () => {
+    const room = await insertRoom(api);
+    const row = fileRow(room);
+    await insert(api, 'encrypted_files', row);
+    const id = row['id'];
+    const someoneElse = await insertUser(api);
+    for (const [sql, values] of [
+      ['UPDATE encrypted_files SET object_key = $2 WHERE id = $1', [`f/${'b'.repeat(43)}`]],
+      ['UPDATE encrypted_files SET key_version = 2 WHERE id = $1', []],
+      ['UPDATE encrypted_files SET uploader_id = $2 WHERE id = $1', [someoneElse]],
+      ['UPDATE encrypted_files SET ciphertext_sha256 = $2 WHERE id = $1', [DUMMY.digest().fill(7)]],
+      ['UPDATE encrypted_files SET content_iv = $2 WHERE id = $1', [DUMMY.iv().fill(7)]],
+      ['UPDATE encrypted_files SET wrapped_dek = $2 WHERE id = $1', [DUMMY.wrappedDek().fill(7)]],
+      ['UPDATE encrypted_files SET manifest_ciphertext = $2 WHERE id = $1', [DUMMY.ciphertext().fill(7)]],
+    ] as const) {
+      expect(await run(sql, [id, ...values]), sql).toBe(SQLSTATE.integrityConstraintViolation);
+    }
+    expect(await run("UPDATE encrypted_files SET status = 'AVAILABLE', uploaded_at = now() WHERE id = $1", [id])).toBe(
+      'none',
+    );
+    expect(
+      await run("UPDATE encrypted_files SET status = 'PENDING_UPLOAD', uploaded_at = NULL WHERE id = $1", [id]),
+    ).toBe(SQLSTATE.integrityConstraintViolation);
+    expect(await run("UPDATE encrypted_files SET expires_at = now() + interval '1 day' WHERE id = $1", [id])).toBe(
+      'none',
+    );
+    expect(await run("UPDATE encrypted_files SET expires_at = now() + interval '2 days' WHERE id = $1", [id])).toBe(
+      SQLSTATE.integrityConstraintViolation,
+    );
+    expect(await run('UPDATE encrypted_files SET expires_at = NULL WHERE id = $1', [id])).toBe(
+      SQLSTATE.integrityConstraintViolation,
+    );
+    const tombstone =
+      "UPDATE encrypted_files SET status = 'DELETED', wrapped_dek = NULL, manifest_ciphertext = NULL, deleted_at = now() WHERE id = $1";
+    expect(await run(tombstone, [id])).toBe('none');
+    expect(await run("UPDATE encrypted_files SET status = 'AVAILABLE' WHERE id = $1", [id])).toBe(
+      SQLSTATE.integrityConstraintViolation,
+    );
+    expect(await run('UPDATE encrypted_files SET object_deleted_at = now() WHERE id = $1', [id])).toBe('none');
+    expect(
+      await run("UPDATE encrypted_files SET object_deleted_at = now() + interval '1 hour' WHERE id = $1", [id]),
+    ).toBe(SQLSTATE.integrityConstraintViolation);
+  });
+});
+
 describe('write-once identity columns', () => {
   it('never changes a public identity key after upload, but allows status changes', async () => {
     const user = await insertUser(api);

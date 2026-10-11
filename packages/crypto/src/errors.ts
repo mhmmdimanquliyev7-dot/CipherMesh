@@ -35,6 +35,14 @@ export const CryptoErrorCode = {
   KEY_AUTHENTICATION_FAILED: 'KEY_AUTHENTICATION_FAILED',
   /** The decrypted room key does not match the signed commitment (cryptographic-architecture 7.3, T-29). */
   KEY_COMMITMENT_MISMATCH: 'KEY_COMMITMENT_MISMATCH',
+  /**
+   * An encrypted file failed a check other than an AES-GCM tag: the ciphertext hash or length
+   * differs from the record, the decrypted manifest is malformed, or the decrypted content does
+   * not match the manifest's size and plaintext hash. No plaintext is released (Phase 7, T-07).
+   */
+  FILE_INTEGRITY_FAILED: 'FILE_INTEGRITY_FAILED',
+  /** An encrypted file uses an algorithm suite or manifest version this client does not support. */
+  FILE_FORMAT_UNSUPPORTED: 'FILE_FORMAT_UNSUPPORTED',
 } as const;
 
 export type CryptoErrorCode = (typeof CryptoErrorCode)[keyof typeof CryptoErrorCode];
@@ -53,6 +61,8 @@ const MESSAGES: Readonly<Record<CryptoErrorCode, string>> = {
   PASSPHRASE_REJECTED: 'The Vault Passphrase does not meet the policy',
   KEY_AUTHENTICATION_FAILED: 'The room key could not be authenticated and was not used',
   KEY_COMMITMENT_MISMATCH: "The room key does not match the room's signed record and was not used",
+  FILE_INTEGRITY_FAILED: 'The encrypted file failed its integrity check',
+  FILE_FORMAT_UNSUPPORTED: 'The encrypted file format is not supported',
 };
 
 export class CryptoError extends Error {

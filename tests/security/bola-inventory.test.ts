@@ -1,3 +1,4 @@
+import { describeMatrixAction } from '@ciphermesh/shared';
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../../apps/api/src/app';
@@ -20,6 +21,11 @@ const config = loadConfig({
   TOTP_ENCRYPTION_KEY: randomBytes(32).toString('base64url'),
   TOTP_ENCRYPTION_KEY_ID: 'bola-inventory-test',
   IDENTIFIER_HMAC_KEY: randomBytes(32).toString('base64url'),
+  // Object storage is required in production (Phase 7); never contacted here.
+  STORAGE_ENDPOINT: 'https://storage.ciphermesh.example',
+  STORAGE_BUCKET: 'cm-files',
+  STORAGE_ACCESS_KEY_ID: 'inventory-test-key',
+  STORAGE_SECRET_ACCESS_KEY: randomBytes(24).toString('base64url'),
 });
 const { routes } = createApp({
   config,
@@ -53,6 +59,7 @@ describe('bola inventory', () => {
       expect(c.mutates, c.key).toBe(route?.method !== 'GET');
       expect(c.targetsMember, c.key).toBe(c.key.includes(':userId'));
       expect(c.targetsInvitation, c.key).toBe(c.key.includes(':invitationId'));
+      expect(c.targetsFile === true, c.key).toBe(c.key.includes(':fileId'));
       // The action a case names is the matrix action the route declares (AZ-xx).
       if (c.kind === 'room') expect(route?.action.startsWith(`${String(c.action)}-`), c.key).toBe(true);
     }
@@ -62,7 +69,7 @@ describe('bola inventory', () => {
     for (const c of ROOM_CASES) {
       for (const required of ['A', 'B', 'D', 'E', 'F', 'H'] as const) expect(c.classes, c.key).toContain(required);
       if (c.mutates) expect(c.classes, c.key).toContain('G');
-      if (c.targetsMember || c.targetsInvitation) {
+      if (c.targetsMember || c.targetsInvitation || c.targetsFile === true) {
         expect(c.classes, c.key).toContain('C');
         expect(c.target, c.key).toBeDefined();
       }
@@ -71,7 +78,11 @@ describe('bola inventory', () => {
   });
 
   it('marks the routes the matrix protects with a step-up, so attackers are confirmed before they attack', () => {
-    const stepUpRoutes = routes.filter((r) => r.access === 'room' && /\/(delete|transfer-ownership)$/.test(r.path));
+    // From the matrix, not the path: deleting a room (AZ-04) needs a step-up, deleting a file (AZ-18) does not.
+    const stepUpRoutes = routes.filter(
+      (r) => r.access === 'room' && describeMatrixAction(/^AZ-\d{2}/.exec(r.action)?.[0] ?? '')?.stepUpAlways === true,
+    );
+    expect(stepUpRoutes.map((r) => r.action).sort()).toEqual(['AZ-04-ROOM-DELETE', 'AZ-05-OWNERSHIP-TRANSFER']);
     expect(
       BOLA_CASES.filter((c) => c.stepUp)
         .map((c) => c.key)

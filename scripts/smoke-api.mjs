@@ -110,6 +110,11 @@ try {
       APP_ORIGIN: 'https://ciphermesh.example',
       DATABASE_URL: 'postgresql://cm_api:smoke-placeholder-value@127.0.0.1:1/ciphermesh?sslmode=verify-full',
       ...AUTH_KEYS,
+      // Required in production since Phase 7; never contacted by the smoke test.
+      STORAGE_ENDPOINT: 'https://storage.invalid',
+      STORAGE_BUCKET: 'cm-files',
+      STORAGE_ACCESS_KEY_ID: 'smoke-placeholder',
+      STORAGE_SECRET_ACCESS_KEY: 'smoke-placeholder-value-not-a-secret',
     },
     [
       ['/api/health', 200, '{"status":"ok"}'],

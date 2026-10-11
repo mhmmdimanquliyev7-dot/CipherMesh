@@ -55,6 +55,23 @@ export const ROOM_KEYS = Object.freeze({
   safetyCodeDigits: 20,
 });
 
+/**
+ * Encrypted files (cryptographic-architecture section 6.1, Phase 7). Each file has its own random
+ * 256-bit FEK; the FEK encrypts the content and the manifest (CP-16: two messages) and is wrapped
+ * under RWK_v with AES-256-GCM, so a wrapped FEK is 32 key bytes plus the tag. CP-19 limits a file
+ * to 50 MiB, encrypted in one AES-GCM operation; packages/shared repeats the value (FILE_LIMITS)
+ * and a test compares the two. Manifest format version 1 holds the name, type, size and the
+ * SHA-256 of the plaintext (CD-09).
+ */
+export const FILES = Object.freeze({
+  fekBytes: 32,
+  wrappedFekBytes: 48,
+  maxPlaintextBytes: 50 * 1024 * 1024,
+  manifestVersion: 1,
+  maxNameLength: 255,
+  maxTypeLength: 127,
+});
+
 /** Room roles as they appear in signed membership grants (authorization-model section 2.1). */
 export const ROOM_ROLES = Object.freeze(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'] as const);
 export type RoomRole = (typeof ROOM_ROLES)[number];

@@ -16,7 +16,7 @@ import { availableParallelism, cpus, platform, release, tmpdir, totalmem } from 
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { chromium, firefox, webkit } from '@playwright/test';
 import { build } from 'vite';
-import { buildCsp, STATIC_SECURITY_HEADERS } from '../../apps/web/scripts/csp-lib.mjs';
+import { DEFAULT_STORAGE_ORIGIN, STATIC_SECURITY_HEADERS, buildCsp } from '../../apps/web/scripts/csp-lib.mjs';
 
 /** @typedef {import('./vault-page/bench').BenchResult} BenchResult */
 
@@ -27,7 +27,7 @@ const TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.wasm': 'application/wasm',
 };
-const headers = { ...STATIC_SECURITY_HEADERS, 'Content-Security-Policy': buildCsp([]) };
+const headers = { ...STATIC_SECURITY_HEADERS, 'Content-Security-Policy': buildCsp([], DEFAULT_STORAGE_ORIGIN) };
 
 const outDir = await mkdtemp(join(tmpdir(), 'cm-vault-bench-'));
 /** @type {{ engine: string, version: string, result: BenchResult, problems: string[] }[]} */

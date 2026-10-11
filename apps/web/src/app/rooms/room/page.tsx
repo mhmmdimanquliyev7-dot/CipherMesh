@@ -19,6 +19,7 @@ import { Suspense, useCallback, useEffect, useState, type SyntheticEvent } from 
 import { StepUpForm } from '../../../components/step-up-form';
 import { Alert, Button, Card, Field, SecondaryButton } from '../../../components/ui';
 import { api, ApiError, formText } from '../../../lib/api';
+import { FilePanel } from '../../../rooms/file-panel';
 import { InviteCard, RoomInvitations } from '../../../rooms/invitations';
 import { RoomKeyPanel } from '../../../rooms/key-panel';
 import { roomKeys } from '../../../rooms/keys';
@@ -26,7 +27,7 @@ import { describeRoomError, REKEY_NOTICE, ROOM_NAME_WARNING } from '../../../roo
 import { assignableRoles, mayAttempt, ROLE_LABEL } from '../../../rooms/permissions';
 
 /**
- * One room (Phase 5, CM-T030, CM-T031; Phase 6, CM-T033 to CM-T036, CM-T085). The static export has
+ * One room (Phase 5, CM-T030, CM-T031; Phase 6, CM-T033 to CM-T036, CM-T085; Phase 7 files, CM-T038 to CM-T041). The static export has
  * no per-room pages, so the room ID travels in the query string and is validated before use
  * (ADR-011). The page shows controls the shared matrix allows for the user's role, as UX only; the
  * API authorizes every request against the stored membership and answers 404 to anyone who is not
@@ -137,6 +138,14 @@ function Room({ roomId }: { readonly roomId: string }) {
         />
       )}
       <RoomKeyPanel roomId={roomId} profile={room.room.securityProfile} members={members} />
+      <FilePanel
+        roomId={roomId}
+        role={role}
+        profile={room.room.securityProfile}
+        keyState={room.room.keyState}
+        selfId={selfId}
+        members={members}
+      />
       <Members
         roomId={roomId}
         role={role}

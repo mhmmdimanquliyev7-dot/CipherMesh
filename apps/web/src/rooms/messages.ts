@@ -11,6 +11,11 @@ export function describeRoomError(error: unknown): string {
         return KEY_MISMATCH;
       case 'CRYPTO_UNAVAILABLE':
         return 'This browser does not provide the cryptography CipherMesh requires.';
+      case 'CRYPTO_AUTHENTICATION_FAILED':
+      case 'FILE_INTEGRITY_FAILED':
+        return FILE_INTEGRITY_ERROR;
+      case 'FILE_FORMAT_UNSUPPORTED':
+        return 'This file was encrypted in a format this version of CipherMesh does not support. Nothing was opened.';
       default:
         return 'A cryptographic check failed. Nothing was used or sent.';
     }
@@ -19,6 +24,10 @@ export function describeRoomError(error: unknown): string {
     if (error.code === 'VAULT_LOCKED')
       return 'Unlock your vault first. Room keys are created and opened in this browser.';
     if (error.code === 'ROOM_KEY_MISSING') return KEY_MISSING;
+    if (error.code === 'FILE_TOO_LARGE')
+      return 'Files can be at most 50 MiB (they are encrypted in this browser in one piece).';
+    if (error.code === 'STORAGE_TRANSFER_FAILED')
+      return 'The encrypted file could not be transferred to or from storage. Check your connection and try again.';
   }
   if (error instanceof ApiError) {
     switch (error.code) {
@@ -56,10 +65,37 @@ export function describeRoomError(error: unknown): string {
         return 'This room requires you to compare and confirm the fingerprint first.';
       case 'FINGERPRINT_MISMATCH':
         return "The fingerprint you confirmed is not this person's current fingerprint. Do not invite them; compare again.";
+      // Encrypted files (Phase 7).
+      case 'KEY_VERSION_STALE':
+        return 'The room key changed while you were uploading. Reload the room and try again.';
+      case 'FILE_ID_UNAVAILABLE':
+        return 'That file identifier cannot be used. Please try again.';
+      case 'EXPIRY_NOT_ALLOWED':
+        return "Choose an expiry that this room's security profile allows.";
+      case 'FILE_QUOTA_EXCEEDED':
+        return 'The storage quota is used up, or you have too many unfinished uploads. Delete files or wait, then try again.';
+      case 'UPLOAD_INCOMPLETE':
+        return 'The encrypted file has not reached storage yet. Try again.';
+      case 'UPLOAD_SIZE_MISMATCH':
+        return 'The stored file did not match what was announced, so the upload was cancelled.';
+      case 'UPLOAD_EXPIRED':
+        return 'The upload took too long and was cancelled. Try again.';
+      case 'FILE_NOT_PENDING':
+        return 'This upload was already completed or cancelled.';
+      case 'STORAGE_UNAVAILABLE':
+        return 'File storage is not available right now. Try again later.';
     }
   }
   return describeError(error);
 }
+
+/** Any failed check of an encrypted file (CM-T039, T-07): nothing was shown or saved. */
+export const FILE_INTEGRITY_ERROR =
+  'This file failed its integrity check: it was changed or damaged after it was encrypted. Nothing was shown or saved. Tell the room owner through another channel.';
+
+/** Encrypted files (security-ui, L-11, L-14): what encryption does and does not cover. */
+export const FILES_EXPLANATION =
+  'Files are encrypted in your browser before upload; the server and storage hold only ciphertext. Their size and upload time are visible to the server. A file you download is saved unencrypted on your device, outside CipherMesh, and removing someone from the room does not take back files they already downloaded.';
 
 /** Shown wherever a room name is typed (data-model 4.6, T-28). */
 export const ROOM_NAME_WARNING =

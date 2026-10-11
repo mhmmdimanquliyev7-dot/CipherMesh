@@ -56,6 +56,26 @@ export const ErrorCode = {
   FINGERPRINT_REQUIRED: 'FINGERPRINT_REQUIRED',
   /** The confirmed fingerprint differs from the invitee's current identity fingerprint (PC-05, T-25). */
   FINGERPRINT_MISMATCH: 'FINGERPRINT_MISMATCH',
+  // Encrypted files (Phase 7, authorization-model.md section 7, DF-07, DF-08). The API sees only
+  // ciphertext, the wrapped FEK and the encrypted manifest (INV-01, INV-16).
+  /** A content write names a key version other than the room's current one (PC-16). */
+  KEY_VERSION_STALE: 'KEY_VERSION_STALE',
+  /** The client-chosen file ID was used before; file IDs enter the file's AAD (CD-08). */
+  FILE_ID_UNAVAILABLE: 'FILE_ID_UNAVAILABLE',
+  /** The expiry is missing where the profile requires one, or later than it allows (PC-08). */
+  EXPIRY_NOT_ALLOWED: 'EXPIRY_NOT_ALLOWED',
+  /** The room or account storage quota, or the limit on pending uploads, would be exceeded. */
+  FILE_QUOTA_EXCEEDED: 'FILE_QUOTA_EXCEEDED',
+  /** Completion before the ciphertext reached storage; the upload can still be retried. */
+  UPLOAD_INCOMPLETE: 'UPLOAD_INCOMPLETE',
+  /** The stored object differs from the announced size; the upload was cancelled. */
+  UPLOAD_SIZE_MISMATCH: 'UPLOAD_SIZE_MISMATCH',
+  /** Completion after the completion window; the upload was abandoned. */
+  UPLOAD_EXPIRED: 'UPLOAD_EXPIRED',
+  /** The file is not waiting for completion (already completed, cancelled or deleted). */
+  FILE_NOT_PENDING: 'FILE_NOT_PENDING',
+  /** Object storage is not configured or did not answer; nothing was changed. */
+  STORAGE_UNAVAILABLE: 'STORAGE_UNAVAILABLE',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

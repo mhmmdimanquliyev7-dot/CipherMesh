@@ -1,6 +1,6 @@
 // `pnpm security:negative-controls`: proves that the security tests are real (Phase 3, extended
-// with the vault and cryptography controls of Phase 4, the room authorization controls of Phase 5
-// and the cryptographic membership controls of Phase 6). `--only=<prefix>` runs a subset, for example `--only=NC-05`.
+// with the vault and cryptography controls of Phase 4, the room authorization controls of Phase 5,
+// the cryptographic membership controls of Phase 6 and the encrypted file controls of Phase 7). `--only=<prefix>` runs a subset, for example `--only=NC-05`.
 //
 // For each control, one deliberate defect is written into a source file in the working tree, the
 // tests that must catch it are run, and the original file is restored immediately afterwards
@@ -743,6 +743,127 @@ const CONTROLS = [
     ],
     tests: [],
     e2e: { spec: 'tests/e2e/room-keys.spec.ts', title: 'kept in the browser' },
+  },
+  // ------------------------------------------------------------------- Phase 7: encrypted files
+  {
+    id: 'NC-07-01',
+    defect: 'The browser releases decrypted content that does not match the manifest size and plaintext hash',
+    file: 'packages/crypto/src/files.ts',
+    edits: [
+      [
+        '      if (plaintext.length !== manifest.size || !bytesEqual(await sha256(plaintext), manifest.sha256)) {',
+        '      if (plaintext.length < 0) {',
+      ],
+    ],
+    tests: ['packages/crypto/src/files.test.ts'],
+  },
+  {
+    id: 'NC-07-02',
+    defect: 'File content is no longer bound to its file ID in the AES-GCM AAD (cm.file.content)',
+    file: 'packages/crypto/src/files.ts',
+    edits: [
+      [
+        "  // The contexts validate the identifiers; build them before any key exists.\n  const contentAad = contextBytes('cm.file.content', { roomId, fileId });",
+        "  // The contexts validate the identifiers; build them before any key exists.\n  const contentAad = contextBytes('cm.file.content', { roomId, fileId: roomId });",
+      ],
+      [
+        "  const { roomId, fileId, keyVersion } = record;\n  const contentAad = contextBytes('cm.file.content', { roomId, fileId });",
+        "  const { roomId, fileId, keyVersion } = record;\n  const contentAad = contextBytes('cm.file.content', { roomId, fileId: roomId });",
+      ],
+    ],
+    tests: ['packages/crypto/src/files.test.ts'],
+  },
+  {
+    id: 'NC-07-03',
+    defect: 'A wrapped FEK is no longer bound to its file (cm.dek.wrap names the room instead of the file)',
+    file: 'packages/crypto/src/files.ts',
+    edits: [
+      [
+        "  return contextBytes('cm.dek.wrap', { roomId, keyVersion, itemType: 'file', itemId: fileId, revision: 0 });",
+        "  return contextBytes('cm.dek.wrap', { roomId, keyVersion, itemType: 'file', itemId: roomId, revision: 0 });",
+      ],
+    ],
+    tests: ['packages/crypto/src/files.test.ts'],
+  },
+  {
+    id: 'NC-07-04',
+    defect: 'Key material and download URLs of a file are served without the room and membership filter (BOLA)',
+    file: 'apps/api/src/db/file-store.ts',
+    edits: [
+      [
+        '        where: { id: fileId, ...readable(roomId, userId, now) },',
+        "        where: { id: fileId, status: 'AVAILABLE' },",
+      ],
+    ],
+    tests: ['tests/authz/bola.test.ts'],
+  },
+  {
+    id: 'NC-07-05',
+    defect: 'An upload is completed without asking storage whether the ciphertext arrived with the announced size',
+    file: 'apps/api/src/files/service.ts',
+    edits: [
+      ['        stored = await storage.head(file.objectKey);', '        stored = { size: file.ciphertextSize };'],
+    ],
+    tests: ['tests/files/files-upload.test.ts'],
+  },
+  {
+    id: 'NC-07-06',
+    defect: 'Presigned upload URLs no longer sign the content length (storage accepts any size)',
+    file: 'apps/api/src/storage/object-store.ts',
+    edits: [
+      [
+        '      aws: { signQuery: true, allHeaders: true, datetime: amzDate(now) },',
+        '      aws: { signQuery: true, allHeaders: false, datetime: amzDate(now) },',
+      ],
+    ],
+    tests: ['tests/files/files-upload.test.ts'],
+  },
+  {
+    id: 'NC-07-07',
+    defect:
+      'The upload request accepts unknown fields (a plaintext name, type or caller identity) instead of refusing them',
+    file: 'packages/validation/src/files.ts',
+    edits: [
+      ['export const fileUploadRequestSchema = z.strictObject({', 'export const fileUploadRequestSchema = z.object({'],
+    ],
+    tests: ['tests/files/files-upload.test.ts'],
+  },
+  {
+    id: 'NC-07-08',
+    defect: 'VIEWERs in RESTRICTED rooms obtain file key material and download URLs (PC-12 removed)',
+    file: 'apps/api/src/files/service.ts',
+    edits: [
+      [
+        "    return access.role !== 'VIEWER' || FILE_RULES[access.room.securityProfile].viewerMayDownload;",
+        "    return access.role !== 'VIEWER' || FILE_RULES[access.room.securityProfile].viewerMayDownload || true;",
+      ],
+    ],
+    tests: ['tests/files/files-access.test.ts'],
+  },
+  {
+    id: 'NC-07-09',
+    defect: 'Expired files are still served until the worker runs (INV-14, expiry no longer checked at read time)',
+    file: 'apps/api/src/db/file-store.ts',
+    edits: [
+      [
+        '  OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],',
+        '  OR: [{ expiresAt: null }, { expiresAt: { not: now } }],',
+      ],
+    ],
+    tests: ['tests/files/files-access.test.ts'],
+  },
+  {
+    id: 'NC-07-10',
+    defect: 'The browser keeps decrypted file content in sessionStorage',
+    file: 'apps/web/src/rooms/files.ts',
+    edits: [
+      [
+        '  return { opened, bytes: await opened.decrypt(ciphertext) };',
+        "  const plain = await opened.decrypt(ciphertext);\n  sessionStorage.setItem('cm-last-file', new TextDecoder().decode(plain.subarray(0, 256)));\n  return { opened, bytes: plain };",
+      ],
+    ],
+    tests: [],
+    e2e: { spec: 'tests/e2e/files.spec.ts', title: 'another member downloads the identical bytes' },
   },
 ];
 

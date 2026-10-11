@@ -115,8 +115,31 @@ export default tseslint.config(
   {
     // One database access module (CM-T013): the Prisma client, the driver adapter and pg are
     // imported only in apps/api/src/db, so connection handling and logging stay in one place.
+    // Phase 7 (CM-T037): likewise the S3 client is imported only in apps/api/src/storage, so
+    // credentials, presigning and object-key rules stay in one module.
     files: ['apps/api/src/**'],
     ignores: ['apps/api/src/db/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            ...childProcess,
+            { name: 'pg', message: 'Database access goes through apps/api/src/db only.' },
+            { name: 'aws4fetch', message: 'Object storage access goes through apps/api/src/storage only.' },
+          ],
+          patterns: [
+            {
+              group: ['@prisma/*', '**/generated/prisma', '**/generated/prisma/**'],
+              message: 'Database access goes through apps/api/src/db only.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['apps/api/src/storage/**'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -127,6 +150,20 @@ export default tseslint.config(
               group: ['@prisma/*', '**/generated/prisma', '**/generated/prisma/**'],
               message: 'Database access goes through apps/api/src/db only.',
             },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['apps/api/src/db/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            ...childProcess,
+            { name: 'aws4fetch', message: 'Object storage access goes through apps/api/src/storage only.' },
           ],
         },
       ],

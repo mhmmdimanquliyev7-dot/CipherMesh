@@ -33,12 +33,15 @@ import {
   type RegisteredRoute,
 } from './routes/registry';
 import { createReadinessProbe, PUBLIC_ROUTE_ALLOWLIST, systemRoutes } from './routes/system';
+import { fileRoutes } from './routes/files';
 import { invitationRoutes } from './routes/invitations';
 import { roomRoutes } from './routes/rooms';
 import { vaultRoutes } from './routes/vault';
 import { createInvitationService } from './rooms/invitations';
 import { createRoomKeyService } from './rooms/keys';
 import { createRoomService } from './rooms/service';
+import { createObjectStore, type ObjectStore } from './storage/object-store';
+import { createFileService } from './files/service';
 import { createVaultService, defaultVaultRateLimits, type VaultRateLimits, type VaultService } from './vault/service';
 
 export interface AppDependencies {
@@ -58,6 +61,8 @@ export interface AppDependencies {
     readonly rateLimits?: AuthRateLimits;
     readonly vaultRateLimits?: VaultRateLimits;
     readonly events?: SecurityEventSink;
+    /** Object storage double for tests that must simulate storage failures. */
+    readonly storage?: ObjectStore;
   };
 }
 
@@ -120,6 +125,14 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
     events,
     clock,
   });
+  // Encrypted files (Phase 7): ciphertext in object storage, presigned URLs for browsers.
+  const files = createFileService({
+    store: roomData.store,
+    transaction: roomData.transaction,
+    storage: testing?.storage ?? createObjectStore(config.storage),
+    events,
+    clock,
+  });
 
   const app = express();
   app.disable('x-powered-by');
@@ -145,6 +158,7 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
       ...vaultRoutes(vault),
       ...roomRoutes(roomService, roomAccess, roomKeys, invitations, roomData.store),
       ...invitationRoutes(invitations),
+      ...fileRoutes(files, roomData.store),
       ...(testing?.routes ?? []),
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],

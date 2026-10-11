@@ -4,6 +4,15 @@
 // (apps/web/out-meta/security-headers.json), and the API behind a /api reverse proxy on the same
 // origin, with exactly one forwarding hop (TRUST_PROXY_HOPS=1).
 //
+// Phase 7: a second HTTPS listener (E2E_STORAGE_PORT, default 4174) stands in for the
+// provider's TLS storage endpoint. It forwards every request unchanged, including the Host
+// header that presigned URLs are signed for, to the local object-storage emulator, so browsers
+// reach storage cross-origin over HTTPS exactly as in production (presigned PUT and GET, bucket
+// CORS, the page's CSP connect-src). The API presigns for this origin (STORAGE_PUBLIC_ENDPOINT).
+// It answers on another HOST name (localhost, the application is 127.0.0.1): cookies are not
+// isolated by port, and one engine sent the session cookie to another port of the same host
+// (finding SF-07-01). As a standing check, it refuses any request that carries a cookie.
+//
 // The TLS certificate is self-signed for 127.0.0.1, generated with OpenSSL at startup, valid for
 // one day and kept only in memory: the key file is deleted immediately. Playwright accepts it via
 // ignoreHTTPSErrors. The API is the built bundle (run `pnpm build` first) using DATABASE_URL from
@@ -24,6 +33,8 @@ const webDir = join(root, 'apps', 'web');
 const outDir = join(webDir, 'out');
 const port = Number(process.env.E2E_PORT ?? 4173);
 const origin = `https://127.0.0.1:${String(port)}`;
+const storagePort = Number(process.env.E2E_STORAGE_PORT ?? 4174);
+const storageOrigin = `https://localhost:${String(storagePort)}`;
 if (existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
 
 /** @type {Record<string, string>} */
@@ -52,7 +63,7 @@ const generated = spawnSync(opensslBinary(), [
   '-subj',
   '/CN=127.0.0.1',
   '-addext',
-  'subjectAltName=IP:127.0.0.1',
+  'subjectAltName=IP:127.0.0.1,DNS:localhost',
   '-keyout',
   join(certDir, 'key.pem'),
   '-out',
@@ -74,6 +85,10 @@ const freePort = () =>
 const apiPort = await freePort();
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required for the E2E API (see .env.example)');
+const storageUpstream = process.env.STORAGE_ENDPOINT;
+if (!storageUpstream || !process.env.STORAGE_ACCESS_KEY_ID || !process.env.STORAGE_SECRET_ACCESS_KEY) {
+  throw new Error('STORAGE_ENDPOINT and the STORAGE_* credentials are required for the E2E API (see .env.example)');
+}
 const api = spawn(process.execPath, ['dist/server.js'], {
   cwd: join(root, 'apps', 'api'),
   env: {
@@ -89,6 +104,12 @@ const api = spawn(process.execPath, ['dist/server.js'], {
     TOTP_ENCRYPTION_KEY_ID: 'e2e',
     IDENTIFIER_HMAC_KEY: randomBytes(32).toString('base64url'),
     TRUST_PROXY_HOPS: '1',
+    STORAGE_ENDPOINT: storageUpstream,
+    STORAGE_PUBLIC_ENDPOINT: storageOrigin,
+    STORAGE_BUCKET: process.env.STORAGE_BUCKET ?? 'cm-files',
+    STORAGE_REGION: process.env.STORAGE_REGION ?? 'us-east-1',
+    STORAGE_ACCESS_KEY_ID: process.env.STORAGE_ACCESS_KEY_ID,
+    STORAGE_SECRET_ACCESS_KEY: process.env.STORAGE_SECRET_ACCESS_KEY,
   },
   stdio: ['ignore', 'inherit', 'inherit'],
 });
@@ -180,3 +201,40 @@ createServer(tls, (req, res) => {
 }).listen(port, '127.0.0.1', () => {
   console.log(`E2E server at ${origin} (static export and /api proxy)`);
 });
+
+// ------------------------------------------------------------- object storage over HTTPS
+const upstreamStorage = new URL(storageUpstream);
+const storageServer = createServer(tls, (req, res) => {
+  // SF-07-01: a browser must never send a cookie to storage. Refuse instead of forwarding.
+  if (req.headers.cookie !== undefined) {
+    res.writeHead(400, { 'content-type': 'text/plain' }).end('cookies are never sent to storage');
+    return;
+  }
+  /** @type {Record<string, string | string[]>} */
+  const forward = {};
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (value !== undefined && !HOP_BY_HOP.has(name)) forward[name] = value;
+  }
+  const upstream = httpRequest(
+    {
+      host: upstreamStorage.hostname,
+      port: upstreamStorage.port,
+      path: req.url,
+      method: req.method,
+      headers: forward,
+    },
+    (answer) => {
+      res.writeHead(answer.statusCode ?? 502, answer.headers);
+      answer.pipe(res);
+    },
+  );
+  upstream.on('error', () => {
+    res.writeHead(502).end();
+  });
+  req.pipe(upstream);
+});
+// localhost may resolve to either loopback address; both are served, nothing beyond loopback.
+storageServer.listen(storagePort, '127.0.0.1', () => {
+  console.log(`E2E storage endpoint at ${storageOrigin} (HTTPS in front of the local emulator)`);
+});
+createServer(tls, (req, res) => storageServer.emit('request', req, res)).listen(storagePort, '::1');

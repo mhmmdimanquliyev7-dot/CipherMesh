@@ -64,29 +64,67 @@ export function sha256Source(text) {
  * the Argon2id WebAssembly module compile (ADR-010, LIB-03). It permits compiling WebAssembly
  * only: it does not allow eval(), new Function() or inline scripts, and the module itself is
  * part of a same-origin script bundle. The Argon2id Web Worker is a same-origin script, so
- * script-src 'self' covers it (worker-src falls back to script-src). The object-storage origin is
- * added to connect-src in Phase 7.
+ * script-src 'self' covers it (worker-src falls back to script-src).
+ *
+ * Phase 7 (CM-T037 to CM-T041, deployment-architecture.md): connect-src adds exactly one origin,
+ * the object storage that presigned URLs point to, so encrypted files travel between the browser
+ * and storage without passing through the API; a URL to any other origin is refused by the
+ * browser. img-src adds blob: for previews of decrypted raster images (never HTML or SVG).
  *
  * form-action 'none' (Phase 4, security finding SF-04-01): the client never submits an HTML form
  * natively; every form is handled by JavaScript and sent with fetch(). A native submission, which
  * is possible before hydration or when the bundle fails to load, would be a GET that carries the
  * typed values, such as the account password, in the URL. The browser now refuses it.
  * @param {readonly string[]} scriptHashes
+ * @param {string} storageOrigin the object-storage origin, checked by storageOrigin()
  * @returns {string}
  */
-export function buildCsp(scriptHashes) {
+export function buildCsp(scriptHashes, storageOrigin) {
+  if (storageOrigin !== checkStorageOrigin(storageOrigin)) throw new Error('Invalid storage origin');
   const scriptSrc = ["'self'", "'wasm-unsafe-eval'", ...[...new Set(scriptHashes)].sort()].join(' ');
   return [
     "default-src 'none'",
     `script-src ${scriptSrc}`,
     "style-src 'self'",
-    "img-src 'self'",
+    "img-src 'self' blob:",
     "font-src 'self'",
-    "connect-src 'self'",
+    `connect-src 'self' ${storageOrigin}`,
     "manifest-src 'self'",
     "form-action 'none'",
     "frame-ancestors 'none'",
     "base-uri 'none'",
     "object-src 'none'",
   ].join('; ');
+}
+
+/**
+ * Where presigned URLs point in local builds: the HTTPS storage proxy of tests/e2e/static-server.mjs,
+ * on another host name than the application (SF-07-01: cookies are not isolated by port).
+ */
+export const DEFAULT_STORAGE_ORIGIN = 'https://localhost:4174';
+
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+/**
+ * The object-storage origin for connect-src, from CM_STORAGE_ORIGIN at build time. It must be a
+ * bare origin, over https except on loopback; anything else fails the build rather than
+ * producing a weaker or broken policy.
+ * @param {string | undefined} value
+ * @returns {string}
+ */
+export function checkStorageOrigin(value) {
+  const candidate = value === undefined || value === '' ? DEFAULT_STORAGE_ORIGIN : value;
+  let url;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new Error('CM_STORAGE_ORIGIN must be an origin such as https://storage.example');
+  }
+  const secure = url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK.has(url.hostname));
+  // A host name of letters, digits, dots and hyphens, or an IPv6 literal: never a CSP wildcard.
+  const plainHost = /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:]+\])$/.test(url.hostname);
+  if (!secure || !plainHost || url.origin !== candidate) {
+    throw new Error('CM_STORAGE_ORIGIN must be an https origin (http only on loopback), without path');
+  }
+  return url.origin;
 }

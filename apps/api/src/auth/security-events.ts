@@ -71,6 +71,13 @@ export const SECURITY_EVENTS = [
   /** A member's statement that they compared the Room Safety Code of a version (AZ-30). */
   'SAFETY_CODE_CONFIRMED',
   'SAFETY_CODE_MISMATCH_REPORTED',
+  // Encrypted files (Phase 7; PC-13: uploads and deletions at BASELINE, download-URL issuance at
+  // EXTENDED and FULL). Details carry the room and file IDs, the key version, the ciphertext size
+  // and reason codes only: never a presigned URL, an object key, a wrapped FEK or a manifest.
+  'FILE_UPLOADED',
+  'FILE_UPLOAD_CANCELLED',
+  'FILE_DOWNLOAD_ISSUED',
+  'FILE_DELETED',
 ] as const;
 export type SecurityEventName = (typeof SECURITY_EVENTS)[number];
 

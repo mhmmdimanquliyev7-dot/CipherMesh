@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { PLACEHOLDER_PHC } from '../../scripts/db/synthetic';
 
@@ -179,7 +179,8 @@ export function fileRow(room: RoomFixture, overrides: Record<string, unknown> = 
     content_iv: DUMMY.iv(),
     manifest_ciphertext: DUMMY.ciphertext(),
     manifest_iv: DUMMY.iv(),
-    object_key: `rooms/${randomUUID()}`,
+    // The server-generated form since Phase 7: "f/" and 32 random bytes in base64url.
+    object_key: `f/${randomBytes(32).toString('base64url')}`,
     ciphertext_size: 1024,
     ciphertext_sha256: DUMMY.digest(),
     ...overrides,
