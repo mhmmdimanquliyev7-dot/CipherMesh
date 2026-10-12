@@ -100,6 +100,26 @@ export const SECURITY_EVENTS = [
   'PROFILE_DOWNGRADED',
   'ENVELOPES_FETCHED',
   'MEMBER_LIST_VIEWED',
+  // Key rotation (Phase 11, ADR-013 "Audit events", BASELINE). Details carry the room and operation
+  // IDs, the mode, key versions, counts and reason codes only: never an envelope, commitment,
+  // signature, fingerprint or recipient key (INV-10, INV-18). Every operation transition is one event.
+  'MEMBER_LEFT',
+  'REKEY_STARTED',
+  'REKEY_COMPLETED',
+  'REKEY_ABANDONED',
+  'REKEY_SUPERSEDED',
+  'REKEY_CANCELLED',
+  'REKEY_STALE',
+  /** A finalize was refused and nothing was stored (recipient set, signature or version). */
+  'REKEY_REJECTED',
+  'KEY_VERSION_RETIRED',
+  /** The worker destroyed an unreferenced RETIRED version: envelopes deleted, commitment kept. */
+  'KEY_VERSION_DESTROYED',
+  /** AZ-14: keys re-shared to a member's current identity (CM-T053). */
+  'KEYS_RESHARED',
+  'MEMBER_REINSTATED',
+  /** A vault reset replaced a member's identity in a room: shown to the room's administrators. */
+  'MEMBER_IDENTITY_REPLACED',
 ] as const;
 export type SecurityEventName = (typeof SECURITY_EVENTS)[number];
 

@@ -28,6 +28,7 @@ import {
   type RoomDetailRecord,
   type RoomStore,
   type RoomSummaryRecord,
+  type StaledOperation,
 } from '../db/room-store';
 import { HttpError } from '../http/errors';
 import { decodeExact, verifiedIdentity, verifyGrant, verifyRoomCreation } from './statements';
@@ -223,6 +224,24 @@ export function createRoomService(deps: RoomServiceDependencies) {
       !(await tx.lockActiveIdentity(targetUserId, grant.subjectKeyId))
     ) {
       throw identityKeyChanged();
+    }
+  }
+
+  /** Phase 11: the PENDING rekey operations a membership change made STALE (ADR-013 step 5). */
+  function recordStaled(actor: Actor, meta: RequestMeta, staled: readonly StaledOperation[]): void {
+    for (const stale of staled) {
+      events.record({
+        name: 'REKEY_STALE',
+        outcome: 'SUCCESS',
+        actorUserId: actor.userId,
+        requestId: meta.requestId,
+        details: {
+          roomId: stale.roomId,
+          operationId: stale.operationId,
+          mode: stale.mode,
+          reason: 'MEMBERSHIP_CHANGED',
+        },
+      });
     }
   }
 
@@ -488,7 +507,7 @@ export function createRoomService(deps: RoomServiceDependencies) {
         if (grant !== undefined) await lockGrantIdentities(tx, targetUserId, grant);
         if (!(await tx.setMemberRole(target, role, grant))) throw notFound();
         await tx.incrementMembershipEpoch(access.roomId, now);
-        return { from: target.role };
+        return { from: target.role, staled: tx.takeStaledOperations() };
       });
       if (changed !== undefined) {
         events.record({
@@ -499,6 +518,7 @@ export function createRoomService(deps: RoomServiceDependencies) {
           requestId: meta.requestId,
           details: { roomId: access.roomId, from: changed.from, to: role },
         });
+        recordStaled(actor, meta, changed.staled);
       }
       return { userId: targetUserId, role };
     },
@@ -509,7 +529,7 @@ export function createRoomService(deps: RoomServiceDependencies) {
      */
     async removeMember(actor: Actor, access: RoomAccess, targetUserId: string, meta: RequestMeta): Promise<void> {
       const now = clock();
-      const wasActive = await transaction(async (tx) => {
+      const removed = await transaction(async (tx) => {
         const locked = await lockAndReauthorize(tx, actor, access, meta, 'AZ-09', now, {
           target: { userId: targetUserId, includeSuspended: true },
           sensitive: true,
@@ -517,7 +537,7 @@ export function createRoomService(deps: RoomServiceDependencies) {
         if (locked.target === undefined || !(await tx.removeMember(locked.target, actor.userId, now))) {
           throw notFound();
         }
-        return locked.room.keyState === 'ACTIVE';
+        return { wasActive: locked.room.keyState === 'ACTIVE', staled: tx.takeStaledOperations() };
       });
       events.record({
         name: 'MEMBER_REMOVED',
@@ -527,7 +547,8 @@ export function createRoomService(deps: RoomServiceDependencies) {
         requestId: meta.requestId,
         details: { roomId: access.roomId },
       });
-      if (wasActive) recordRekeyRequired(actor, meta, access.roomId, 'MEMBER_REMOVED');
+      if (removed.wasActive) recordRekeyRequired(actor, meta, access.roomId, 'MEMBER_REMOVED');
+      recordStaled(actor, meta, removed.staled);
     },
 
     /**
@@ -545,7 +566,7 @@ export function createRoomService(deps: RoomServiceDependencies) {
     ): Promise<void> {
       const now = clock();
       const grant = await verifiedOwnerGrant(actor, meta, access.roomId, targetUserId, 'OWNER', proof);
-      await transaction(async (tx) => {
+      const staled = await transaction(async (tx) => {
         const locked = await lockAndReauthorize(tx, actor, access, meta, 'AZ-05', now, {
           target: { userId: targetUserId, includeSuspended: false },
         });
@@ -555,6 +576,7 @@ export function createRoomService(deps: RoomServiceDependencies) {
           throw notFound();
         }
         await tx.incrementMembershipEpoch(access.roomId, now);
+        return tx.takeStaledOperations();
       });
       events.record({
         name: 'OWNERSHIP_TRANSFERRED',
@@ -564,6 +586,7 @@ export function createRoomService(deps: RoomServiceDependencies) {
         requestId: meta.requestId,
         details: { roomId: access.roomId },
       });
+      recordStaled(actor, meta, staled);
     },
   };
 }

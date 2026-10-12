@@ -62,6 +62,7 @@ describe('bola inventory', () => {
       expect(c.targetsFile === true, c.key).toBe(c.key.includes(':fileId'));
       expect(c.targetsNote === true, c.key).toBe(c.key.includes(':noteId'));
       expect(c.targetsSecret === true, c.key).toBe(c.key.includes(':secretId'));
+      expect(c.targetsOperation === true, c.key).toBe(c.key.includes(':operationId'));
       // The action a case names is the matrix action the route declares (AZ-xx).
       if (c.kind === 'room') expect(route?.action.startsWith(`${String(c.action)}-`), c.key).toBe(true);
     }
@@ -76,7 +77,8 @@ describe('bola inventory', () => {
         c.targetsInvitation ||
         c.targetsFile === true ||
         c.targetsNote === true ||
-        c.targetsSecret === true
+        c.targetsSecret === true ||
+        c.targetsOperation === true
       ) {
         expect(c.classes, c.key).toContain('C');
         expect(c.target, c.key).toBeDefined();

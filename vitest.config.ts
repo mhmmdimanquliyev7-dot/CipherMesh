@@ -118,6 +118,20 @@ export default defineConfig({
         },
       },
       {
+        // Key rotation (Phase 11, CM-T050 to CM-T053): the rekey state machine, leaving, re-sharing
+        // and the identity procedure against the real API and PostgreSQL (cm_api, and cm_worker for
+        // the maintenance job), with real browser cryptography from packages/crypto. Row-lock
+        // barriers force the races. One file at a time (shared connection limit).
+        test: {
+          name: 'rekey',
+          include: ['tests/rekey/**/*.test.ts'],
+          fileParallelism: false,
+          globalSetup: ['tests/database/global-setup.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
         test: {
           name: 'database',
           include: ['tests/database/**/*.test.ts'],

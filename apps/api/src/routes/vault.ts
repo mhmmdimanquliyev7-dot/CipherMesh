@@ -83,7 +83,13 @@ export function vaultRoutes(vault: VaultService): readonly AnyRoute[] {
       body: vaultResetRequestSchema,
       response: vaultResetResponseSchema,
       handler: async (ctx) => {
-        const reset = await vault.resetVault(actorOf(ctx), ctx.body.supersedesKeyId, ctx.body.vault, ctx.request);
+        const reset = await vault.resetVault(
+          actorOf(ctx),
+          ctx.body.supersedesKeyId,
+          ctx.body.vault,
+          ctx.request,
+          ctx.body.identityCompromised === true,
+        );
         return {
           status: 201,
           body: {

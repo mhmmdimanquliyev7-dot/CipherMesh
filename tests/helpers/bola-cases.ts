@@ -12,7 +12,8 @@ import type { Person } from './rooms';
  * and Safety Code routes (CM-T033 to CM-T036, CM-T085); Phase 7 the file routes (CM-T037 to
  * CM-T041), whose target is a file of the room; Phase 8 the note routes (CM-T042), whose target is
  * a note of the room; Phase 9 the secret routes (CM-T043, CM-T044), whose target is a secret of the
- * room.
+ * room; Phase 11 the rekey, leave and re-share routes (CM-T050 to CM-T053), whose finalize and
+ * cancel target a rekey operation of the room (OL-13).
  *
  * Attack classes (prompt 07C section 4):
  *   A  a member of room A addresses the existing room B
@@ -42,6 +43,8 @@ export interface RoomRef {
   readonly noteId?: string;
   /** The secret ID in the path, for routes that name a secret (Phase 9). */
   readonly secretId?: string;
+  /** The rekey operation ID in the path, for routes that name an operation (Phase 11, OL-13). */
+  readonly operationId?: string;
 }
 
 export interface Extras {
@@ -67,10 +70,12 @@ export interface BolaCase {
   readonly targetsNote?: boolean;
   /** The path names a secret (`:secretId`); it may belong to another room. */
   readonly targetsSecret?: boolean;
+  /** The path names a rekey operation (`:operationId`); it may belong to another room (OL-13). */
+  readonly targetsOperation?: boolean;
   /** The route requires a recent step-up, so attackers confirm their account first. */
   readonly stepUp: boolean;
   /** For targeted routes: which object of the room is the target. */
-  readonly target?: 'MEMBER' | 'ADMIN' | 'INVITATION' | 'FILE' | 'NOTE' | 'SECRET';
+  readonly target?: 'MEMBER' | 'ADMIN' | 'INVITATION' | 'FILE' | 'NOTE' | 'SECRET' | 'OPERATION';
   readonly classes: readonly AttackClass[];
   readonly send: (who: Person, ref: RoomRef, extras?: Extras) => Promise<Response>;
 }
@@ -93,6 +98,7 @@ const invitation = (ref: RoomRef): string => ref.invitationId ?? randomUUID();
 const file = (ref: RoomRef): string => ref.fileId ?? randomUUID();
 const note = (ref: RoomRef): string => ref.noteId ?? randomUUID();
 const secret = (ref: RoomRef): string => ref.secretId ?? randomUUID();
+const operation = (ref: RoomRef): string => ref.operationId ?? randomUUID();
 const b64 = (bytes: number): string => randomBytes(bytes).toString('base64url');
 
 /** Well-formed bodies that nobody signed: authorization must refuse them before anything else. */
@@ -127,6 +133,20 @@ const fillerNote = () => ({
   nekIv: b64(12),
   ciphertext: b64(64),
   contentIv: b64(12),
+});
+/** A well-formed rekey finalize (Phase 11) that no browser made: envelopes and a statement of nobody. */
+const fillerFinalize = () => ({
+  targetVersion: 2,
+  commitment: b64(32),
+  statementSignature: b64(64),
+  envelopes: [{ recipientUserId: randomUUID(), recipientKeyId: randomUUID(), wrappedKey: b64(384) }],
+});
+/** A well-formed re-share (Phase 11, AZ-14) that no browser made. */
+const fillerReshare = () => ({
+  subjectKeyId: randomUUID(),
+  confirmedFingerprint: null,
+  grantSignature: b64(64),
+  envelopes: [{ keyVersion: 1, wrappedKey: b64(384) }],
 });
 /** A well-formed recipient-bound secret (Phase 9) that no browser made; sizes as CP-29 allows. */
 const fillerSecret = () => ({
@@ -502,6 +522,70 @@ export const BOLA_CASES: readonly BolaCase[] = [
       (ref) => `/rooms/${ref.roomId}/secrets/${secret(ref)}/revoke`,
       () => ({}),
     ),
+  },
+  // Phase 11 (CM-T050 to CM-T053): key rotation. Bodies are well formed and signed by nobody.
+  {
+    ...room,
+    key: 'GET /rooms/:roomId/rekey-operations/current',
+    action: 'AZ-15',
+    mutates: false,
+    classes: READ,
+    send: get((ref) => `/rooms/${ref.roomId}/rekey-operations/current`),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/rekey-operations',
+    action: 'AZ-13',
+    mutates: true,
+    classes: WRITE,
+    send: post(
+      (ref) => `/rooms/${ref.roomId}/rekey-operations`,
+      () => ({}),
+    ),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/rekey-operations/:operationId/finalize',
+    action: 'AZ-13',
+    mutates: true,
+    targetsOperation: true,
+    target: 'OPERATION',
+    classes: TARGETED_WRITE,
+    send: post((ref) => `/rooms/${ref.roomId}/rekey-operations/${operation(ref)}/finalize`, fillerFinalize),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/rekey-operations/:operationId/cancel',
+    action: 'AZ-13',
+    mutates: true,
+    targetsOperation: true,
+    target: 'OPERATION',
+    classes: TARGETED_WRITE,
+    send: post(
+      (ref) => `/rooms/${ref.roomId}/rekey-operations/${operation(ref)}/cancel`,
+      () => ({}),
+    ),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/leave',
+    action: 'AZ-11',
+    mutates: true,
+    classes: WRITE,
+    send: post(
+      (ref) => `/rooms/${ref.roomId}/leave`,
+      () => ({}),
+    ),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/members/:userId/reshare',
+    action: 'AZ-14',
+    mutates: true,
+    targetsMember: true,
+    target: 'MEMBER',
+    classes: TARGETED_WRITE,
+    send: post((ref) => `/rooms/${ref.roomId}/members/${member(ref)}/reshare`, fillerReshare),
   },
   // Self-service routes name no room. They are covered for caller-controlled identity (H) only:
   // the rooms they return or create belong to the session user, never to a request field.

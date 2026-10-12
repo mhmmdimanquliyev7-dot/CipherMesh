@@ -53,7 +53,7 @@ export function createAdminService(deps: AdminDependencies) {
         await auth.setUserStatus(userId, 'DISABLED');
         const revoked = await auth.revokeUserSessions(userId, 'ACCOUNT_DISABLED', now);
         const suspended = await rooms.suspendMemberships(userId, actor.userId, now);
-        return { revoked, suspended };
+        return { revoked, suspended, staled: rooms.takeStaledOperations() };
       });
       deps.events.record({
         name: 'ACCOUNT_DISABLED',
@@ -81,6 +81,21 @@ export function createAdminService(deps: AdminDependencies) {
             details: { roomId: room.roomId, reason: 'MEMBER_SUSPENDED' },
           });
         }
+      }
+      // Phase 11: a rekey snapshot that still named the suspended member can never be finalized.
+      for (const stale of outcome.staled) {
+        deps.events.record({
+          name: 'REKEY_STALE',
+          outcome: 'SUCCESS',
+          actorUserId: actor.userId,
+          requestId: meta.requestId,
+          details: {
+            roomId: stale.roomId,
+            operationId: stale.operationId,
+            mode: stale.mode,
+            reason: 'MEMBERSHIP_CHANGED',
+          },
+        });
       }
     },
 

@@ -106,6 +106,21 @@ export const ErrorCode = {
   POLICY_UNSUPPORTED: 'POLICY_UNSUPPORTED',
   /** A profile change named a current profile that is no longer the stored one (stale request). */
   PROFILE_CHANGED: 'PROFILE_CHANGED',
+  // Key rotation (Phase 11, ADR-013 section "Idempotency and replay", authorization-model section 7).
+  /** Another member's rekey operation holds a valid lease (one live operation per room, CP-25). */
+  REKEY_IN_PROGRESS: 'REKEY_IN_PROGRESS',
+  /** The operation is ABANDONED, SUPERSEDED, CANCELLED or STALE, or its lease or snapshot ended. */
+  REKEY_OPERATION_CLOSED: 'REKEY_OPERATION_CLOSED',
+  /** A repeated finalize of a COMPLETED operation carries a different payload. */
+  REKEY_PAYLOAD_MISMATCH: 'REKEY_PAYLOAD_MISMATCH',
+  /** The envelope set differs from the server's recipient snapshot (missing, extra or duplicate). */
+  REKEY_RECIPIENTS_MISMATCH: 'REKEY_RECIPIENTS_MISMATCH',
+  /** Only the member who started a rekey operation can finalize it (OL-13). */
+  REKEY_NOT_STARTER: 'REKEY_NOT_STARTER',
+  /** The room has no key version to rotate (created before Phase 6, L-43). */
+  ROOM_KEY_UNAVAILABLE: 'ROOM_KEY_UNAVAILABLE',
+  /** AZ-14: the member already holds the current key version under their current identity. */
+  RESHARE_NOT_NEEDED: 'RESHARE_NOT_NEEDED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

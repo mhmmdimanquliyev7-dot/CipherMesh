@@ -348,9 +348,24 @@ export function createInvitationService(deps: InvitationServiceDependencies) {
         const versions = await tx.pendingEnvelopeVersions(invitation);
         if (!versions.includes(room.currentKeyVersion)) throw notOpen();
         if (!(await tx.acceptInvitation(invitation, Math.min(...versions), now))) throw notOpen();
-        return { roomId: room.id, role: invitation.role };
+        return { roomId: room.id, role: invitation.role, staled: tx.takeStaledOperations() };
       });
       record('MEMBER_JOINED', actor, meta, { roomId: accepted.roomId, invitationId, role: accepted.role });
+      // A MANUAL rekey's snapshot did not include the new member: it can no longer be finalized.
+      for (const stale of accepted.staled) {
+        events.record({
+          name: 'REKEY_STALE',
+          outcome: 'SUCCESS',
+          actorUserId: actor.userId,
+          requestId: meta.requestId,
+          details: {
+            roomId: stale.roomId,
+            operationId: stale.operationId,
+            mode: stale.mode,
+            reason: 'MEMBERSHIP_CHANGED',
+          },
+        });
+      }
       return accepted;
     },
 
