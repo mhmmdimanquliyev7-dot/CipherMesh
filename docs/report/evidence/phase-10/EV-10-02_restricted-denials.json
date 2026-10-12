@@ -1,0 +1,52 @@
+{
+  "evidence": "EV-10-02 denials in a RESTRICTED room; synthetic accounts, local PostgreSQL",
+  "responses": [
+    {
+      "request": "member without MFA opens the room",
+      "status": 403,
+      "body": {
+        "error": {
+          "code": "MFA_REQUIRED",
+          "message": "This room requires a session verified with MFA",
+          "requestId": "ec69f9d3-afe0-4af9-b3fc-cce24d2ca83e"
+        }
+      }
+    },
+    {
+      "request": "member without a recent step-up reveals a secret",
+      "status": 401,
+      "body": {
+        "error": {
+          "code": "STEP_UP_REQUIRED",
+          "message": "Confirm your identity to continue",
+          "requestId": "ac89631e-3812-4672-b755-b62eb6f13cd6"
+        }
+      }
+    },
+    {
+      "request": "VIEWER (with a step-up) asks for a download URL",
+      "status": 403,
+      "body": {
+        "error": {
+          "code": "FORBIDDEN",
+          "message": "You do not have permission for this action",
+          "requestId": "ff2c311d-ff4f-44f6-9664-85572729f8d4"
+        }
+      }
+    }
+  ],
+  "recordedReasons": [
+    {
+      "action": "AZ-01",
+      "reason": "PROFILE_PC_01"
+    },
+    {
+      "action": "AZ-24",
+      "reason": "PROFILE_PC_03"
+    },
+    {
+      "action": "AZ-17",
+      "reason": "PROFILE_PC_12"
+    }
+  ]
+}

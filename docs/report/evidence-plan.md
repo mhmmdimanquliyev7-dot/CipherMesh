@@ -162,6 +162,12 @@ Captured in Phase 9 (Prompt 11), with synthetic data only, in [evidence/phase-09
 | EV-10-01 | Policy matrix report | Test report | Profiles are enforced controls | ISMS |
 | EV-10-02 | Denials in a RESTRICTED room (MFA, step-up, VIEWER download) | API responses | Classification-based handling rules | ISMS |
 | EV-10-03 | Profile downgrade audit event | Audit view | Accountability for weakening controls | ISMS |
+| EV-10-04 | Profile panel after an upgrade (rules shown from the catalogue) | Screenshot | Labelling of classified rooms (5.13) | ISMS |
+| EV-10-05 | Phase 10 gate results | Test output | Verification before merge | ISMS |
+| EV-10-06 | Phase 10 negative controls | Test output | The policy tests detect real defects | ISMS |
+| EV-10-07 | CI run of the Phase 10 pull request | CI log | Change control | ISMS |
+
+Captured in Phase 10 (Prompt 12), with synthetic data only, in [evidence/phase-10/](evidence/phase-10/): EV-10-01 (policy matrix report), EV-10-02 (RESTRICTED refusals as API responses, plus a browser screenshot), EV-10-03 (the recorded `PROFILE_DOWNGRADED` event and a screenshot; the audit view arrives with Phases 12 and 14), EV-10-04, EV-10-05 (gate results in phase-10-traceability.md section 5) and EV-10-06. EV-10-07 is recorded at merge. Jira history items stay pending until the backlog is imported.
 
 ### Phase 11: Key Rotation
 | ID | Evidence | How to capture | Demonstrates | Tags |

@@ -1,6 +1,6 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-12, end of Prompt 11 (Phase 9 implemented, verified and merged into `main`: CM-T043, CM-T044). Phases 1 to 9 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-12, Prompt 12 (Phase 10 implemented and verified on `feature/CM-T046-security-policies`: CM-T046 to CM-T049; the merge is recorded by the post-merge handoff). Phases 1 to 9 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
@@ -10,8 +10,9 @@ Snapshot: 2026-10-12, end of Prompt 11 (Phase 9 implemented, verified and merged
 | Phase 7 | Encrypted Files: client-side AES-256-GCM files of at most 50 MiB with a per-file FEK wrapped under RWK_v, ciphertext in the S3-compatible bucket through presigned URLs, quotas, expiry, deletion and worker cleanup (section 6b) |
 | Phase 8 | Secure Notes (CM-T042): title and body as one AES-256-GCM message under a fresh NEK per revision, the revision bound in both contexts, optimistic concurrency with 409 on stale saves, AZ-19 to AZ-22, text-only rendering (section 6c). Traceability: [phase-08-traceability.md](phase-08-traceability.md) |
 | Phase 9 | Burn Secrets (CM-T043, CM-T044): one AES-256-GCM message under a fresh SEK, only the 32-byte SEK RSA-OAEP-wrapped to a recipient key the sender's browser authenticated against the room's signed statements; POST-only reveal in a locking transaction that returns and, with burn-after-reading, destroys the ciphertext in one statement; AZ-23 to AZ-25 and the new AZ-32 (section 6d). CM-T045 (external links, stretch) not built. Traceability: [phase-09-traceability.md](phase-09-traceability.md) |
-| Branch | `feature/CM-T043-burn-secrets` (head `09584e5`) is merged and takes no further commits |
-| Next | **Prompt 12: Phase 10, Security Policies** (CM-T046 to CM-T049), after this Phase 9 handoff is merged. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Secrets panel only follows the current style |
+| Phase 10 | Security Policies (CM-T046 to CM-T049): the versioned, frozen policy catalogue `packages/shared/src/policy.ts` (version 1), PC-01 and PC-02 on every room request and again on the locked room row, PC-03 for every sensitive operation that exists, PC-13 FULL events, profile changes with expiry clamping and revocation (AZ-03), the `policy` test matrix (section 6e). Traceability: [phase-10-traceability.md](phase-10-traceability.md) |
+| Branch | `feature/CM-T046-security-policies`, from `main` at `b6a4da4`; `feature/CM-T043-burn-secrets` is merged and takes no further commits |
+| Next | **Prompt 13: Phase 11, Key Rotation** (CM-T050 to CM-T053), after the Phase 10 merge and handoff. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Security profile panel only follows the current style |
 | Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 9. After this handoff is merged it is the baseline for Prompt 12 |
 
 ## 2. Architecture implemented so far
@@ -24,7 +25,7 @@ Snapshot: 2026-10-12, end of Prompt 11 (Phase 9 implemented, verified and merged
 
 ## 3. Database state
 
-- PostgreSQL 17, Prisma 7.10.0 with the pg adapter. 16 tables, 232 classified fields (`/// class:`), ten migrations; the last is `20261009000000_burn_secrets` (Phase 9: the CP-29 payload bound, the 7-day lifetime bound, REVEALED only with burn, and the secret guard trigger; no column or grant changes).
+- PostgreSQL 17, Prisma 7.10.0 with the pg adapter. 16 tables, 232 classified fields (`/// class:`), eleven migrations; the last is `20261010000000_security_policies` (Phase 10: the secret guard and the invitation grant trigger let an open row's `expires_at` move only earlier, for upgrade clamping; no column or grant changes). Before it, `20261009000000_burn_secrets` (Phase 9: the CP-29 payload bound, the 7-day lifetime bound, REVEALED only with burn, and the secret guard trigger; no column or grant changes).
 - Roles `cm_migrator` (owner, never on the VM), `cm_api`, `cm_worker`, `cm_verifier`, with a tested grant matrix. `audit_events` is append-only; **the hash chain does not exist yet** (Phase 12).
 - Phase 6 columns: `rooms.creator_key_id` and `genesis_signature` (NULL only for rooms from before Phase 6); `room_key_versions.created_by_key_id`, `previous_commitment`, `recipient_user_ids`, `recipient_key_ids`, `statement_signature`; `invitations.grantor_key_id` and `grant_signature`; `room_members.subject_key_id`, `grant_role`, `grantor_user_id`, `grantor_key_id`, `grant_signature`. Composite foreign keys bind each signing key to its user, CHECKs enforce all-or-nothing grants and sizes, and triggers make the genesis, the key-version statement and the invitation grant write-once.
 - `rooms` and `room_members` exist since Phase 2; key versions, envelopes and invitations are written by the API since Phase 6.
@@ -160,6 +161,26 @@ Behaviour to know:
 - **Decisions** D-09-01 to D-09-15 are in the traceability file; no new dependency.
 - Test helper `tests/helpers/secrets.ts`; suites `tests/secrets` (lifecycle, concurrency with row-lock barriers and two API instances); `pnpm test:secrets`.
 
+## 6e. Security policies (Phase 10, CM-T046 to CM-T049)
+
+| Part | Location |
+|---|---|
+| Catalogue (version 1, deep-frozen; `resolveRoomPolicy`, `currentPolicy`, the pure gate decisions, `clampedExpiry`) | `packages/shared/src/policy.ts`; the per-feature constants of Phases 5 to 9 were removed |
+| Gates | `apps/api/src/authorization/rooms.ts` (membership 404, then PC-01 and PC-02, matrix, PC-03 when the route declares `requires: { sensitive }`), `apps/api/src/authorization/policy.ts` (`enforceRoomAccess`, `reapplyRoomPolicy` for the locked row, `policyOf`, the responses and `ROOM_ACCESS_DENIED` reasons) |
+| Profile change | `POST /rooms/{roomId}/profile` (AZ-03) in `routes/rooms.ts`, `RoomService.changeProfile`, `db/policy-store.ts` (`setRoomProfile`, `applyUpgrade`); schemas `profileChangeRequestSchema`, `profileChangedResponseSchema` |
+| Web | `apps/web/src/rooms/profile-panel.tsx` (rules from the catalogue, OWNER change form, downgrade warning); panels take the resolved `policy`; file and secret panels ask the page for a step-up (`onStepUp`) |
+| Tests | `tests/policy` (Vitest project `policy`: matrix and profile changes), `tests/security/policy-catalogue.test.ts`, `packages/shared/src/policy.test.ts`, `tests/e2e/policies.spec.ts`, helpers `tests/helpers/policy.ts` (`inRoomLockOrder` forces lock order) |
+
+Behaviour to know:
+- **Resolution.** A room's rules come only from its stored `security_profile` and `policy_version`. An unknown version answers 503 `POLICY_UNSUPPORTED` (reason recorded), never a fallback. New rooms and profile changes record version 1.
+- **Order.** Membership (404) → PC-01 (403 `MFA_REQUIRED`), PC-02 (401 `REAUTH_REQUIRED`) → matrix (403) → PC-03 (401 `STEP_UP_REQUIRED`) → static step-up of AZ-04 and AZ-05 → handler, which re-applies matrix and gates on the locked room row. A RESTRICTED VIEWER asking for a download URL gets the step-up prompt first, then PC-12.
+- **PC-03 routes:** reveal, download URL, invite, approve, remove member, profile change, delete room (pinned in `route-inventory.test.ts`). START_REKEY comes with Phase 11: its route must declare `sensitive: 'START_REKEY'`.
+- **Profile change.** OWNER only; `expectedProfile` must equal the stored profile (409 `PROFILE_CHANGED`). Upgrade: the new profile's PC-01 and PC-02, and for RESTRICTED its PC-03; shortens expiry of live files and notes, ACTIVE secrets and open invitations; revokes invitations that skipped approval, lack a required fingerprint or share older versions, and non-burn secrets when burn becomes mandatory; `PROFILE_UPGRADED` with counts. Downgrade: step-up within 5 minutes; nothing extended; `PROFILE_DOWNGRADED` with severity HIGH. Allowed while REKEY_REQUIRED; never changes the key state.
+- **Events.** FULL adds `ENVELOPES_FETCHED` and `MEMBER_LIST_VIEWED` (room and count). All to the redacted log until Phase 12.
+- **Tests that move session ages** update `sessions.authenticated_at` or `step_up_at` as cm_api; a test that needs a CONFIDENTIAL or RESTRICTED actor must use `mfaPersonWithVault` (and step up in RESTRICTED for the PC-03 operations).
+- **Decisions** D-10-01 to D-10-09 are in the traceability file; no new dependency.
+- **Not enforced yet, by plan:** PC-11 (CM-T045) and PC-14 (CM-T052, Phase 11: the worker must set REKEY_REQUIRED with CRYPTOPERIOD_EXPIRED from `policy.cryptoperiodMs`).
+
 ## 7. Invariants every session must preserve
 
 All of CLAUDE.md section 6 (INV-01 to INV-19). For Phases 5 and 6 especially:
@@ -171,29 +192,29 @@ All of CLAUDE.md section 6 (INV-01 to INV-19). For Phases 5 and 6 especially:
 - **INV-09:** no unchained rows in `audit_events`.
 - Never weaken tests, grants, cookies or authorization to make something pass.
 
-## 8. Documents Prompt 12 must read
+## 8. Documents Prompt 13 must read
 
-- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 10, CM-T046 to CM-T049); `docs/management/jira-backlog.md` (CM-EPIC-09); [phase-09-traceability.md](phase-09-traceability.md).
-- `docs/security/security-policy-profiles.md` (all PC rows; sections on enforcement order and what is enforced since Phases 6, 7, 8 and 9), `docs/security/authorization-model.md` (sections 3, 9.2 and the notes on profile conditions), L-42 in `limitations.md`, and the constants the gates will replace: `INVITATION_RULES` (`packages/shared/src/rooms.ts`), `FILE_RULES`, `NOTE_RULES`, `SECRET_RULES` and `PROFILE_ACCESS_REQUIREMENTS`, compared with the profile table by `tests/security/profile-requirements.test.ts`.
+- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 11, CM-T050 to CM-T053); `docs/management/jira-backlog.md` (CM-EPIC-10); [phase-10-traceability.md](phase-10-traceability.md).
+- ADR-013 (rekey), ADR-015 section 4 (rekey part), `docs/crypto/key-lifecycle.md`, DF-10, PC-14 and PC-15 in `security-policy-profiles.md`, authorization model 9.11 (a rekey start is a PC-03 operation; route declarations), L-44 and L-46 in `limitations.md`.
 - The PC-16 scope question for AZ-26 stays open with CM-T045 (not built).
 
 ## 9. Test counts
 
-Gates of Prompt 11 on the final Phase 9 code (2026-10-12, local PostgreSQL and storage), recorded in EV-09-06 and phase-09-traceability.md section 5:
+Gates of Prompt 12 on the final Phase 10 code (2026-10-12, local PostgreSQL and storage), recorded in EV-10-05 and phase-10-traceability.md section 5:
 
 | Gate | Result |
 |---|---|
 | `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | Pass |
-| `pnpm test` | 2044 tests in 81 files (Phase 8: 1956 in 78). New suites: `packages/crypto/src/secrets.test.ts`, `tests/secrets` (lifecycle 20, concurrency 8); extended: `bola.test.ts`, database constraints, route and BOLA inventories, authorization matrix (AZ-32) |
-| `pnpm test:e2e` (three engines, one worker) | 118 passed, 14 skipped by design (was 102 and 12) |
-| `pnpm security:negative-controls` | 90 of 90 caught (eleven Phase 9), both baselines pass, 49 source files restored byte for byte |
+| `pnpm test` | 2201 tests in 84 files (Phase 9: 2044 in 81). New: `tests/policy` (matrix 110, profile changes 14), `policy-catalogue.test.ts` (replaces `profile-requirements.test.ts`), `policy.test.ts`. One local first-run process stall (see below) |
+| `pnpm test:e2e` (three engines, one worker) | 118 passed, 16 skipped by design, 1 Firefox navigation timeout in a Phase 9 test that passed on rerun |
+| `pnpm security:negative-controls` | 102 of 102 caught (twelve Phase 10), both baselines pass, 54 source files restored byte for byte |
 | `pnpm test:coverage:crypto` | 98.79% statements, 94.16% branches (gate 90%) |
-| `pnpm test:coverage:authz` | 97.26% statements, 98.3% branches |
+| `pnpm test:coverage:authz` (with `policy.ts`) | 96.92% statements, 97.24% branches |
 | `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, `db:validate`, `db:check-schema`, `db:drift` | Pass |
 | `pnpm audit:deps` | Pass (no known vulnerabilities); no dependency added or changed |
 | Secret scan (gitleaks) | Full history and staged changes: no leaks found |
 
-Local notes: `.gitignore` now anchors `/secrets/` (an unanchored rule hid `apps/api/src/secrets` and `tests/secrets`); if Docker Desktop restarts and the Postgres container cannot bind `127.0.0.1:55432` (Windows reserves port ranges, for example 55388 to 55487), set another `POSTGRES_PORT` and the same port in the three database URLs of the git-ignored `.env`; the files suites need the local storage (`pnpm services:up && pnpm storage:bootstrap`); the database suites need the local PostgreSQL container (Docker Desktop stops during long pauses; restart it and wait for healthy). Run E2E and the negative controls one at a time, E2E with `--workers=1`. The notes suites need only PostgreSQL (`pnpm test:notes`). The `cm_api` connection limit of 40 is shared by all projects; the `authz` project runs its files serially. The test helper `newAddress()` wraps inside 1..0xfffe (a start near 0xffff once overflowed the IPv6 group and tripped the per-address registration limit). Known timing-sensitive tests are listed in the memory notes: `vault.test.ts` KDF-busy test, the TOTP drift test and the cross-engine vault E2E; on a red CI run rerun the job once, find the mechanism and never loosen assertions.
+Local notes: `.gitignore` anchors `/secrets/`; if Docker Desktop restarts and the Postgres container cannot bind `127.0.0.1:55432` (Windows reserves port ranges), set another `POSTGRES_PORT` and the same port in the three database URLs of the git-ignored `.env`; the files and policy suites need the local storage (`pnpm services:up && pnpm storage:bootstrap`); the database suites need the local PostgreSQL container. Run E2E and the negative controls one at a time, E2E with `--workers=1`. The `cm_api` connection limit of 40 is shared by all projects; `authz`, `files`, `notes`, `secrets` and `policy` run their files serially. Twice in Prompt 12 a single test reported "timed out in 60000ms" after 10 to 16 minutes: the test process itself stalled (its timer could not fire); reruns passed and a 10-second tick logger showed no stall. A duration far above the timeout means a stall, not a defect, but check with the tick logger. Known timing-sensitive tests are in the memory notes; on a red CI run rerun the job once, find the mechanism and never loosen assertions.
 
 ## 10. Known limitations and residual risks
 
@@ -204,7 +225,7 @@ Local notes: `.gitignore` now anchors `/secrets/` (an unanchored rule hid `apps/
 - Phase 7: files are at most 50 MiB, single-shot, no resumable upload, memory and phones not measured (L-47); removal does not take back downloaded files (L-48); backups keep deleted ciphertext (L-49); names and types come from the uploader (L-50).
 - Phase 8: note metadata (authors, editors, revision counts, sizes, times) is visible to the server (L-51); only the current revision, no history or merge (L-52); authorship is the server's statement (L-53, L-09); removal does not take back notes already read (L-54); an older revision served under its own number is noticed only if this tab saw a newer one (L-10, T-32).
 - Phase 9: secret metadata is visible to the server and to OWNER and ADMIN (L-55); the sender of a secret is the server's statement (L-56); burn-after-reading is at most once and proves release, not reading (L-57); revealed text is dropped, not wiped (L-58); with L-03 and L-12.
-- Profile gates not yet checked on every room request (L-42); rooms from before Phase 6 stay keyless (L-43); a room that loses a member stays REKEY_REQUIRED until the rekey exists, and neither a re-enabled account nor a reset identity gets rooms back until CM-T053 (L-44); a reused room ID is refused with 409, and there is no room quota (L-45).
+- Phase 10: reads are judged by the profile at the request's start (L-59); profiles are per room, not per device, and the room list still shows a room to a member who fails its profile (L-60); profile changes do not take back what members obtained (L-61); PC-11 and PC-14 wait for later phases (L-62). L-42 is resolved. Rooms from before Phase 6 stay keyless (L-43); a room that loses a member stays REKEY_REQUIRED until the rekey exists, and neither a re-enabled account nor a reset identity gets rooms back until CM-T053 (L-44); a reused room ID is refused with 409, and there is no room quota (L-45).
 - Full list: `docs/security/limitations.md`.
 
 ## 11. Deferred decisions
@@ -228,7 +249,7 @@ Local notes: `.gitignore` now anchors `/secrets/` (an unanchored rule hid `apps/
 
 - External one-time secret links (CM-T045, stretch). Files (Phase 7), notes (Phase 8) and recipient-bound secrets (Phase 9, section 6d) are implemented. Note version history, collaborative editing and Markdown are not planned for any phase. Secrets are not signed by their sender (L-56).
 - Rekey, key-version retirement, leaving a room, re-sharing keys, the compromised-identity procedure (Phase 11).
-- The security policy engine (Phase 10), the audit hash chain (Phase 12), the Crypto Inspector or the Security Dashboard (Phases 13 and 14).
+- The audit hash chain (Phase 12), the Crypto Inspector or the Security Dashboard (Phases 13 and 14).
 - Deployment, Nginx or cloud resources (Phase 17 onward).
 - Any server-side handling of the Vault Passphrase, private keys or room key material, ever.
 
