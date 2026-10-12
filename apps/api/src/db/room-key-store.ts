@@ -164,11 +164,21 @@ export function roomKeyStoreFunctions(db: Db) {
       return rows.length === 1;
     },
 
-    /** The current public identity of an ACTIVE member of the room, as seen by an ACTIVE member. */
+    /**
+     * The current public identity of an ACTIVE member of the room, as seen by an ACTIVE member. Since
+     * Phase 11 also of a SUSPENDED member (the member list shows them), so an OWNER or ADMIN can
+     * verify the identity of a re-enabled account before reinstating it with re-shared keys (AZ-14).
+     * Public keys only; a disabled account or a retired identity has none to show.
+     */
     async findMemberIdentity(roomId: string, viewerId: string, memberId: string): Promise<IdentityRecord | null> {
       if (!isUuidV4(roomId) || !isUuidV4(viewerId) || !isUuidV4(memberId)) return null;
       const member = await db.roomMember.findFirst({
-        where: { roomId, userId: memberId, status: 'ACTIVE', room: callerIsMember(roomId, viewerId) },
+        where: {
+          roomId,
+          userId: memberId,
+          status: { in: ['ACTIVE', 'SUSPENDED'] },
+          room: callerIsMember(roomId, viewerId),
+        },
         select: { userId: true },
       });
       if (member === null) return null;

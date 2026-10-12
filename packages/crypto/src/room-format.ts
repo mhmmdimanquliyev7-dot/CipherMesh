@@ -2,7 +2,14 @@ import { fromBase64Url, toBase64Url } from './encoding';
 import { CryptoError, CryptoErrorCode } from './errors';
 import { ECDSA, RSA_OAEP, ROOM_KEYS, ROOM_ROLES, type RoomRole } from './params';
 import type { RecipientRef } from './recipients';
-import type { InvitationKeys, OpenedRoomKey, RekeyKeys, RoomCreationKeys, RoomKeyBundle } from './room-keys';
+import type {
+  InvitationKeys,
+  OpenedRoomKey,
+  RekeyKeys,
+  RoomCreationKeys,
+  RoomKeyBundle,
+  SignedMembershipGrant,
+} from './room-keys';
 import { openRoomKey } from './room-keys';
 import type { Bytes } from './types';
 import type { UnlockedVault } from './vault';
@@ -166,6 +173,25 @@ export function invitationKeysToWire(keys: InvitationKeys) {
     grantSignature: toBase64Url(keys.grantSignature),
     envelopes: keys.envelopes.map((e) => ({ keyVersion: e.keyVersion, wrappedKey: toBase64Url(e.wrappedKey) })),
   };
+}
+
+/**
+ * Signed grants from the server, decoded strictly for the verification rule (Phase 11: the grants
+ * that name a rekey's recipients). Decoding proves nothing: the rule verifies every signature.
+ */
+export function grantsFromWire(roomId: string, grants: RoomKeyMaterialWire['grants']): SignedMembershipGrant[] {
+  return grants.map((g) => {
+    if (!isRole(g.role)) throw refused();
+    return {
+      roomId,
+      subjectUserId: g.subjectUserId,
+      subjectKeyId: g.subjectKeyId,
+      role: g.role,
+      grantorUserId: g.grantorUserId,
+      grantorKeyId: g.grantorKeyId,
+      signature: decode(g.signature, ECDSA.signatureBytes),
+    };
+  });
 }
 
 /** The body of POST /rooms/{id}/rekey-operations/{operationId}/finalize (CM-T050). */

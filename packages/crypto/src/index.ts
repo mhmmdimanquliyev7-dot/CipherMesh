@@ -67,6 +67,7 @@ export {
 } from './room-keys';
 export {
   grantProofToWire,
+  grantsFromWire,
   invitationKeysToWire,
   openRoomKeys,
   rekeyKeysToWire,

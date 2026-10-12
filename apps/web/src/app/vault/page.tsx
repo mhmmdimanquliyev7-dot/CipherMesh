@@ -507,7 +507,8 @@ function Reset({ account }: { readonly account: AccountView }) {
       action.setError(problem ?? 'Confirm that you understand the consequences.');
       return;
     }
-    void action.run(target, () => vaultController.reset(passphrase));
+    const compromised = form.get('compromised') === 'yes';
+    void action.run(target, () => vaultController.reset(passphrase, compromised));
   }
   return (
     <Card title="Replace my identity">
@@ -522,6 +523,13 @@ function Reset({ account }: { readonly account: AccountView }) {
         <label className="flex items-start gap-2 text-sm text-slate-300">
           <input type="checkbox" name="acknowledge" value="yes" className="mt-1" />
           <span>I understand that my current identity and what was encrypted only for it cannot be restored.</span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-slate-300">
+          <input type="checkbox" name="compromised" value="yes" className="mt-1" />
+          <span>
+            Someone else may have my current keys or this device (not only a forgotten passphrase). Every room I am in
+            is then locked until its owner or an admin rotates the room key.
+          </span>
         </label>
         {action.error === undefined ? null : <Alert kind="error">{action.error}</Alert>}
         {action.busy ? <Progress>Creating a new identity in this browser…</Progress> : null}

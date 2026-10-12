@@ -484,8 +484,10 @@ export class VaultController {
   /**
    * Vault reset after a lost passphrase: a NEW identity replaces the old one. Nothing protected
    * by the old private keys can be recovered by CipherMesh; there is no escrow or master key.
+   * With `identityCompromised` (Phase 11, key-lifecycle R5) every room of the user also needs a
+   * rekey, because whoever holds the old keys holds every room key wrapped to them.
    */
-  async reset(newPassphrase: string): Promise<void> {
+  async reset(newPassphrase: string, identityCompromised = false): Promise<void> {
     this.#requireStepUp('strict');
     const account = this.#account();
     const view = this.#view;
@@ -501,7 +503,7 @@ export class VaultController {
       });
       await this.#post(
         '/vault/reset',
-        { supersedesKeyId, vault: vaultRecordToWire(setup.record) },
+        { supersedesKeyId, vault: vaultRecordToWire(setup.record), identityCompromised },
         vaultResetResponseSchema,
       );
       const loaded = await this.#fetchRecord(account.userId);
