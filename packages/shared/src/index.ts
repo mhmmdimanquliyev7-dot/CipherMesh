@@ -7,3 +7,4 @@ export * from './identifiers';
 export * from './notes';
 export * from './product';
 export * from './rooms';
+export * from './secrets';

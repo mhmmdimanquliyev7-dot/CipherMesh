@@ -77,6 +77,21 @@ const recipientSchema = z.strictObject({ userId: uuidV4Schema, keyId: uuidV4Sche
 /** A public identity with its user, for verifying signatures (current or retired keys). */
 export const signerIdentitySchema = publicIdentitySchema.extend({ userId: uuidV4Schema });
 
+/** Signed membership grants as stored (ADR-015); the browser verifies every one before it counts. */
+const grantListSchema = z
+  .array(
+    z.strictObject({
+      subjectUserId: uuidV4Schema,
+      subjectKeyId: uuidV4Schema,
+      role: roomRoleSchema,
+      grantorUserId: uuidV4Schema,
+      grantorKeyId: uuidV4Schema,
+      signature: signatureSchema,
+    }),
+  )
+  .max(1_000);
+const signerIdentityListSchema = z.array(signerIdentitySchema).max(500);
+
 /** GET /rooms/{roomId}/key-versions (AZ-15): every statement a member needs to verify a key. */
 export const keyVersionsResponseSchema = z.strictObject({
   currentKeyVersion: keyVersionSchema,
@@ -106,19 +121,8 @@ export const keyVersionsResponseSchema = z.strictObject({
       }),
     )
     .max(1_000),
-  grants: z
-    .array(
-      z.strictObject({
-        subjectUserId: uuidV4Schema,
-        subjectKeyId: uuidV4Schema,
-        role: roomRoleSchema,
-        grantorUserId: uuidV4Schema,
-        grantorKeyId: uuidV4Schema,
-        signature: signatureSchema,
-      }),
-    )
-    .max(1_000),
-  identities: z.array(signerIdentitySchema).max(500),
+  grants: grantListSchema,
+  identities: signerIdentityListSchema,
 });
 export type KeyVersionsResponse = z.infer<typeof keyVersionsResponseSchema>;
 
@@ -130,10 +134,17 @@ export const envelopesResponseSchema = z.strictObject({
 });
 export type EnvelopesResponse = z.infer<typeof envelopesResponseSchema>;
 
-/** GET /rooms/{roomId}/members/{userId}/identity (AZ-01): a member's current public identity. */
+/**
+ * GET /rooms/{roomId}/members/{userId}/identity (AZ-01): a member's current public identity and,
+ * since Phase 9, the member's own signed grant with its authority chain and the signers'
+ * identities, so a sender's browser can check that the room's statements name exactly this key
+ * before it wraps a secret's SEK to it (CM-T043, ADR-015 section 4). Served as stored; nothing in
+ * it counts until the browser verifies it.
+ */
 export const memberIdentityResponseSchema = z.strictObject({
   userId: uuidV4Schema,
   identity: publicIdentitySchema.extend({ createdAt: isoTimestampSchema }),
+  authority: z.strictObject({ grants: grantListSchema, identities: signerIdentityListSchema }),
 });
 export type MemberIdentityResponse = z.infer<typeof memberIdentityResponseSchema>;
 

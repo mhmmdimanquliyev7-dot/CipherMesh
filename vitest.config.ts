@@ -90,6 +90,20 @@ export default defineConfig({
         },
       },
       {
+        // Recipient-bound secret suites (Phase 9): the real API (one or two instances), PostgreSQL
+        // as cm_api and cm_worker, and secrets encrypted by packages/crypto for recipients
+        // authenticated as the browser authenticates them. One file at a time (shared connection
+        // limit; the concurrency suite holds row locks on purpose).
+        test: {
+          name: 'secrets',
+          include: ['tests/secrets/**/*.test.ts'],
+          fileParallelism: false,
+          globalSetup: ['tests/database/global-setup.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
         test: {
           name: 'database',
           include: ['tests/database/**/*.test.ts'],

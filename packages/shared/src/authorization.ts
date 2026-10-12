@@ -131,6 +131,10 @@ const ROOM_MATRIX = {
   // Added in Phase 6 (CM-T034, CM-T035): OL-11 lets the OWNER and ADMINs see the room's
   // invitations, which no other action covered; MEMBER and VIEWER see none.
   'AZ-31': { title: "View the room's invitations", rules: row(Y, Y, N, N) },
+  // Added in Phase 9 (CM-T043): OL-14 lets every member list the metadata of the secrets they
+  // sent or received, and the OWNER and ADMINs that of every secret of the room, which AZ-25
+  // (revocation) needs. The filter is in the query; no ciphertext is listed.
+  'AZ-32': { title: "View the room's secret metadata", rules: row(Y, Y, Y, Y) },
 } satisfies Record<string, RoomActionDefinition>;
 
 export type RoomActionId = keyof typeof ROOM_MATRIX;

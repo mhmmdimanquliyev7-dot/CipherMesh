@@ -36,7 +36,11 @@ blob-report/
 *.keystore
 id_rsa*
 id_ed25519*
-secrets/
+# Anchored: an unanchored `secrets/` also ignored the source directories
+# apps/api/src/secrets and tests/secrets (Phase 9). Only root-level and
+# infrastructure secret directories hold credential files.
+/secrets/
+/infrastructure/**/secrets/
 
 # Databases, dumps and backups
 *.sqlite

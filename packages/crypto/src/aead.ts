@@ -61,6 +61,24 @@ export async function generateDataKey(): Promise<Key> {
 }
 
 /**
+ * Imports 32 random bytes as a non-extractable AES-256-GCM key for one usage, and wipes the input.
+ * Used only for SEKs (Phase 9): unlike a FEK or NEK, a SEK is wrapped with RSA-OAEP, which takes
+ * the raw 32 bytes (INV-17), so the sender holds the bytes briefly to wrap them and the recipient
+ * gets them back from the unwrap. WebCrypto copies the bytes when importing, so wiping the
+ * caller's buffer afterwards leaves only the non-extractable key.
+ */
+export async function importDataKey(raw: Bytes, usage: 'encrypt' | 'decrypt'): Promise<Key> {
+  try {
+    if (raw.length !== AES_GCM.keyBits / 8) throw new CryptoError(CryptoErrorCode.INVALID_INPUT);
+    return await guarded(CryptoErrorCode.INVALID_INPUT, () =>
+      subtle().importKey('raw', raw, { name: AES_GCM.name, length: AES_GCM.keyBits }, false, [usage]),
+    );
+  } finally {
+    raw.fill(0);
+  }
+}
+
+/**
  * Wraps a DEK under a room wrapping key (RWK_v) with AES-256-GCM, a fresh IV and the canonical
  * `cm.dek.wrap` context as AAD. The raw key bytes exist only inside WebCrypto.
  */

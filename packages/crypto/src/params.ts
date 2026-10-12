@@ -90,6 +90,22 @@ export const NOTES = Object.freeze({
   maxRevision: 2_147_483_647,
 });
 
+/**
+ * Recipient-bound secrets (cryptographic-architecture section 6.3, DF-09, Phase 9). Each secret has
+ * its own random 256-bit SEK, which encrypts exactly one message (CP-16): the RFC 8785 secret
+ * document {text, v}. Only the 32-byte SEK is wrapped, with RSA-OAEP-3072 to the recipient's
+ * encryption key (INV-17, CP-02), so a wrapped SEK is 384 bytes. The size bound is CP-29 (decision
+ * D-09-01, phase-09-traceability.md): a document of at most 16 KiB holds passwords, recovery codes,
+ * API keys and PEM-encoded keys, and keeps the request far inside the API's 128 KiB body limit.
+ * packages/shared repeats the values (SECRET_LIMITS) and a test compares the two.
+ */
+export const SECRETS = Object.freeze({
+  sekBytes: 32,
+  wrappedSekBytes: 384,
+  formatVersion: 1,
+  maxDocumentBytes: 16 * 1024,
+});
+
 /** Room roles as they appear in signed membership grants (authorization-model section 2.1). */
 export const ROOM_ROLES = Object.freeze(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'] as const);
 export type RoomRole = (typeof ROOM_ROLES)[number];

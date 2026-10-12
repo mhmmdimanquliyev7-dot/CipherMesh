@@ -86,6 +86,19 @@ export {
   type StoredNote,
 } from './notes';
 export { noteCiphertextToWire, storedNoteFromWire, type NoteCiphertextWire, type StoredNoteWire } from './note-format';
-export { FILES, NOTES, ROOM_KEYS, type RoomRole } from './params';
+// Recipient-bound secrets (Phase 9, CM-T043, CM-T044).
+export {
+  authenticateSecretRecipient,
+  encryptSecret,
+  isSecretText,
+  openSecret,
+  secretDocumentBytes,
+  type EncryptedSecret,
+  type OpenedSecret,
+  type SecretRecipient,
+  type StoredSecret,
+} from './secrets';
+export { encryptedSecretToWire, storedSecretFromWire, type SecretCiphertextWire } from './secret-format';
+export { FILES, NOTES, ROOM_KEYS, SECRETS, type RoomRole } from './params';
 export { isDerivationRunning } from './kdf/derive';
 export type { Key } from './types';

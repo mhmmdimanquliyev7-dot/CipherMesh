@@ -11,18 +11,19 @@ import type { Person } from './rooms';
  * a removed route cannot leave a stale one. Phase 6 added the key-material, invitation, key-report
  * and Safety Code routes (CM-T033 to CM-T036, CM-T085); Phase 7 the file routes (CM-T037 to
  * CM-T041), whose target is a file of the room; Phase 8 the note routes (CM-T042), whose target is
- * a note of the room.
+ * a note of the room; Phase 9 the secret routes (CM-T043, CM-T044), whose target is a secret of the
+ * room.
  *
  * Attack classes (prompt 07C section 4):
  *   A  a member of room A addresses the existing room B
  *   B  the same request answers identically for a nonexistent room (non-disclosure)
- *   C  addressed room A, target object of room B (a member, an invitation, a file or a note)
+ *   C  addressed room A, target object of room B (a member, an invitation, a file, a note or a secret)
  *   D  role variants: OWNER, ADMIN, MEMBER, VIEWER, outsider, PLATFORM_ADMIN, and people who are
  *      members of two rooms with different roles
  *   E  membership states: SUSPENDED, REMOVED, LEFT
  *   F  room states: DELETING, DELETED, REKEY_REQUIRED
  *   G  every denied mutation leaves rooms, memberships, invitations, key versions, envelopes and
- *      files and notes byte-for-byte unchanged
+ *      files, notes and secrets byte-for-byte unchanged
  *   H  client-supplied identity (body, query, headers) never changes the outcome
  */
 export type Response = Awaited<ReturnType<Browser['request']>>;
@@ -39,6 +40,8 @@ export interface RoomRef {
   readonly fileId?: string;
   /** The note ID in the path, for routes that name a note (Phase 8). */
   readonly noteId?: string;
+  /** The secret ID in the path, for routes that name a secret (Phase 9). */
+  readonly secretId?: string;
 }
 
 export interface Extras {
@@ -62,10 +65,12 @@ export interface BolaCase {
   readonly targetsFile?: boolean;
   /** The path names a note (`:noteId`); it may belong to another room. */
   readonly targetsNote?: boolean;
+  /** The path names a secret (`:secretId`); it may belong to another room. */
+  readonly targetsSecret?: boolean;
   /** The route requires a recent step-up, so attackers confirm their account first. */
   readonly stepUp: boolean;
   /** For targeted routes: which object of the room is the target. */
-  readonly target?: 'MEMBER' | 'ADMIN' | 'INVITATION' | 'FILE' | 'NOTE';
+  readonly target?: 'MEMBER' | 'ADMIN' | 'INVITATION' | 'FILE' | 'NOTE' | 'SECRET';
   readonly classes: readonly AttackClass[];
   readonly send: (who: Person, ref: RoomRef, extras?: Extras) => Promise<Response>;
 }
@@ -87,6 +92,7 @@ const member = (ref: RoomRef): string => ref.userId ?? randomUUID();
 const invitation = (ref: RoomRef): string => ref.invitationId ?? randomUUID();
 const file = (ref: RoomRef): string => ref.fileId ?? randomUUID();
 const note = (ref: RoomRef): string => ref.noteId ?? randomUUID();
+const secret = (ref: RoomRef): string => ref.secretId ?? randomUUID();
 const b64 = (bytes: number): string => randomBytes(bytes).toString('base64url');
 
 /** Well-formed bodies that nobody signed: authorization must refuse them before anything else. */
@@ -121,6 +127,18 @@ const fillerNote = () => ({
   nekIv: b64(12),
   ciphertext: b64(64),
   contentIv: b64(12),
+});
+/** A well-formed recipient-bound secret (Phase 9) that no browser made; sizes as CP-29 allows. */
+const fillerSecret = () => ({
+  secretId: randomUUID(),
+  recipientUserId: randomUUID(),
+  recipientKeyId: randomUUID(),
+  suite: 'CM1',
+  wrappedSek: b64(384),
+  payloadIv: b64(12),
+  ciphertext: b64(64),
+  expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+  burnAfterReading: true,
 });
 const fillerKeys = () => ({
   creatorKeyId: randomUUID(),
@@ -427,6 +445,48 @@ export const BOLA_CASES: readonly BolaCase[] = [
     classes: TARGETED_WRITE,
     send: post(
       (ref) => `/rooms/${ref.roomId}/notes/${note(ref)}/delete`,
+      () => ({}),
+    ),
+  },
+  {
+    ...room,
+    key: 'GET /rooms/:roomId/secrets',
+    action: 'AZ-32',
+    mutates: false,
+    classes: READ,
+    send: get((ref) => `/rooms/${ref.roomId}/secrets`),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/secrets',
+    action: 'AZ-23',
+    mutates: true,
+    classes: WRITE,
+    send: post((ref) => `/rooms/${ref.roomId}/secrets`, fillerSecret),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/secrets/:secretId/reveal',
+    action: 'AZ-24',
+    mutates: true,
+    targetsSecret: true,
+    target: 'SECRET',
+    classes: TARGETED_WRITE,
+    send: post(
+      (ref) => `/rooms/${ref.roomId}/secrets/${secret(ref)}/reveal`,
+      () => ({}),
+    ),
+  },
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/secrets/:secretId/revoke',
+    action: 'AZ-25',
+    mutates: true,
+    targetsSecret: true,
+    target: 'SECRET',
+    classes: TARGETED_WRITE,
+    send: post(
+      (ref) => `/rooms/${ref.roomId}/secrets/${secret(ref)}/revoke`,
       () => ({}),
     ),
   },

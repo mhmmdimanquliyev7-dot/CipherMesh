@@ -98,6 +98,11 @@ describe('route inventory', () => {
       'GET /rooms/:roomId/notes/:noteId AZ-20-NOTE-READ',
       'POST /rooms/:roomId/notes/:noteId/update AZ-21-NOTE-UPDATE',
       'POST /rooms/:roomId/notes/:noteId/delete AZ-22-NOTE-DELETE',
+      // Phase 9 (CM-T043, CM-T044): recipient-bound secrets of one room. The reveal is a POST.
+      'GET /rooms/:roomId/secrets AZ-32-SECRET-LIST',
+      'POST /rooms/:roomId/secrets AZ-23-SECRET-CREATE',
+      'POST /rooms/:roomId/secrets/:secretId/reveal AZ-24-SECRET-REVEAL',
+      'POST /rooms/:roomId/secrets/:secretId/revoke AZ-25-SECRET-REVOKE',
     ]);
   });
 
@@ -147,6 +152,9 @@ describe('route inventory', () => {
       // never changing a row); creation, updates and deletion are POSTs.
       '/rooms/:roomId/notes',
       '/rooms/:roomId/notes/:noteId',
+      // Phase 9: only the metadata list is a read. There is no GET for one secret, and the reveal
+      // that releases (and burns) the ciphertext is a POST, so no preview or prefetch consumes it.
+      '/rooms/:roomId/secrets',
     ]);
   });
 
