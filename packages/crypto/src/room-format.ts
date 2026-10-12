@@ -2,7 +2,7 @@ import { fromBase64Url, toBase64Url } from './encoding';
 import { CryptoError, CryptoErrorCode } from './errors';
 import { ECDSA, RSA_OAEP, ROOM_KEYS, ROOM_ROLES, type RoomRole } from './params';
 import type { RecipientRef } from './recipients';
-import type { InvitationKeys, OpenedRoomKey, RoomCreationKeys, RoomKeyBundle } from './room-keys';
+import type { InvitationKeys, OpenedRoomKey, RekeyKeys, RoomCreationKeys, RoomKeyBundle } from './room-keys';
 import { openRoomKey } from './room-keys';
 import type { Bytes } from './types';
 import type { UnlockedVault } from './vault';
@@ -165,6 +165,20 @@ export function invitationKeysToWire(keys: InvitationKeys) {
   return {
     grantSignature: toBase64Url(keys.grantSignature),
     envelopes: keys.envelopes.map((e) => ({ keyVersion: e.keyVersion, wrappedKey: toBase64Url(e.wrappedKey) })),
+  };
+}
+
+/** The body of POST /rooms/{id}/rekey-operations/{operationId}/finalize (CM-T050). */
+export function rekeyKeysToWire(keys: RekeyKeys) {
+  return {
+    targetVersion: keys.keyVersion,
+    commitment: toBase64Url(keys.commitment),
+    statementSignature: toBase64Url(keys.signature),
+    envelopes: keys.envelopes.map((e) => ({
+      recipientUserId: e.userId,
+      recipientKeyId: e.keyId,
+      wrappedKey: toBase64Url(e.wrappedKey),
+    })),
   };
 }
 

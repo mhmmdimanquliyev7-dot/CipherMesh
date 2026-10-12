@@ -5,7 +5,7 @@ import { deriveBits, deriveWrappingKey, importKeyMaterial } from './hkdf';
 import { verifyPublicIdentity, type PublicIdentity, type VerifiedIdentity } from './identity';
 import { ROOM_KEYS, SUITE, type RoomRole } from './params';
 import { randomBytes } from './random';
-import type { RecipientRef } from './recipients';
+import { compareRecipients, sortRecipients, type RecipientRef } from './recipients';
 import {
   genesisStatement,
   keyVersionStatement,
@@ -370,6 +370,149 @@ export async function authenticateRoomMember(
   }
   if (!verified.isKeyHolder({ userId: identity.userId, keyId: identity.keyId })) throw authenticationFailed();
   return identity;
+}
+
+// ------------------------------------------------------------------------------ rekey (DF-10)
+
+/** One recipient of a rekey after this browser checked it (ADR-013 step 2.1). */
+export interface ReviewedRekeyRecipient {
+  /** The public identity as verified here: binding signature, fingerprint over both keys. */
+  readonly identity: VerifiedIdentity;
+  /**
+   * Whether the room's verified statements already name exactly this (user, key) as a key holder
+   * (a signed recipient list or an accepted grant). False for a key the room has not seen signed
+   * before, for example after a vault reset: the person reviewing the rekey compares its
+   * fingerprint out of band before the new key is wrapped to it (T-25, AG-03).
+   */
+  readonly knownHolder: boolean;
+}
+
+/**
+ * Checks the recipient snapshot the server returned for a rekey (CM-T050) before any key is made:
+ * the room's statements must pass the verification rule for this client (the base version, with
+ * the recipients' grants added), every recipient's public identity must verify on its own, no
+ * user or key may appear twice, the set must hold 1 to 100 entries (CP-25), and it must contain
+ * this client's own current identity. Nothing here can tell whether a listed member is still in
+ * the room (L-46): the server computes the snapshot from its records (OL-13), and the reviewer
+ * sees every name and fingerprint before signing.
+ */
+export async function reviewRekeyRecipients(
+  vault: UnlockedVault,
+  base: RoomKeyBundle,
+  candidates: readonly PublicIdentity[],
+): Promise<ReviewedRekeyRecipient[]> {
+  let verified: Verified;
+  try {
+    verified = await verifyStatements(vault, base);
+  } catch (error) {
+    throw controlled(error);
+  }
+  if (candidates.length === 0 || candidates.length > ROOM_KEYS.maxRecipients) throw authenticationFailed();
+  const users = new Set(candidates.map((c) => c.userId));
+  const keys = new Set(candidates.map((c) => c.keyId));
+  if (users.size !== candidates.length || keys.size !== candidates.length) throw authenticationFailed();
+  const self = selfOf(vault);
+  if (!candidates.some((c) => c.userId === self.userId && c.keyId === self.keyId)) throw authenticationFailed();
+  const reviewed: ReviewedRekeyRecipient[] = [];
+  for (const candidate of candidates) {
+    let identity: VerifiedIdentity;
+    try {
+      identity = await verifyPublicIdentity(candidate);
+    } catch {
+      throw authenticationFailed();
+    }
+    reviewed.push({ identity, knownHolder: verified.isKeyHolder({ userId: identity.userId, keyId: identity.keyId }) });
+  }
+  return reviewed;
+}
+
+/** What the finalize request carries: public values and ciphertext only, never RKM_(v+1). */
+export interface RekeyKeys {
+  readonly keyVersion: number;
+  readonly commitment: Bytes;
+  /** cm.room.key-version signed by this client's identity (ADR-015 section 4). */
+  readonly signature: Bytes;
+  /** One RSA-OAEP envelope per recipient, in the canonical recipient order. */
+  readonly envelopes: readonly (RecipientRef & { readonly wrappedKey: Bytes })[];
+}
+
+/**
+ * Creates key version v+1 in this browser (CM-T050, ADR-013 step 2, key-lifecycle 1.4):
+ *   1. opens version v with the full verification rule, so the signed previous commitment is one
+ *      this client verified itself and not merely what the server served;
+ *   2. draws fresh RKM_(v+1) from the CSPRNG; it never derives from RKM_v;
+ *   3. refuses material that reproduces RKC_v under version v's context (reuse check);
+ *   4. wraps RKM_(v+1) once per reviewed recipient under the label that names the room, version,
+ *      user and key, and signs cm.room.key-version naming RKC_(v+1), RKC_v and the recipients.
+ * The raw material is wiped once the envelopes exist; the result keeps only non-extractable keys.
+ */
+export async function createRekeyKeys(
+  vault: UnlockedVault,
+  input: {
+    readonly roomId: string;
+    readonly base: RoomKeyBundle;
+    readonly recipients: readonly VerifiedIdentity[];
+  },
+): Promise<{ readonly keys: RekeyKeys; readonly opened: OpenedRoomKey }> {
+  const { roomId, base } = input;
+  if (base.roomId !== roomId) throw new CryptoError(CryptoErrorCode.INVALID_INPUT);
+  const previous = await openRoomKey(vault, base);
+  const keyVersion = previous.keyVersion + 1;
+  const recipients = sortRecipients(input.recipients.map((r) => ({ userId: r.userId, keyId: r.keyId })));
+  const self = selfOf(vault);
+  if (
+    recipients.length === 0 ||
+    recipients.length > ROOM_KEYS.maxRecipients ||
+    recipients.some((r, i) => i > 0 && compareRecipients(recipients[i - 1] as RecipientRef, r) === 0) ||
+    !recipients.some((r) => r.userId === self.userId && r.keyId === self.keyId)
+  ) {
+    throw new CryptoError(CryptoErrorCode.INVALID_INPUT);
+  }
+  const byRef = new Map(input.recipients.map((r) => [ref(r.userId, r.keyId), r]));
+  const rkm = randomBytes(ROOM_KEYS.materialBytes);
+  try {
+    const material = await importKeyMaterial(rkm.slice());
+    const commitment = await commitmentOf(material, roomId, keyVersion);
+    if (bytesEqual(await commitmentOf(material, roomId, previous.keyVersion), previous.commitment)) {
+      throw authenticationFailed();
+    }
+    const envelopes: (RecipientRef & { wrappedKey: Bytes })[] = [];
+    for (const recipient of recipients) {
+      const identity = byRef.get(ref(recipient.userId, recipient.keyId));
+      if (identity === undefined) throw new CryptoError(CryptoErrorCode.INVALID_INPUT);
+      envelopes.push({
+        ...recipient,
+        wrappedKey: await wrap32(identity.encryptionPublicKey, rkm, envelopeLabel(roomId, keyVersion, recipient)),
+      });
+    }
+    wipe(rkm);
+    const signature = await signStatement(
+      vault.signingPrivateKey,
+      keyVersionStatement({
+        roomId,
+        keyVersion,
+        commitment,
+        previousCommitment: previous.commitment,
+        creatorUserId: self.userId,
+        creatorKeyId: self.keyId,
+        recipients,
+      }),
+    );
+    return {
+      keys: { keyVersion, commitment, signature, envelopes },
+      opened: {
+        roomId,
+        keyVersion,
+        commitment,
+        creator: vault.identity,
+        authorization: { kind: 'recipient-list' },
+        material,
+        wrappingKey: await wrappingKeyOf(material, roomId, keyVersion),
+      },
+    };
+  } finally {
+    wipe(rkm);
+  }
 }
 
 // ------------------------------------------------------------------------- room creation (DF-05)
