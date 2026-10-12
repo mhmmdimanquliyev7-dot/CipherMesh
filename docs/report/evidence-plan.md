@@ -144,10 +144,17 @@ Captured in Phase 8 (Prompt 10), with synthetic data only, in [evidence/phase-08
 ### Phase 9: Secrets
 | ID | Evidence | How to capture | Demonstrates | Tags |
 |---|---|---|---|---|
-| EV-09-01 | Secret row before and after reveal | Query output | Burn-after-reading removes the live copy | CRY |
+| EV-09-01 | Secret revealed once on an explicit click (the row after the reveal is asserted by `secrets-lifecycle.test.ts`) | Screenshot and test | Burn-after-reading removes the live copy | CRY |
 | EV-09-02 | Concurrent reveal test | Test output | Single-use atomicity | APP |
 | EV-09-03 | UI warning that copying cannot be prevented | Screenshot | Honest limitation (L-03) | ISMS |
 | EV-09-04 | Secret row with AES-256-GCM payload and a 384-byte wrapped SEK | Query output | Envelope encryption for secrets; RSA wraps only the key | CRY |
+| EV-09-05 | Secret canary scan report | Test output | No secret plaintext in persistent server storage, logs or events | CRY, ISMS |
+| EV-09-06 | Phase 9 verification gates | Command output | Release readiness of the phase | ISMS |
+| EV-09-07 | Phase 9 negative controls | Command output | The secret tests detect real defects | ISMS |
+| EV-09-08 | CI run of the Phase 9 pull request | CI summary | Change control through CI | ISMS |
+| EV-09-09 | Tampered reveal refused; XSS in a secret shown as text | Screenshot | Authenticated decryption and safe rendering | CRY, APP |
+
+Captured in Phase 9 (Prompt 11), with synthetic data only, in [evidence/phase-09/](evidence/phase-09/): EV-09-01 (the revealed page; the row after the reveal is asserted by `secrets-lifecycle.test.ts`), EV-09-02 (concurrency test output), EV-09-03 (the reveal warning), EV-09-04 (the stored row), EV-09-05 (canary scan output), EV-09-06 (gate results), EV-09-07 (negative controls) and EV-09-09 (tamper and XSS screenshot). EV-09-08 is the CI run of the Phase 9 pull request. Jira history items stay pending until the backlog is imported.
 
 ### Phase 10: Policies
 | ID | Evidence | How to capture | Demonstrates | Tags |

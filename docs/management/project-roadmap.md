@@ -169,9 +169,9 @@ Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceabili
 | Goal | Recipient-bound secrets with burn-after-reading |
 | Dependencies | Phase 6 (the stretch item CM-T045 also needs Phase 10) |
 | Deliverables | Secret creation with the envelope pattern (AES-256-GCM payload, RSA-wrapped 32-byte SEK) and listing; atomic reveal; revocation and expiry; optional external one-time links |
-| Security checkpoint | At-most-once delivery; POST-only reveal; only the recipient can decrypt; the UI states that copying cannot be prevented |
-| Tests | `burn` and `secret-envelope` suites; concurrent reveals; recipient isolation test |
-| Documentation updates | L-03 and L-12 demonstration notes |
+| Security checkpoint | At-most-once delivery; POST-only reveal; only the recipient can decrypt; the UI states that copying cannot be prevented. **Phase 9 status:** all met: one locking transaction returns and destroys a burn-after-reading secret (twenty concurrent reveals over two API instances give one success, EV-09-02), no GET releases anything, the reveal answers only the stored recipient, the sender's browser wraps only to a recipient key the room's signed statements name, and the UI warns before a reveal and states that copying cannot be prevented. CM-T045 (external links, stretch) was not built |
+| Tests | `burn` and `secret-envelope` suites; concurrent reveals; recipient isolation test. **Phase 9:** `secrets.test.ts`, `tests/secrets` (lifecycle and concurrency), BOLA over four routes, database constraints, `secrets.spec.ts` in three engines |
+| Documentation updates | L-03 and L-12 demonstration notes. **Phase 9:** DF-09 confirmed with the implemented shape; CP-29, CD-32, AZ-32 and OL-14 added; L-55 to L-58 |
 | Jira evidence | Database row before and after reveal; concurrency test output |
 
 ### Phase 10: Security Policies (M4, CM-T046 to CM-T049)

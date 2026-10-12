@@ -124,6 +124,8 @@ When no file or note references a RETIRED version, the worker deletes its envelo
 | Retirement | Not applicable (files are immutable) | Replaced by the next revision | Not applicable |
 | Destruction | Wrapped FEK set to NULL on delete or expiry | Replaced, or set to NULL on delete | Wrapped SEK and payload set to NULL on burn, expiry or revoke |
 
+SEK, as implemented in Phase 9 (CD-32): 32 bytes from the CSPRNG in the sender's browser, wrapped with RSA-OAEP to the recipient key the room's verified statements name, then imported as a non-extractable AES-256-GCM key and overwritten; the recipient's browser unwraps it, imports it the same way and overwrites the bytes. Nothing stores it unwrapped. Its wrapped copy is destroyed in the reveal statement of a burn-after-reading secret, by revocation (AZ-25), by the worker after expiry or when the room is deleted, and in the transaction that removes or suspends the recipient or resets the recipient's vault (D-09-06). Backups keep the wrapped copy until their retention ends (L-12).
+
 ## 3. User identity keys
 
 An identity is the encryption key pair and the signing key pair under one key ID (ADR-015). Both pairs always share one status and change together; there is no separate rotation of the signing key.

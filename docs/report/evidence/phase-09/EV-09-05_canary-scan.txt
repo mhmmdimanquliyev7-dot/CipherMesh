@@ -1,0 +1,5 @@
+EV-09-05 Secret canary scan (tables, log and security events), 2026-10-12, branch feature/CM-T043-burn-secrets, local PostgreSQL 17, synthetic data only.
+
+ ✓ |secrets| tests/secrets/secrets-lifecycle.test.ts > no secret text anywhere on the server > finds no canary in any table, the log or the security events (EV-09-05) 444ms
+ Test Files  1 passed (1)
+      Tests  1 passed | 19 skipped (20)

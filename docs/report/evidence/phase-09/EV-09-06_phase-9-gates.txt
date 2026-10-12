@@ -1,0 +1,15 @@
+EV-09-06 Phase 9 verification gates (CM-T043, CM-T044), 2026-10-12, branch feature/CM-T043-burn-secrets, local PostgreSQL 17 and object storage, Windows 11, Node 24.
+
+| Gate | Result |
+|---|---|
+| `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 2044 tests in 81 files (Phase 8: 1956 in 78). New: `packages/crypto/src/secrets.test.ts` (OpenSSL known answers, tamper and authentication tests), `tests/secrets` (lifecycle 20, concurrency 8); extended: `bola.test.ts`, database constraints (payload bound, lifetime bound, guard trigger), route and BOLA inventories, authorization matrix (AZ-32), registry |
+| `pnpm test:e2e` (three engines, one worker) | 118 passed, 14 skipped by design (single-engine tests); was 102 and 12. `secrets.spec.ts` covers the explicit reveal, two tabs, expiry, revocation, vault lock, a tampering server, XSS as text and the cross-engine path |
+| `pnpm security:negative-controls` | 90 of 90 caught (79 earlier plus eleven Phase 9: NC-09-01 to NC-09-11), both baselines pass, 49 source files restored byte for byte (EV-09-07) |
+| `pnpm test:coverage:crypto` | 98.79% statements, 94.16% branches (gate 90%) |
+| `pnpm test:coverage:authz` | 97.26% statements, 98.3% branches |
+| `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, `db:validate`, `db:check-schema`, `db:drift` | Pass |
+| `pnpm audit:deps` | Pass; no dependency added or changed |
+| Secret scan (gitleaks, pinned image) | Full history (60 commits) and staged changes: no leaks found |
+
+Two defects of the working tree were found and fixed during the final verification: the unanchored `.gitignore` rule `secrets/` ignored the source directories `apps/api/src/secrets` and `tests/secrets` (now `/secrets/` and `/infrastructure/**/secrets/`), and `packages/shared/src/authorization.test.ts` still treated AZ-32 as an unknown action (five failing assertions; it now expects the thirty-two actions). Neither touched a security control.
