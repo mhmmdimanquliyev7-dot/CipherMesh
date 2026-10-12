@@ -26,6 +26,8 @@ const EXPECTED: Record<'cm_api' | 'cm_worker' | 'cm_verifier', Record<string, re
     user_key_pairs: [S, I, U],
     rooms: [S, I, U],
     room_members: [S, I, U],
+    // Phase 11: the grant history is append-only (trigger); the API inserts through room_members.
+    room_member_grants: [S, I],
     invitations: [S, I, U],
     room_key_versions: [S, I, U],
     rekey_operations: [S, I, U],
