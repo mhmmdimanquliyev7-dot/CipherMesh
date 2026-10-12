@@ -230,7 +230,9 @@ test('envelopes made in Chromium open in Firefox and WebKit, with the same Safet
 
 // ------------------------------------------------------------- known answers in every engine
 
-test('the commitment and Safety Code derivations give the known answers in this engine (CP-24)', async ({ page }) => {
+test('the commitment, Safety Code and envelope round trip give the known answers in this engine (CP-24, SF-11-01)', async ({
+  page,
+}) => {
   // The real package source, bundled for the browser like the Phase 4 benchmark page (vite).
   const output = await build({
     configFile: false,
@@ -251,7 +253,7 @@ test('the commitment and Safety Code derivations give the known answers in this 
   await page.evaluate(code);
   const result = (await page.evaluate(() =>
     (globalThis as unknown as { __cmRoomKat: () => Promise<unknown> }).__cmRoomKat(),
-  )) as { commitment: string; code: unknown; ones: unknown };
+  )) as { commitment: string; code: unknown; ones: unknown; unwrapped: string[] };
   const roomId = '0f3e2d1c-4b5a-4968-8776-a5b4c3d2e1f0';
   const info = Buffer.from(JSON.stringify({ ctx: 'cm.room.commitment', keyVersion: 1, roomId, v: 1 }));
   const rkm = Buffer.from(Array.from({ length: 32 }, (_, i) => i));
@@ -263,6 +265,8 @@ test('the commitment and Safety Code derivations give the known answers in this 
     digits: '35631199793402506816',
   });
   expect(result.ones).toEqual({ keyVersion: 3, words: Array(6).fill('zoo'), digits: '73786976294838206463' });
+  // SF-11-01: a wrapped room key that starts with zero bytes opens to the same 32 bytes here.
+  expect(result.unwrapped).toEqual([`00${rkm.subarray(1).toString('hex')}`, `0000${rkm.subarray(2).toString('hex')}`]);
 });
 
 // ------------------------------------------------- split view by an authorized owner (EV-06-06)

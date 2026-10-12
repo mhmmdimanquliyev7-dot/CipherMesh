@@ -11,7 +11,13 @@ export default defineConfig({
   forbidOnly: Boolean(process.env['CI']),
   retries: 0,
   reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
-  use: { baseURL: `https://127.0.0.1:${String(port)}`, ignoreHTTPSErrors: true },
+  use: {
+    baseURL: `https://127.0.0.1:${String(port)}`,
+    ignoreHTTPSErrors: true,
+    // Evidence for the open navigation-hang item (current-state section 12): a failed test in CI
+    // keeps its trace in the uploaded report. Every value in a trace is synthetic test data.
+    trace: process.env['CI'] ? 'retain-on-failure' : 'off',
+  },
   webServer: {
     command: 'node tests/e2e/static-server.mjs',
     url: `https://127.0.0.1:${String(port)}/`,

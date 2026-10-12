@@ -6,7 +6,7 @@ import {
   privateDecrypt,
   publicEncrypt,
 } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import vectors from '../vectors/rsa-oaep-3072-sha256.json' with { type: 'json' };
 import { contextBytes } from './contexts';
 import { fromHex, toHex } from './encoding';
@@ -88,7 +88,7 @@ describe('RSA-OAEP wrapper (INV-17: 32-byte values only, label always a canonica
     }
   });
 
-  it('rejects a wrong label, a modified ciphertext, a wrong size and a valid OAEP value of 31 bytes', async () => {
+  it('rejects a wrong label, a modified ciphertext, a wrong size and a valid OAEP value of 33 bytes', async () => {
     const pair = await generateEncryptionKeyPair();
     const value = new Uint8Array(32).fill(9);
     const wrapped = await wrap32(pair.publicKey, value, label);
@@ -103,18 +103,78 @@ describe('RSA-OAEP wrapper (INV-17: 32-byte values only, label always a canonica
     flipped[100] = (flipped[100] ?? 0) ^ 0x10;
     await expectCode(unwrap32(pair.privateKey, flipped, label), CryptoErrorCode.AUTHENTICATION_FAILED);
     await expectCode(unwrap32(pair.privateKey, wrapped.slice(1), label), CryptoErrorCode.AUTHENTICATION_FAILED);
-    // A correctly padded ciphertext of a 31-byte value, made by OpenSSL, is still refused.
+    // A correctly padded ciphertext of a 33-byte value, made by OpenSSL, is refused.
     const spki = await exportSpki(pair.publicKey);
-    const short = publicEncrypt(
-      {
-        key: createPublicKey({ key: Buffer.from(spki), format: 'der', type: 'spki' }),
-        padding: constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: 'sha256',
-        oaepLabel: Buffer.from(label),
-      },
-      Buffer.alloc(31, 1),
+    const encryptByOpenSsl = (value: Buffer): Uint8Array =>
+      new Uint8Array(
+        publicEncrypt(
+          {
+            key: createPublicKey({ key: Buffer.from(spki), format: 'der', type: 'spki' }),
+            padding: constants.RSA_PKCS1_OAEP_PADDING,
+            oaepHash: 'sha256',
+            oaepLabel: Buffer.from(label),
+          },
+          value,
+        ),
+      );
+    await expectCode(
+      unwrap32(pair.privateKey, encryptByOpenSsl(Buffer.alloc(33, 1)), label),
+      CryptoErrorCode.AUTHENTICATION_FAILED,
     );
-    await expectCode(unwrap32(pair.privateKey, new Uint8Array(short), label), CryptoErrorCode.AUTHENTICATION_FAILED);
+    // A shorter value can only be read as the 32-byte value with leading zeros: the same result the
+    // sender gets by wrapping that 32-byte value, so accepting it gives nobody a new capability.
+    const short = await unwrap32(pair.privateKey, encryptByOpenSsl(Buffer.alloc(31, 1)), label);
+    expect(toHex(short)).toBe(`00${'01'.repeat(31)}`);
+  });
+});
+
+describe('unwrap32 on an engine that drops leading zero bytes (finding SF-11-01, CD-33)', () => {
+  const label = contextBytes('cm.vault.pair-check', { ...PAIR_CHECK_IDS, suite: 'CM1' });
+  // Playwright's Linux WebKit (libgcrypt) returns the OAEP message as an integer: 00 || x comes back
+  // as x. This stub reproduces exactly that on top of the real decryption.
+  async function withStrippingEngine<T>(run: () => Promise<T>): Promise<T> {
+    const original = globalThis.crypto.subtle.decrypt.bind(globalThis.crypto.subtle);
+    const spy = vi.spyOn(globalThis.crypto.subtle, 'decrypt').mockImplementation(async (...args) => {
+      const out = new Uint8Array(await original(...args));
+      let i = 0;
+      while (i < out.length && out[i] === 0) i++;
+      return out.slice(i).buffer;
+    });
+    try {
+      return await run();
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it('restores 32-byte values that start with one or more zero bytes', async () => {
+    const pair = await generateEncryptionKeyPair();
+    for (const zeros of [1, 2, 31]) {
+      const value = new Uint8Array(32).fill(0xa5);
+      value.fill(0, 0, zeros);
+      const wrapped = await wrap32(pair.publicKey, value, label);
+      const unwrapped = await withStrippingEngine(() => unwrap32(pair.privateKey, wrapped, label));
+      expect(unwrapped.length).toBe(32);
+      expect(toHex(unwrapped)).toBe(toHex(value));
+    }
+  });
+
+  it('still fails closed for a wrong label or a modified ciphertext', async () => {
+    const pair = await generateEncryptionKeyPair();
+    const value = new Uint8Array(32).fill(7);
+    value[0] = 0;
+    const wrapped = await wrap32(pair.publicKey, value, label);
+    const otherLabel = contextBytes('cm.vault.pair-check', {
+      ...PAIR_CHECK_IDS,
+      suite: 'CM1',
+      keyId: PAIR_CHECK_IDS.userId,
+    });
+    await withStrippingEngine(async () => {
+      await expectCode(unwrap32(pair.privateKey, wrapped, otherLabel), CryptoErrorCode.AUTHENTICATION_FAILED);
+      const flipped = new Uint8Array(wrapped);
+      flipped[7] = (flipped[7] ?? 0) ^ 0x01;
+      await expectCode(unwrap32(pair.privateKey, flipped, label), CryptoErrorCode.AUTHENTICATION_FAILED);
+    });
   });
 });
 

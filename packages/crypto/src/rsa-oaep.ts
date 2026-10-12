@@ -75,18 +75,30 @@ export async function wrap32(publicKey: Key, value: Bytes, label: CanonicalBytes
 }
 
 /**
- * Decrypts a 384-byte value and requires a 32-byte result. A wrong key, label or modified byte
+ * Decrypts a 384-byte value and returns exactly 32 bytes. A wrong key, label or modified byte
  * fails with one generic error; the client stops after a failure instead of retrying, which
  * denies an attacker the adaptive queries of a Manger-style attack (ADR-007).
+ *
+ * A shorter result is the 32-byte value with its leading zero bytes dropped and is restored by
+ * left-padding (finding SF-11-01, CD-33): the WebKit build Playwright runs on Linux (libgcrypt
+ * backend) returns the OAEP message as an integer, so a value starting with 0x00 (1 in 256 room
+ * keys and SEKs) came back as 31 bytes and an honest key was refused as tampered. Padding grants
+ * nothing new: whoever can encrypt a short value X can encrypt the 32-byte value 00..X directly,
+ * and every caller still checks what the value opens (signed commitment, AEAD tags). A result
+ * longer than 32 bytes is refused.
  */
 export async function unwrap32(privateKey: Key, ciphertext: Bytes, label: CanonicalBytes): Promise<Bytes> {
   if (ciphertext.length !== RSA_OAEP.ciphertextBytes || label.length === 0) {
     throw new CryptoError(CryptoErrorCode.AUTHENTICATION_FAILED);
   }
   const value = await rsaOaepDecryptRaw(privateKey, ciphertext, label);
-  if (value.length !== RSA_OAEP.wrappedValueBytes) {
+  if (value.length === RSA_OAEP.wrappedValueBytes) return value;
+  if (value.length > RSA_OAEP.wrappedValueBytes) {
     value.fill(0);
     throw new CryptoError(CryptoErrorCode.AUTHENTICATION_FAILED);
   }
-  return value;
+  const padded = new Uint8Array(RSA_OAEP.wrappedValueBytes);
+  padded.set(value, RSA_OAEP.wrappedValueBytes - value.length);
+  value.fill(0);
+  return padded;
 }
