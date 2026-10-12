@@ -476,6 +476,16 @@ Status: Phase 0.5 revision of the Phase 0 model, with implementation checks for 
 - **Testing strategy:** `tests/database/privileges.test.ts` compares live privileges with an independent copy of the matrix and checks role attributes, ownership and escalation attempts; `tests/database/migrations.test.ts` runs the drift check with a negative control; `tests/security/startup-config.test.ts` rejects other roles in `DATABASE_URL`.
 - **Rating:** Likelihood Medium, Impact High, inherent **High**. Treatment: Mitigate. Residual: **Low**.
 
+### T-41 Security-profile bypass and silent weakening of a room
+- **STRIDE:** Elevation of privilege, Tampering, Repudiation
+- **Assets:** A-01, A-02, A-07, A-08 (content, ciphertext and envelopes, metadata, audit trail)
+- **Threat:** A member reaches a CONFIDENTIAL or RESTRICTED room, or performs a sensitive operation in it, without meeting the profile; or a room is weakened (downgraded, its lifetimes extended) without the controls the profile document requires and without a trace.
+- **Attack scenario:** A member without MFA calls a room route directly; a client sends a weaker profile, a forged policy version or a role in the request; a request picks a secondary route that forgot the gate; a write starts under STANDARD while the OWNER upgrades the room, and lands after it under the old rules; a stolen session downgrades a RESTRICTED room with an old step-up; a database row with an unknown policy version is served under a default; a downgrade extends lifetimes.
+- **Security controls:** The versioned, frozen policy catalogue in code (no database table can change a value, CM-T046); the room's rules resolved only from its stored profile and version, an unknown version fails closed (`POLICY_UNSUPPORTED`); PC-01 and PC-02 in the central room authorizer for every room route and again on the locked room row inside every write; PC-03 declared by each sensitive route, checked at the gate and again under the lock; profile changes OWNER-only, on the locked row with a stale-expectation check, upgrades requiring the new profile's access requirements, downgrades a step-up within 5 minutes; upgrades shorten lifetimes and revoke rule-breaking invitations and secrets in the same transaction; database triggers let expiry move only earlier; `PROFILE_UPGRADED` and high-severity `PROFILE_DOWNGRADED` events.
+- **Residual risk:** Reads use the profile at the start of the request (L-59); profiles are per room, not per device (L-60); what members already obtained is not taken back (L-61); profile events are log entries until the Phase 12 ledger (L-33, L-62).
+- **Testing strategy:** `tests/policy/policy-matrix.test.ts` (every control and profile, PC-01 and PC-02 on every room route), `tests/policy/profile-change.test.ts` (forced lock order for concurrent changes and writes), `tests/security/policy-catalogue.test.ts`, the BOLA suite and negative controls NC-10-01 to NC-10-12.
+- **Rating:** Likelihood Medium, Impact High, inherent **High**. Treatment: Mitigate. Residual: **Low**.
+
 ## 5. Risk register summary
 
 | ID | Threat | Likelihood | Impact | Inherent | Treatment | Residual | Related limitation |
@@ -519,6 +529,7 @@ Status: Phase 0.5 revision of the Phase 0 model, with implementation checks for 
 | T-37 | Rekey abuse and incomplete rekeys | M | M | Medium | Mitigate | Low | L-24 |
 | T-38 | Audit signing-key compromise | M | M | Medium | Mitigate, Accept | Medium (Level 1) | L-25 |
 | T-39 | Over-privileged database roles and schema drift | M | H | High | Mitigate | Low | L-26, L-28 |
+| T-41 | Security-profile bypass and silent weakening | M | H | High | Mitigate | Low | L-59, L-60, L-61, L-62 |
 | T-40 | Unauthorized replacement or reset of a vault | L | H | Medium | Mitigate, Accept | Low | L-07, L-40 |
 
 Residual risks rated **High** (T-23) and every **Accept** decision require explicit acknowledgement by the project owner at the end of Phase 0 and again before the final report.
@@ -642,3 +653,19 @@ Prompt 08 implemented key version 1 at room creation, the signed room statements
 | T-36 Injected key version | Section above: statements, authority chain, commitment and recipient authorization are verified in the browser and the first two also by the API (NC-06-01, NC-06-08) | Identity substitution, a legitimate member's keys, served code, grants as statements (L-46) |
 
 Phase 6 review (Prompt 08): no new security finding. The two design questions found while reading the normative documents are recorded in ADR-015 section 4.1 (the invited-member clarification approved by the project owner) and L-46 (grants are statements). Defects found and fixed during the work were test-harness defects, not production defects: an address overflow in a test helper (per-address limits keyed `unknown` after 0xffff) and Safety Code leak checks that searched single common words.
+
+## 13. Phase 10 implementation check (security policies)
+
+Prompt 12 implemented the versioned policy catalogue, the server-side policy gates, profile changes with expiry clamping and the policy test matrix (CM-T046 to CM-T049). It adds one entry point (`POST /rooms/{roomId}/profile`, AZ-03, behind the same session, CSRF and room authorization as every room route), no new trust boundary or data store, and threat T-41.
+
+| Threat | Implemented and tested in Phase 10 | Still open |
+|---|---|---|
+| T-41 Profile bypass, silent weakening | As described in T-41 | L-59 to L-62 |
+| T-04 Malicious member | A member who does not meet the room's profile is refused every room request; sensitive operations in RESTRICTED rooms need a fresh step-up even for authorized roles | A member who meets the profile can still copy what they decrypt (L-03, L-60) |
+| T-05, T-06 Non-member access, BOLA | Outsiders and platform administrators get the generic 404 before any profile is read; the profile route is attacked by the BOLA suite like every room route | |
+| T-08 Session theft | PC-02 bounds a stolen session's use to 4 hours (CONFIDENTIAL) or 1 hour (RESTRICTED) after the password sign-in; PC-03 requires the password and TOTP again for the sensitive operations; a downgrade needs a step-up within 5 minutes | A thief with the password and TOTP device (L-34) |
+| T-20 Audit modification | Profile changes and refusals are recorded with the profile, version and counts; downgrades with severity HIGH | Hash chain (Phase 12, L-26, L-33) |
+| T-21 Removed member | PC-15 and PC-16 tested in every profile; a profile change does not unlock a write-locked room | The rekey (Phase 11, L-44) |
+
+Phase 10 review: one defect was found and fixed during development, before any commit: the first upgrade attempt failed with a database error because the Phase 6 invitation trigger and the Phase 9 secret guard made `expires_at` write-once; the migration `20261010000000_security_policies` now lets an open invitation's or ACTIVE secret's expiry move only earlier, with database tests for both directions. No security finding remains open.
+

@@ -1,20 +1,15 @@
 import {
+  decideRoomAccess,
   decideRoomAction,
   ErrorCode,
-  INVITATION_RULES,
-  PROFILE_ACCESS_REQUIREMENTS,
+  resolveRoomPolicy,
   type AssignableRoomRole,
   type RoomActionId,
   type RoomResourceFacts,
 } from '@ciphermesh/shared';
 import type { SecurityEventSink } from '../auth/security-events';
-import {
-  requireRecentAuthentication,
-  requireStepUp,
-  SESSION_POLICY,
-  type Actor,
-  type RequestMeta,
-} from '../auth/sessions';
+import type { Actor, RequestMeta } from '../auth/sessions';
+import { policyDenialError, policyOf, reapplyRoomPolicy } from '../authorization/policy';
 import { reauthorizeRoomAction, roomDenial, type RoomAccess } from '../authorization/rooms';
 import {
   InvitationPendingError,
@@ -75,19 +70,22 @@ const rekeyRequired = (): HttpError =>
 const notOpen = (): HttpError =>
   new HttpError(409, ErrorCode.INVITATION_NOT_OPEN, 'This invitation cannot be used for this action');
 const expired = (): HttpError => new HttpError(409, ErrorCode.INVITATION_EXPIRED, 'This invitation has expired');
-/** PC-03: in RESTRICTED rooms, inviting and approving need a step-up within the last 15 minutes. */
-function requireRestrictedStepUp(actor: Actor, room: LockedRoom, now: Date): void {
-  if (room.securityProfile === 'RESTRICTED' && requireStepUp(actor, SESSION_POLICY.stepUpMs, now) !== undefined) {
-    throw new HttpError(401, ErrorCode.STEP_UP_REQUIRED, 'Confirm your identity to continue');
-  }
-}
+/**
+ * PC-03: inviting and approving are sensitive operations (a step-up within 15 minutes in
+ * RESTRICTED rooms). The route gate checks them at the start of the request; the transaction
+ * checks again on the locked room row (CM-T047).
+ */
+const SENSITIVE_ACTIONS: ReadonlySet<RoomActionId> = new Set(['AZ-06', 'AZ-07']);
 const envelopeSetInvalid = (): HttpError =>
   new HttpError(422, ErrorCode.ENVELOPE_SET_INVALID, 'The key envelopes do not match what this room requires');
 
 export function createInvitationService(deps: InvitationServiceDependencies) {
   const { store, transaction, events, clock } = deps;
 
-  /** Locks the room and the actor's membership (in that order) and decides again on that state. */
+  /**
+   * Locks the room and the actor's membership (in that order) and decides again on that state:
+   * the matrix, then the room's policy gates on the locked profile (PC-01, PC-02, PC-03).
+   */
   async function lockAndReauthorize(
     tx: RoomStore,
     actor: Actor,
@@ -113,6 +111,7 @@ export function createInvitationService(deps: InvitationServiceDependencies) {
       ...(facts === undefined ? {} : { resource: facts }),
     });
     if (room === null || member === null) throw notFound();
+    reapplyRoomPolicy(events, { ...request, action }, actor, room, clock(), SENSITIVE_ACTIONS.has(action));
     return { room, member };
   }
 
@@ -186,14 +185,13 @@ export function createInvitationService(deps: InvitationServiceDependencies) {
           const { room, member } = await lockAndReauthorize(tx, actor, roomId, meta, 'AZ-06', (locked) =>
             Promise.resolve({ roomId: locked.id, roles: [input.role] }),
           );
-          requireRestrictedStepUp(actor, room, now);
           if (room.keyState !== 'ACTIVE') throw rekeyRequired();
           if ((await tx.lockMembership(roomId, invitee.userId)) !== null) {
             throw new HttpError(409, ErrorCode.ALREADY_MEMBER, 'This user is already a member of the room');
           }
           if (!(await tx.lockActiveIdentity(invitee.userId, invitee.keyId))) throw identityKeyChanged();
           if (!(await tx.lockActiveIdentity(actor.userId, inviter.keyId))) throw identityKeyChanged();
-          const rules = INVITATION_RULES[room.securityProfile];
+          const rules = policyOf(room).invitations;
           // PC-05: the human comparison itself cannot be proven (L-18); the value must match.
           if (rules.fingerprintConfirmation === 'required' && input.confirmedFingerprint === null) {
             throw new HttpError(
@@ -271,7 +269,6 @@ export function createInvitationService(deps: InvitationServiceDependencies) {
       const now = clock();
       await transaction(async (tx) => {
         const { room } = await lockAndReauthorize(tx, actor, access.roomId, meta, 'AZ-07');
-        requireRestrictedStepUp(actor, room, now);
         const invitation = await tx.lockInvitation(room.id, invitationId);
         if (invitation === null) throw notFound();
         if (invitation.status !== 'PENDING_APPROVAL' || invitation.invitedById === actor.userId) throw notOpen();
@@ -325,22 +322,14 @@ export function createInvitationService(deps: InvitationServiceDependencies) {
         if (invitation === null || invitation.inviteeUserId !== actor.userId) throw notFound();
         if (invitation.status !== 'PENDING') throw notOpen();
         if (invitation.expiresAt <= now) throw expired();
-        // Joining needs the room's access requirements, as creating it does (PC-01, PC-02).
-        const requirement = PROFILE_ACCESS_REQUIREMENTS[room.securityProfile];
-        if (requirement.mfaVerifiedSession && actor.session.mfaVerifiedAt === null) {
-          throw new HttpError(
-            403,
-            ErrorCode.MFA_REQUIRED,
-            'This security profile requires a session verified with MFA',
-          );
-        }
-        if (requireRecentAuthentication(actor, requirement.maxAuthenticationAgeMs, now) !== undefined) {
-          throw new HttpError(
-            401,
-            ErrorCode.REAUTH_REQUIRED,
-            'Sign in again to join a room with this security profile',
-          );
-        }
+        // Joining needs the room's access requirements under its stored policy (PC-01, PC-02), as
+        // every request inside the room does; an unknown policy version fails closed.
+        const access = decideRoomAccess(
+          resolveRoomPolicy(room.securityProfile, room.policyVersion),
+          actor.session,
+          now,
+        );
+        if (!access.allowed) throw policyDenialError(access.reason);
         if (room.keyState !== 'ACTIVE') throw rekeyRequired();
         // 4. Memberships: the caller is not a member yet, and the inviter may still grant this role.
         if ((await tx.lockMembership(room.id, actor.userId)) !== null) {

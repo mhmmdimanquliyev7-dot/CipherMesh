@@ -1,15 +1,23 @@
 import {
+  auditLevelIncludes,
+  currentPolicy,
+  decideProfileChange,
+  decideRoomAccess,
   ErrorCode,
-  PROFILE_ACCESS_REQUIREMENTS,
+  profileChangeDirection,
   type AssignableRoomRole,
+  type ProfileChangeDirection,
+  type ProfilePolicy,
   type RoomActionId,
   type RoomMembershipFacts,
   type RoomRole,
   type SecurityProfile,
 } from '@ciphermesh/shared';
 import type { SecurityEventSink } from '../auth/security-events';
-import { requireRecentAuthentication, type Actor, type RequestMeta } from '../auth/sessions';
+import type { Actor, RequestMeta } from '../auth/sessions';
+import { policyDenial, policyDenialError, reapplyRoomPolicy } from '../authorization/policy';
 import { reauthorizeRoomAction, roomDenial, type RoomAccess } from '../authorization/rooms';
+import { NO_EFFECTS, type ProfileChangeEffects } from '../db/policy-store';
 import {
   RoomIdUnavailableError,
   type ListPosition,
@@ -42,13 +50,6 @@ import { decodeExact, verifiedIdentity, verifyGrant, verifyRoomCreation } from '
  * go to the security-event sink (the log until the Phase 12 ledger, L-33) after commit.
  */
 
-/**
- * Version of the code-defined policy catalogue recorded on each room (data-model 4.6). Version 1
- * is the profile table of security-policy-profiles.md as approved in Phase 0.5; the versioned
- * catalogue itself arrives with CM-T046.
- */
-export const ROOM_POLICY_VERSION = 1;
-
 export interface RoomServiceDependencies {
   readonly store: RoomStore;
   readonly transaction: <T>(fn: (store: RoomStore) => Promise<T>) => Promise<T>;
@@ -68,6 +69,12 @@ export interface NewRoomInput {
     readonly genesisSignature: string;
     readonly keyVersionSignature: string;
   };
+}
+
+/** AZ-03 (CM-T048): the profile to change to and the profile the client believes is stored. */
+export interface ProfileChangeInput {
+  readonly securityProfile: SecurityProfile;
+  readonly expectedProfile: SecurityProfile;
 }
 
 /** A signed membership grant in wire form (AZ-05, AZ-10). */
@@ -107,11 +114,15 @@ export function createRoomService(deps: RoomServiceDependencies) {
     readonly room: LockedRoom;
     readonly actor: LockedMembership;
     readonly target: LockedMembership | undefined;
+    /** The policy of the locked room row, after its gates passed. */
+    readonly policy: ProfilePolicy;
   }
 
   /**
    * Locks the room, the actor's membership and, for target actions, the target's membership (in
-   * this order, which every room transaction uses), then decides again on the locked state.
+   * this order, which every room transaction uses), then decides again on the locked state: the
+   * matrix, and the room's policy gates (PC-01, PC-02, and PC-03 for a sensitive operation) on the
+   * locked profile, so a concurrent profile change cannot slip between the check and the write.
    */
   async function lockAndReauthorize(
     tx: RoomStore,
@@ -119,8 +130,17 @@ export function createRoomService(deps: RoomServiceDependencies) {
     access: RoomAccess,
     meta: RequestMeta,
     action: RoomActionId,
-    target?: { readonly userId: string; readonly requestedRole?: RoomRole; readonly includeSuspended: boolean },
+    now: Date,
+    options: {
+      readonly target?: {
+        readonly userId: string;
+        readonly requestedRole?: RoomRole;
+        readonly includeSuspended: boolean;
+      };
+      readonly sensitive?: boolean;
+    } = {},
   ): Promise<Locked> {
+    const { target } = options;
     const request = { actorUserId: actor.userId, requestId: meta.requestId };
     const room = await tx.lockRoom(access.roomId);
     const actorMembership = room === null ? null : await tx.lockMembership(access.roomId, actor.userId);
@@ -148,7 +168,8 @@ export function createRoomService(deps: RoomServiceDependencies) {
     });
     // The decision denies a missing room or membership; these guards only narrow the types.
     if (room === null || actorMembership === null) throw notFound();
-    return { room, actor: actorMembership, target: targetMembership };
+    const policy = reapplyRoomPolicy(events, { ...request, action }, actor, room, now, options.sensitive === true);
+    return { room, actor: actorMembership, target: targetMembership, policy };
   }
 
   /** A signed statement that failed verification: recorded, then refused with nothing stored. */
@@ -227,17 +248,11 @@ export function createRoomService(deps: RoomServiceDependencies) {
      */
     async createRoom(actor: Actor, input: NewRoomInput, meta: RequestMeta): Promise<RoomSummaryRecord> {
       const now = clock();
-      const requirement = PROFILE_ACCESS_REQUIREMENTS[input.securityProfile];
-      if (requirement.mfaVerifiedSession && actor.session.mfaVerifiedAt === null) {
-        throw new HttpError(403, ErrorCode.MFA_REQUIRED, 'This security profile requires a session verified with MFA');
-      }
-      if (requireRecentAuthentication(actor, requirement.maxAuthenticationAgeMs, now) !== undefined) {
-        throw new HttpError(
-          401,
-          ErrorCode.REAUTH_REQUIRED,
-          'Sign in again to create a room with this security profile',
-        );
-      }
+      // A new room is governed by the current catalogue version; the creator must meet its access
+      // requirements (PC-01, PC-02), as every later request to the room must.
+      const policy = currentPolicy(input.securityProfile);
+      const access = decideRoomAccess(policy, actor.session, now);
+      if (!access.allowed) throw policyDenialError(access.reason);
       const identity = await store.findActiveIdentity(actor.userId);
       if (identity === null) {
         throw new HttpError(403, ErrorCode.VAULT_SETUP_REQUIRED, 'Set up your vault before creating a room');
@@ -274,7 +289,7 @@ export function createRoomService(deps: RoomServiceDependencies) {
             roomId: input.roomId,
             name: input.name,
             securityProfile: input.securityProfile,
-            policyVersion: ROOM_POLICY_VERSION,
+            policyVersion: policy.version,
             creatorId: actor.userId,
             now,
             keys: { creatorKeyId: identity.keyId, genesisSignature, commitment, keyVersionSignature, envelope },
@@ -316,13 +331,25 @@ export function createRoomService(deps: RoomServiceDependencies) {
     },
 
     /** AZ-01. Members of this room, visible only to an ACTIVE member of it. */
-    listMembers(
+    async listMembers(
       actor: Actor,
       access: RoomAccess,
       after: ListPosition | undefined,
       take: number,
+      meta: RequestMeta,
     ): Promise<MemberRecord[]> {
-      return store.listMembers(access.roomId, actor.userId, after, take);
+      const members = await store.listMembers(access.roomId, actor.userId, after, take);
+      // PC-13: member-list views are recorded at the FULL audit level.
+      if (auditLevelIncludes(access.policy.auditLevel, 'FULL')) {
+        events.record({
+          name: 'MEMBER_LIST_VIEWED',
+          outcome: 'SUCCESS',
+          actorUserId: actor.userId,
+          requestId: meta.requestId,
+          details: { roomId: access.roomId, count: members.length },
+        });
+      }
+      return members;
     },
 
     /** AZ-02. */
@@ -334,7 +361,7 @@ export function createRoomService(deps: RoomServiceDependencies) {
     ): Promise<{ id: string; name: string; updatedAt: Date }> {
       const now = clock();
       await transaction(async (tx) => {
-        await lockAndReauthorize(tx, actor, access, meta, 'AZ-02');
+        await lockAndReauthorize(tx, actor, access, meta, 'AZ-02', now);
         if (!(await tx.renameRoom(access.roomId, name, now))) throw notFound();
       });
       events.record({
@@ -347,11 +374,80 @@ export function createRoomService(deps: RoomServiceDependencies) {
       return { id: access.roomId, name, updatedAt: now };
     },
 
+    /**
+     * AZ-03 (CM-T048, security-policy-profiles.md section 4). OWNER only, by the matrix; PC-03 of
+     * the current profile is applied by the route gate and again here. On the locked room row:
+     *   - the stored profile must still be the one the client expected (409 PROFILE_CHANGED);
+     *   - the direction comes from the stored profile and the requested one, never from the client;
+     *   - an upgrade needs the new profile's access requirements and, where it has PC-03, its
+     *     step-up; it shortens existing expiry dates and revokes open items that break the new rules;
+     *   - a downgrade needs a step-up within 5 minutes and changes no existing item (nothing is
+     *     extended).
+     * The room then records the new profile with the current catalogue version, all in one
+     * transaction: a refused change writes nothing.
+     */
+    async changeProfile(
+      actor: Actor,
+      access: RoomAccess,
+      input: ProfileChangeInput,
+      meta: RequestMeta,
+    ): Promise<{ securityProfile: SecurityProfile; policyVersion: number; change: ProfileChangeDirection }> {
+      const now = clock();
+      const request = { actorUserId: actor.userId, requestId: meta.requestId, action: 'AZ-03' as const };
+      const outcome = await transaction(async (tx) => {
+        const {
+          room,
+          actor: owner,
+          policy: from,
+        } = await lockAndReauthorize(tx, actor, access, meta, 'AZ-03', now, { sensitive: true });
+        if (room.securityProfile !== input.expectedProfile) {
+          throw new HttpError(409, ErrorCode.PROFILE_CHANGED, 'The security profile of this room has changed');
+        }
+        const to = currentPolicy(input.securityProfile);
+        const change = profileChangeDirection(from, to);
+        if (change === 'UNCHANGED') {
+          return { change, policyVersion: room.policyVersion, effects: NO_EFFECTS };
+        }
+        const decision = decideProfileChange(from, to, actor.session, now);
+        if (!decision.allowed) throw policyDenial(events, request, decision.reason);
+        let effects: ProfileChangeEffects = NO_EFFECTS;
+        if (change === 'UPGRADE') {
+          effects = await tx.applyUpgrade({
+            roomId: room.id,
+            ownerUserId: owner.userId,
+            currentKeyVersion: room.currentKeyVersion,
+            to,
+            now,
+          });
+        }
+        if (!(await tx.setRoomProfile(room.id, room.securityProfile, to, now))) throw notFound();
+        return { change, policyVersion: to.version, effects };
+      });
+      if (outcome.change !== 'UNCHANGED') {
+        events.record({
+          name: outcome.change === 'UPGRADE' ? 'PROFILE_UPGRADED' : 'PROFILE_DOWNGRADED',
+          outcome: 'SUCCESS',
+          actorUserId: actor.userId,
+          requestId: meta.requestId,
+          details: {
+            roomId: access.roomId,
+            from: input.expectedProfile,
+            to: input.securityProfile,
+            policyVersion: outcome.policyVersion,
+            // A downgrade weakens the room's controls: high severity, for the Security Dashboard.
+            severity: outcome.change === 'DOWNGRADE' ? 'HIGH' : 'NORMAL',
+            ...outcome.effects,
+          },
+        });
+      }
+      return { securityProfile: input.securityProfile, policyVersion: outcome.policyVersion, change: outcome.change };
+    },
+
     /** AZ-04, step-up required by the route. The room is DELETING from now on (data-model 5). */
     async deleteRoom(actor: Actor, access: RoomAccess, meta: RequestMeta): Promise<void> {
       const now = clock();
       await transaction(async (tx) => {
-        await lockAndReauthorize(tx, actor, access, meta, 'AZ-04');
+        await lockAndReauthorize(tx, actor, access, meta, 'AZ-04', now, { sensitive: true });
         if (!(await tx.markRoomDeleting(access.roomId, now))) throw notFound();
       });
       events.record({
@@ -383,10 +479,8 @@ export function createRoomService(deps: RoomServiceDependencies) {
           ? undefined
           : await verifiedOwnerGrant(actor, meta, access.roomId, targetUserId, 'ADMIN', proof);
       const changed = await transaction(async (tx) => {
-        const locked = await lockAndReauthorize(tx, actor, access, meta, 'AZ-10', {
-          userId: targetUserId,
-          requestedRole: role,
-          includeSuspended: false,
+        const locked = await lockAndReauthorize(tx, actor, access, meta, 'AZ-10', now, {
+          target: { userId: targetUserId, requestedRole: role, includeSuspended: false },
         });
         const target = locked.target;
         if (target === undefined) throw notFound();
@@ -416,9 +510,9 @@ export function createRoomService(deps: RoomServiceDependencies) {
     async removeMember(actor: Actor, access: RoomAccess, targetUserId: string, meta: RequestMeta): Promise<void> {
       const now = clock();
       const wasActive = await transaction(async (tx) => {
-        const locked = await lockAndReauthorize(tx, actor, access, meta, 'AZ-09', {
-          userId: targetUserId,
-          includeSuspended: true,
+        const locked = await lockAndReauthorize(tx, actor, access, meta, 'AZ-09', now, {
+          target: { userId: targetUserId, includeSuspended: true },
+          sensitive: true,
         });
         if (locked.target === undefined || !(await tx.removeMember(locked.target, actor.userId, now))) {
           throw notFound();
@@ -452,9 +546,8 @@ export function createRoomService(deps: RoomServiceDependencies) {
       const now = clock();
       const grant = await verifiedOwnerGrant(actor, meta, access.roomId, targetUserId, 'OWNER', proof);
       await transaction(async (tx) => {
-        const locked = await lockAndReauthorize(tx, actor, access, meta, 'AZ-05', {
-          userId: targetUserId,
-          includeSuspended: false,
+        const locked = await lockAndReauthorize(tx, actor, access, meta, 'AZ-05', now, {
+          target: { userId: targetUserId, includeSuspended: false },
         });
         if (locked.target === undefined) throw notFound();
         await lockGrantIdentities(tx, targetUserId, grant);

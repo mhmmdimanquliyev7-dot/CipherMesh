@@ -32,6 +32,7 @@ All identifiers that appear inside cryptographic contexts (user, key, room, file
 | DF-10 Member removal and rekey | Removal request, rekey start, new version number and commitment | New RKM envelopes for the snapshotted recipients | RKM |
 | DF-12 Notes | Revision number, expiry | Note ciphertext, wrapped NEK | Title, body, NEK |
 | DF-13 Room Safety Code | Optional statement "compared version v" | None | The Safety Code itself |
+| DF-14 Profile change | Target profile, expected current profile | None | None (no key material moves; nothing is re-encrypted) |
 
 ## DF-01 Registration and login
 
@@ -523,3 +524,37 @@ Security notes:
 - The code never crosses the network. The confirmation and the mismatch report carry only the key version (INV-18).
 - Matching codes show that both browsers hold the same key material for version v. They do not show who else holds it, and they do not reveal a key that every member received from an attacker (L-22, T-36).
 - A recorded confirmation is a member's statement, not a verification by the system.
+
+## DF-14 Security profile change (Phase 10, CM-T048)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor O as OWNER
+  participant B as OWNER browser
+  participant A as API
+  participant D as PostgreSQL
+  O->>B: choose a profile, confirm what changes
+  B->>A: POST /rooms/{roomId}/profile {securityProfile, expectedProfile}
+  A->>A: session, CSRF, membership (404), PC-01 and PC-02 of the stored profile, AZ-03 (OWNER), PC-03
+  A->>D: lock user, room row, membership; re-check matrix and gates on the locked row
+  alt stored profile differs from expectedProfile
+    A-->>B: 409 PROFILE_CHANGED, nothing written
+  else upgrade
+    A->>A: new profile's PC-01, PC-02 (and PC-03 for RESTRICTED) for this session
+    A->>D: shorten expiry of files, notes, ACTIVE secrets, open invitations; revoke rule-breaking invitations and non-burn secrets
+    A->>D: rooms.security_profile, policy_version = current catalogue version
+    A->>A: event PROFILE_UPGRADED (counts only)
+  else downgrade
+    A->>A: step-up within 5 minutes, else 401 STEP_UP_REQUIRED
+    A->>D: rooms.security_profile, policy_version; no item changes
+    A->>A: event PROFILE_DOWNGRADED, severity HIGH
+  end
+  A-->>B: {securityProfile, policyVersion, change}
+```
+
+Security notes:
+- No key material, ciphertext or plaintext moves; profiles govern access, handling and lifetime only (L-61).
+- The direction and the requirements come from the stored profile; `expectedProfile` can only make the request fail.
+- Content writes, invitations and membership changes take the same room row lock, so a request waiting behind the change is judged by the new profile.
+

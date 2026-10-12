@@ -102,6 +102,7 @@ Prisma expresses the tables, enums, foreign keys and partial unique indexes. The
 | Files at most 50 MiB of plaintext | `ciphertext_size BETWEEN 16 AND 52428816` | CP-19 |
 | Public identity keys and key-version commitments are write-once; a retired identity never becomes ACTIVE again (Phase 4) | `BEFORE UPDATE` triggers | 4.5, 4.9, T-25, T-36, T-40 |
 | No cascading deletes | Every foreign key is `ON DELETE RESTRICT`, except the purge of closed rekey operations (`SET NULL`) | Section 5 |
+| Expiry dates move only earlier: files and notes (Phases 7, 8), ACTIVE secrets and open invitations (Phase 10, migration `20261010000000_security_policies`, which replaced the write-once rule of the secret guard and of the invitation grant trigger for `expires_at` only); a closed invitation or a final secret never changes | `BEFORE UPDATE` triggers | Security-policy-profiles section 4, CM-T048 |
 
 Constraints are a second layer behind API validation. They do not know whether a 384-byte value really is an RSA-OAEP ciphertext; they only make a whole class of mistakes (plaintext in a ciphertext column, a missing tombstone step) impossible to store.
 
@@ -208,3 +209,17 @@ ADR-015 adds a signing key to every identity. The hand-written migration adds `s
 | The signing key and the binding signature are write-once; a SUPERSEDED or REVOKED identity can never change status again | The Phase 2 trigger function, replaced with the extended version |
 
 The new columns are NOT NULL without defaults: no identity existed before Phase 4, and on a database with key-pair rows the migration fails instead of inventing values. Grants are unchanged: `cm_api` already holds SELECT, INSERT and UPDATE on `user_key_pairs` (section 2), which the passphrase change and the reset need. `tests/database/constraints.test.ts` covers every new rule by SQLSTATE, including the write-once signing key, a permitted re-wrap and the final retired status. A copy of the database now also reveals the signing public keys and binding signatures, which are public by design (section 6).
+
+## 13. Phase 10: security policies (migration `20261010000000_security_policies`)
+
+No table, column or grant changes: `rooms.security_profile` and `rooms.policy_version` exist since schema v1, and the policy values are the versioned catalogue in `packages/shared`, never a table (data-model 4.16, CM-T046), so a database-level writer cannot weaken every room by editing one row of a policy table. A writer who changes one room's `security_profile` or `policy_version` directly can still weaken or break that room; an unknown version only makes the API refuse the room (503 `POLICY_UNSUPPORTED`), never fall back.
+
+The migration replaces two trigger functions so that a profile upgrade can shorten lifetimes (security-policy-profiles.md section 4):
+
+| Function | Before | Since Phase 10 |
+|---|---|---|
+| `cm_guard_secret_change` | `expires_at` write-once | `expires_at` may move strictly earlier while the secret is ACTIVE; later is refused; REVEALED, EXPIRED and REVOKED stay final; identity columns and the burn flag stay write-once |
+| `cm_reject_invitation_grant_change` | `expires_at` write-once with the grant columns | `expires_at` may move strictly earlier while the invitation is PENDING_APPROVAL or PENDING; later, or any change on a closed invitation, is refused; the signed grant columns stay write-once |
+
+`CREATE OR REPLACE` keeps both triggers and the functions' privileges (restated with `REVOKE ALL ... FROM PUBLIC`). Tests: `tests/database/constraints.test.ts` (both directions, closed rows), `tests/policy/profile-change.test.ts` (the upgrade through the API). The migration replays from zero in the migration test and the drift check reports no difference.
+

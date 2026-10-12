@@ -1,6 +1,6 @@
 # Security Policy Profiles
 
-Status: Phase 0.5 baseline. **This file is the single source of truth for profile values.** Implementation: a versioned, code-defined catalogue in `packages/shared` (see [../architecture/data-model.md](../architecture/data-model.md) section 4.16), enforced by the API. Related: [authorization-model.md](authorization-model.md), [../crypto/key-lifecycle.md](../crypto/key-lifecycle.md).
+Status: Phase 0.5 baseline; implemented in Phase 10 (CM-T046 to CM-T049) without changing a value. **This file is the single source of truth for profile values.** Implementation: the versioned, code-defined catalogue `packages/shared/src/policy.ts` (catalogue version 1 = the table below; see [../architecture/data-model.md](../architecture/data-model.md) section 4.16), enforced by the API ([authorization-model.md](authorization-model.md) section 9.11). Related: [../crypto/key-lifecycle.md](../crypto/key-lifecycle.md).
 
 ## 1. Purpose
 
@@ -56,6 +56,14 @@ Platform-level events (registration, login success and failure, MFA changes, ses
 
 Profile changes do not re-encrypt content. Profiles govern access, handling and lifetime; the cryptographic protection is the same for every profile.
 
+How Phase 10 applies these rules (decisions D-10-01 to D-10-09 in [../management/phase-10-traceability.md](../management/phase-10-traceability.md); none weakens a control):
+- **Who and how.** `POST /rooms/{roomId}/profile` (AZ-03, OWNER only) with the target profile and the profile the client believes is stored. Everything happens on the locked room row in one transaction: a stale expectation is refused (409 `PROFILE_CHANGED`), the direction is computed from the stored profile, and a refused change writes nothing. The room then records the new profile with the current catalogue version.
+- **Upgrade requirements.** The OWNER's session must meet the new profile's PC-01 and PC-02; an upgrade to RESTRICTED also needs RESTRICTED's PC-03 step-up, because the change is a sensitive operation of the room it produces (D-10-03).
+- **"Existing expiry dates"** are those of live files and notes (PC-08), ACTIVE secrets (PC-09) and open invitations (PC-06). An item without an expiry gets exactly the upgrade time plus the new maximum (D-10-04).
+- **"Items that break the new rules"** are revoked: open invitations that skipped the OWNER's approval (PC-04), lack a confirmed fingerprint where one is required (PC-05) or carry envelopes for a version other than the current one where only the current one may be shared (PC-07), and ACTIVE secrets without burn-after-reading when burn becomes mandatory (PC-10, D-10-05). A revoked invitation loses its PENDING envelopes; a revoked secret loses its ciphertext and wrapped SEK.
+- **Key state.** A profile change is neither a content write nor an invitation, so it is allowed while the room is REKEY_REQUIRED or REKEYING, and it does not change the key state (D-10-06).
+- **Concurrency.** Every content write, invitation and membership change re-applies the gates on the locked room row, so a write that started under the old profile and waited behind the change is judged by the new one.
+
 ## 5. What profiles cannot enforce
 
 Being honest about these limits is part of the design (see [limitations.md](limitations.md)):
@@ -82,8 +90,15 @@ Each gate fails closed with a stable error code. Gates never read role or profil
 
 **Enforced since Phase 6:** PC-03 for inviting and approving in RESTRICTED rooms (a step-up within 15 minutes), PC-04 (OWNER approval of ADMIN invitations, approver different from inviter), PC-05 (a confirmed fingerprint equal to the invitee's current one, required in RESTRICTED), PC-06 (the server sets the expiry), PC-07 (RESTRICTED invitations carry the current key version only) and PC-16 for invitations, approvals and acceptances. The values are code constants (`INVITATION_RULES` in `packages/shared/src/rooms.ts`) compared with the table above by `tests/security/profile-requirements.test.ts`. The versioned catalogue and the remaining gates are CM-T046 and CM-T047 (L-42).
 
-**Enforced since Phase 9:** PC-09 (the secret lifetime: at most 7 days, 72 hours or 24 hours by profile, and at least 5 minutes, CP-29) and PC-10 (burn-after-reading mandatory in RESTRICTED, `BURN_REQUIRED` otherwise) at secret creation, and PC-16 for secret creation (`REKEY_REQUIRED`). Secrets are not wrapped under RWK_v, so a secret names no key version and `KEY_VERSION_STALE` does not apply to it; reveals and revocations stay allowed while a room is write-locked. The values are code constants (`SECRET_RULES` in `packages/shared/src/secrets.ts`) compared with the table by `tests/security/profile-requirements.test.ts`. PC-11 (external links) is not implemented: CM-T045 is a P3 stretch item that depends on CM-T047.
+**Enforced since Phase 9:** PC-09 (the secret lifetime: at most 7 days, 72 hours or 24 hours by profile, and at least 5 minutes, CP-29) and PC-10 (burn-after-reading mandatory in RESTRICTED, `BURN_REQUIRED` otherwise) at secret creation, and PC-16 for secret creation (`REKEY_REQUIRED`). Secrets are not wrapped under RWK_v, so a secret names no key version and `KEY_VERSION_STALE` does not apply to it; reveals and revocations stay allowed while a room is write-locked. PC-11 (external links) is not implemented: CM-T045 is a P3 stretch item that depends on CM-T047.
+
+**Enforced since Phase 10 (CM-T046 to CM-T049):** every value of the table is the frozen catalogue `packages/shared/src/policy.ts`, version 1, compared cell by cell with this table by `tests/security/policy-catalogue.test.ts`; the per-feature constants of Phases 5 to 9 (`PROFILE_ACCESS_REQUIREMENTS`, `INVITATION_RULES`, `FILE_RULES`, `NOTE_RULES`, `SECRET_RULES`) were absorbed into it. A room's rules come from its stored profile and policy version; an unknown version fails closed (503 `POLICY_UNSUPPORTED`), never falls back. New:
+- PC-01 and PC-02 on **every** room request (the central room authorizer, after the membership check) and again on the locked room row inside every write (closes L-42);
+- PC-03 for every sensitive operation the profile table lists that exists today: reveal secret, file download URL, invite, approve, remove member, change profile, delete room (START_REKEY arrives with Phase 11);
+- PC-13: the audit emitter reads the room's audit level; FULL adds `ENVELOPES_FETCHED` and `MEMBER_LIST_VIEWED` (EXTENDED already recorded download URLs and note reads); every denied request in a room is recorded as `ROOM_ACCESS_DENIED` at every level, which covers FULL's "every denied request". Events still go to the redacted log until the Phase 12 ledger (L-33);
+- section 4, profile changes, with the rules above.
+Not enforced in Phase 10, by plan: PC-11 (no external-link route, CM-T045) and PC-14 (the cryptoperiod sets REKEY_REQUIRED through the worker of CM-T052, Phase 11; the room page lists it as not yet enforced).
 
 ## 7. Testing
 
-The policy test matrix (Jira CM-T049) generates, for every control and profile, one allowed and one denied request against a real database and asserts the status code, error code and audit event. The matrix is part of the security regression suite and runs on every pull request.
+The policy test matrix (Jira CM-T049) generates, for every control and profile, one allowed and one denied request against a real database and asserts the status code, error code and audit event. The matrix is part of the security regression suite and runs on every pull request: `tests/policy/policy-matrix.test.ts` and `tests/policy/profile-change.test.ts` (Vitest project `policy`, part of `pnpm test`), with the catalogue comparison `tests/security/policy-catalogue.test.ts`. Controls without a request to make in Phase 10 (PC-11, PC-14) are asserted as catalogue values and documented as not yet enforced instead of being given an invented allowed case.

@@ -3,9 +3,11 @@ import {
   ErrorCode,
   isRoomActionId,
   isUuidV4,
+  SENSITIVE_OPERATIONS,
   SESSION_COOKIE,
   type RoomActionId,
   type RoomResourceFacts,
+  type SensitiveOperation,
 } from '@ciphermesh/shared';
 import { parseWith, z } from '@ciphermesh/validation';
 import { Router, type Request, type Response } from 'express';
@@ -35,7 +37,8 @@ import { HttpError } from '../http/errors';
  *   -> JSON content-type gate -> JSON parsing with size limit
  *   -> authentication (session cookie, central; Phase 3) -> path parameters (404 when malformed)
  *   -> input validation
- *   -> room authorization (room routes: database-loaded membership and the matrix; CM-T029)
+ *   -> room authorization (room routes: database-loaded membership, the profile access gates
+ *      PC-01 and PC-02, the matrix, and PC-03 for sensitive operations; CM-T029, CM-T047)
  *   -> route gates (platform administrator, MFA-verified session, step-up; Phase 3)
  *   -> handler -> response projection -> error handler
  *
@@ -56,6 +59,12 @@ export interface AuthenticatedRequirements {
 /** Extra requirements of a room route. There is no platform administrator gate: PA-05. */
 export interface RoomRequirements {
   readonly stepUp?: 'standard' | 'strict';
+  /**
+   * The PC-03 operation the route performs (security-policy-profiles.md): the room's policy then
+   * decides whether a recent step-up is required (RESTRICTED). Declared here, so the request can
+   * never choose whether the gate applies.
+   */
+  readonly sensitive?: SensitiveOperation;
 }
 
 /** Input of a room route's resource loader: the database-loaded scope and the validated request. */
@@ -187,6 +196,8 @@ export interface RegisteredRoute {
   readonly path: string;
   readonly action: string;
   readonly access: RouteAccess['kind'];
+  /** The PC-03 operation a room route declares, for the reviewed inventory. */
+  readonly sensitive: SensitiveOperation | undefined;
 }
 
 const METHODS_WITH_BODY: ReadonlySet<HttpMethod> = new Set(['POST', 'PUT', 'PATCH']);
@@ -244,7 +255,13 @@ export function buildRouter(
     checkPathParameters(route, key);
     const roomAction = checkAuthorizationDeclaration(route, key, rooms);
     seen.add(key);
-    registered.push({ method: route.method, path: route.path, action: route.action, access: route.access.kind });
+    registered.push({
+      method: route.method,
+      path: route.path,
+      action: route.action,
+      access: route.access.kind,
+      sensitive: route.access.kind === 'room' ? route.access.requires?.sensitive : undefined,
+    });
     const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
     router[method](route.path, (req, res) => handle(route, roomAction, req, res, authenticator, rooms));
   }
@@ -324,6 +341,10 @@ function checkAuthorizationDeclaration(
   if ('platformAdmin' in (access.requires ?? {})) {
     throw new RouteRegistrationError(`${key}: PLATFORM_ADMIN has no room access (PA-05)`);
   }
+  const sensitive: unknown = access.requires?.sensitive;
+  if (sensitive !== undefined && !(SENSITIVE_OPERATIONS as readonly unknown[]).includes(sensitive)) {
+    throw new RouteRegistrationError(`${key}: unknown sensitive operation`);
+  }
   if (info.needsResource !== (access.resource !== undefined)) {
     throw new RouteRegistrationError(
       info.needsResource
@@ -376,7 +397,13 @@ async function authorizeRoom(
   route: AnyRoute,
   action: RoomActionId,
   actor: Actor | undefined,
-  input: { readonly params: unknown; readonly query: unknown; readonly body: unknown; readonly requestId: string },
+  input: {
+    readonly params: unknown;
+    readonly query: unknown;
+    readonly body: unknown;
+    readonly requestId: string;
+    readonly now: Date;
+  },
   rooms: RoomAuthorizer | undefined,
 ): Promise<RoomAccess> {
   if (actor === undefined || rooms === undefined || route.access.kind !== 'room') {
@@ -385,11 +412,14 @@ async function authorizeRoom(
   const roomId = (input.params as { readonly roomId?: unknown }).roomId;
   if (typeof roomId !== 'string' || !isUuidV4(roomId)) throw notFound();
   const loader = route.access.resource;
+  const sensitive = route.access.requires?.sensitive;
   return rooms.authorize({
     actor,
     roomId,
     action,
     requestId: input.requestId,
+    now: input.now,
+    ...(sensitive === undefined ? {} : { sensitive }),
     ...(loader === undefined
       ? {}
       : {
@@ -397,6 +427,12 @@ async function authorizeRoom(
             loader({ room, params: input.params, query: input.query, body: input.body }),
         }),
   });
+}
+
+/** The server clock; a route behind authentication cannot run without the authenticator. */
+function clockOf(authenticator: Authenticator | undefined): Date {
+  if (authenticator === undefined) throw new Error('Room route without authenticator');
+  return authenticator.now();
 }
 
 /** Route gates that depend only on the session (not on room membership). */
@@ -456,7 +492,7 @@ async function handle(
           route,
           roomAction,
           actor,
-          { params, query: query.data, body, requestId: request.requestId },
+          { params, query: query.data, body, requestId: request.requestId, now: clockOf(authenticator) },
           rooms,
         );
   if (authenticator !== undefined) applyGates(route, actor, authenticator.now());

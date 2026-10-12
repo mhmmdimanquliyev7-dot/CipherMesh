@@ -1,11 +1,12 @@
 'use client';
 
 import type { OpenedFile } from '@ciphermesh/crypto';
-import { FILE_RULES, FILE_TAG_BYTES, roomRuleFor, type RoomRole, type SecurityProfile } from '@ciphermesh/shared';
+import { FILE_TAG_BYTES, roomRuleFor, type ProfilePolicy, type RoomRole } from '@ciphermesh/shared';
 import type { RoomMember } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
 import { Alert, Button, Card, SecondaryButton } from '../components/ui';
+import { ApiError } from '../lib/api';
 import { useVault } from '../vault/use-vault';
 import {
   decryptFile,
@@ -45,15 +46,15 @@ function formatBytes(bytes: number): string {
 const formatDate = (iso: string | null): string => (iso === null ? 'Never' : new Date(iso).toLocaleString());
 
 /** Expiry choices the profile allows (PC-08), with its default first. */
-function expiryChoices(profile: SecurityProfile): { readonly label: string; readonly days: number | null }[] {
-  const rules = FILE_RULES[profile];
-  const days = [1, 7, 30, 90].filter((d) => rules.maxExpiryMs === null || d * DAY <= rules.maxExpiryMs);
+function expiryChoices(policy: ProfilePolicy): { readonly label: string; readonly days: number | null }[] {
+  const rules = policy.contentExpiry;
+  const days = [1, 7, 30, 90].filter((d) => rules.maxMs === null || d * DAY <= rules.maxMs);
   const choices: { label: string; days: number | null }[] = days.map((d) => ({
     label: d === 1 ? '1 day' : `${String(d)} days`,
     days: d,
   }));
-  if (!rules.expiryRequired) choices.unshift({ label: 'No expiry', days: null });
-  const preferred = rules.defaultExpiryMs === null ? null : rules.defaultExpiryMs / DAY;
+  if (!rules.required) choices.unshift({ label: 'No expiry', days: null });
+  const preferred = rules.defaultMs === null ? null : rules.defaultMs / DAY;
   return [...choices].sort((a, b) => (a.days === preferred ? -1 : b.days === preferred ? 1 : 0));
 }
 
@@ -69,17 +70,21 @@ type Preview = { readonly url: string; readonly name: string } | undefined;
 export function FilePanel({
   roomId,
   role,
-  profile,
+  policy,
   keyState,
   selfId,
   members,
+  onStepUp,
 }: {
   readonly roomId: string;
   readonly role: RoomRole;
-  readonly profile: SecurityProfile;
+  /** The room's policy, resolved from its stored profile and version (CM-T046). */
+  readonly policy: ProfilePolicy;
   readonly keyState: string;
   readonly selfId: string;
   readonly members: readonly RoomMember[];
+  /** Asks the page for a step-up (PC-03 in RESTRICTED rooms), then runs `retry`. */
+  readonly onStepUp: (reason: string, retry: () => Promise<void>) => void;
 }) {
   const vault = useVault();
   const held = useSyncExternalStore(roomKeys.subscribe, () => roomKeys.isOpen(roomId), notOpen);
@@ -123,7 +128,7 @@ export function FilePanel({
     const rule = roomRuleFor('AZ-18', role);
     return rule.kind === 'allow' || (rule.kind === 'own' && uploaderId === selfId);
   };
-  const viewerRestricted = role === 'VIEWER' && !FILE_RULES[profile].viewerMayDownload;
+  const viewerRestricted = role === 'VIEWER' && !policy.viewerMayObtainFileKeys;
   const unlocked = vault.kind === 'unlocked' && held;
   const nameOfUploader = (id: string): string => members.find((m) => m.userId === id)?.displayName ?? 'Former member';
 
@@ -160,7 +165,13 @@ export function FilePanel({
     try {
       await action();
     } catch (error) {
-      setMessage({ kind: 'error', text: describeRoomError(error) });
+      if (error instanceof ApiError && error.code === 'STEP_UP_REQUIRED') {
+        onStepUp('Downloading files in a restricted room requires confirming your identity.', () =>
+          withFile(fileId, action),
+        );
+      } else {
+        setMessage({ kind: 'error', text: describeRoomError(error) });
+      }
     } finally {
       setBusyFile(undefined);
     }
@@ -240,7 +251,7 @@ export function FilePanel({
               data-testid="file-expiry"
               className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
             >
-              {expiryChoices(profile).map((choice) => (
+              {expiryChoices(policy).map((choice) => (
                 <option key={choice.label} value={choice.days === null ? '' : String(choice.days)}>
                   {choice.label}
                 </option>

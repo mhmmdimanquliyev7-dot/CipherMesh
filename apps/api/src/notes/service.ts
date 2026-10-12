@@ -1,8 +1,15 @@
 import { fromBase64Url } from '@ciphermesh/crypto/identity';
-import { ErrorCode, NOTE_LIMITS, NOTE_RULES, type RoomActionId, type RoomResourceFacts } from '@ciphermesh/shared';
+import {
+  auditLevelIncludes,
+  ErrorCode,
+  NOTE_LIMITS,
+  type RoomActionId,
+  type RoomResourceFacts,
+} from '@ciphermesh/shared';
 import { createHash } from 'node:crypto';
 import type { SecurityEventSink } from '../auth/security-events';
 import type { Actor, RequestMeta } from '../auth/sessions';
+import { policyOf, reapplyRoomPolicy } from '../authorization/policy';
 import { reauthorizeRoomAction, roomDenial, type RoomAccess } from '../authorization/rooms';
 import { NoteIdUnavailableError, type NoteFacts, type NoteRecord, type NoteRevisionValues } from '../db/note-store';
 import type { ListPosition, LockedRoom, RoomStore } from '../db/room-store';
@@ -75,7 +82,10 @@ type NoteEvent = 'NOTE_CREATED' | 'NOTE_UPDATED' | 'NOTE_READ' | 'NOTE_DELETED' 
 export function createNoteService(deps: NoteServiceDependencies) {
   const { store, transaction, events, clock } = deps;
 
-  /** Locks the room and the actor's membership (in that order) and decides again on that state. */
+  /**
+   * Locks the room and the actor's membership (in that order) and decides again on that state:
+   * the matrix, then the room's policy gates on the locked profile (PC-01, PC-02; CM-T047).
+   */
   async function lockAndReauthorize(
     tx: RoomStore,
     actor: Actor,
@@ -101,20 +111,21 @@ export function createNoteService(deps: NoteServiceDependencies) {
       ...(facts === undefined ? {} : { resource: facts }),
     });
     if (room === null || member === null) throw notFound();
+    reapplyRoomPolicy(events, { ...request, action }, actor, room, clock(), false);
     return room;
   }
 
   /** PC-08: the expiry the profile requires and allows, measured from now. */
   function checkExpiry(room: LockedRoom, expiresAt: Date | null, now: Date): void {
-    const rules = NOTE_RULES[room.securityProfile];
+    const rules = policyOf(room).contentExpiry;
     const refuse = (): HttpError =>
       new HttpError(422, ErrorCode.EXPIRY_NOT_ALLOWED, 'The expiry is missing or outside what this room allows');
     if (expiresAt === null) {
-      if (rules.expiryRequired) throw refuse();
+      if (rules.required) throw refuse();
       return;
     }
     if (expiresAt.getTime() <= now.getTime()) throw refuse();
-    if (rules.maxExpiryMs !== null && expiresAt.getTime() > now.getTime() + rules.maxExpiryMs) throw refuse();
+    if (rules.maxMs !== null && expiresAt.getTime() > now.getTime() + rules.maxMs) throw refuse();
   }
 
   /** Decodes the ciphertext of one revision; the schema bounded every length already. */
@@ -149,7 +160,7 @@ export function createNoteService(deps: NoteServiceDependencies) {
 
   /** PC-13: note reads are audit events at the EXTENDED and FULL levels. */
   function recordRead(actor: Actor, access: RoomAccess, meta: RequestMeta, details: Record<string, string | number>) {
-    if (NOTE_RULES[access.room.securityProfile].auditReads) {
+    if (auditLevelIncludes(access.policy.auditLevel, 'EXTENDED')) {
       record('NOTE_READ', actor, meta, { roomId: access.roomId, ...details });
     }
   }

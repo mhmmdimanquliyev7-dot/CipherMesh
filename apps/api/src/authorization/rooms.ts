@@ -7,12 +7,15 @@ import {
   type RoomDenyReason,
   type RoomMembershipFacts,
   type RoomResourceFacts,
+  type ProfilePolicy,
   type RoomRole,
+  type SensitiveOperation,
 } from '@ciphermesh/shared';
 import type { SecurityEventSink } from '../auth/security-events';
 import type { Actor } from '../auth/sessions';
 import type { RoomAccessStore, RoomMembershipRecord } from '../db/room-access-store';
 import { HttpError } from '../http/errors';
+import { enforceRoomAccess, enforceSensitiveOperation } from './policy';
 
 /**
  * Central room authorization for the API (CM-T029, INV-05, INV-06, authorization model section 6).
@@ -22,12 +25,16 @@ import { HttpError } from '../http/errors';
  *   1. Load the caller's membership for (room ID from the validated path, session user) from the
  *      database (OL-01). No header, body or query field can supply a role, and the platform role
  *      is never consulted: a PLATFORM_ADMIN without a membership is an outsider (PA-05).
- *   2. Decide with the shared, pure matrix function (`decideRoomAction`, packages/shared).
- *   3. Only if the membership and the role allow it, load the target object within the room
+ *   2. Decide with the shared, pure matrix function (`decideRoomAction`, packages/shared). A caller
+ *      without an ACTIVE membership in an ACTIVE room gets the generic 404 here.
+ *   3. Apply the profile access gates PC-01 and PC-02 of the room's stored policy (Phase 10,
+ *      CM-T047, ./policy.ts); an unsupported stored policy version fails closed.
+ *   4. Only if the membership and the role allow it, load the target object within the room
  *      (routes whose cells depend on the object declare the loader) and decide again with its
  *      facts (OL-02, OL-04).
- *   4. Deny with the generic 404 or 403 of the authorization model and record the reason code;
- *      otherwise hand the handler the database-loaded scope.
+ *   5. For a sensitive operation, apply PC-03 (a recent step-up in RESTRICTED rooms).
+ *   6. Deny with the generic 404 or 403 of the authorization model, or the policy's stable code,
+ *      and record the reason code; otherwise hand the handler the database-loaded scope and policy.
  *
  * The decision describes the database state at the start of the request. A handler that changes
  * membership or ownership must re-check the stored state inside its own transaction (conditional
@@ -42,6 +49,7 @@ export interface RoomMembershipScope {
   readonly room: {
     readonly keyState: RoomMembershipRecord['room']['keyState'];
     readonly securityProfile: RoomMembershipRecord['room']['securityProfile'];
+    readonly policyVersion: number;
   };
 }
 
@@ -50,6 +58,8 @@ export interface RoomAccess extends RoomMembershipScope {
   readonly action: RoomActionId;
   /** The object facts the decision used, when the route declares a resource loader. */
   readonly resource: RoomResourceFacts | undefined;
+  /** The room's policy, resolved from its stored profile and version for this request. */
+  readonly policy: ProfilePolicy;
 }
 
 export interface RoomAuthorizationRequest {
@@ -58,6 +68,10 @@ export interface RoomAuthorizationRequest {
   readonly roomId: string;
   readonly action: RoomActionId;
   readonly requestId: string;
+  /** The server clock at the request, for the session-age and step-up gates. */
+  readonly now: Date;
+  /** The PC-03 operation the route performs, if any (declared by the route, never by the request). */
+  readonly sensitive?: SensitiveOperation;
   /** Loads the target object's facts within the room; null when it does not exist there. */
   readonly loadResource?: (scope: RoomMembershipScope) => Promise<RoomResourceFacts | null>;
 }
@@ -109,7 +123,11 @@ const scopeOf = (record: RoomMembershipRecord): RoomMembershipScope => ({
   roomId: record.roomId,
   membershipId: record.membershipId,
   role: record.role,
-  room: { keyState: record.room.keyState, securityProfile: record.room.securityProfile },
+  room: {
+    keyState: record.room.keyState,
+    securityProfile: record.room.securityProfile,
+    policyVersion: record.room.policyVersion,
+  },
 });
 
 /** Records a denial (action and reason only) and returns the response to throw. */
@@ -166,23 +184,26 @@ export function createRoomAuthorizer(deps: {
         action,
       };
       let decision: RoomDecision = decideRoomAction(input);
+      // Not an active member of an active room: the generic 404 before any policy is consulted,
+      // so an outsider learns nothing about the room's profile (OL-01).
+      if (!decision.allowed && DENIAL_STATUS[decision.reason] === 404) throw denied(request, decision.reason);
+      if (record === null) throw denied(request, 'NOT_A_MEMBER');
+      const policyRequest = { actorUserId: actor.userId, requestId: request.requestId, action };
+      const policy = enforceRoomAccess(deps.events, policyRequest, actor, record.room, request.now);
       let resource: RoomResourceFacts | undefined;
       // Objects are looked up only once the membership and the role permit a first step, so a
       // non-member or a role without the permission never triggers an object lookup.
-      if (
-        record !== null &&
-        request.loadResource !== undefined &&
-        (decision.allowed || decision.reason === 'RESOURCE_REQUIRED')
-      ) {
+      if (request.loadResource !== undefined && (decision.allowed || decision.reason === 'RESOURCE_REQUIRED')) {
         const loaded = await request.loadResource(scopeOf(record));
         if (loaded === null) throw denied(request, 'RESOURCE_NOT_FOUND');
         resource = loaded;
         decision = decideRoomAction({ ...input, resource });
       }
       if (!decision.allowed) throw denied(request, decision.reason);
-      // Unreachable: the decision denies a missing membership. Kept so the types prove it.
-      if (record === null) throw denied(request, 'NOT_A_MEMBER');
-      return { ...scopeOf(record), action, resource };
+      if (request.sensitive !== undefined) {
+        enforceSensitiveOperation(deps.events, policyRequest, actor, policy, request.now);
+      }
+      return { ...scopeOf(record), action, resource, policy };
     },
   };
 }

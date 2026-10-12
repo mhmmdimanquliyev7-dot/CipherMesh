@@ -138,6 +138,8 @@ flowchart LR
 | 403 | `MFA_REQUIRED` | Profile requires MFA (PC-01) |
 | 404 | `NOT_FOUND` | Not a member, object outside the room, or a platform endpoint called by a non-admin |
 | 409 | `REKEY_REQUIRED` | Content write or invitation while the room is REKEY_REQUIRED or REKEYING (PC-16) |
+| 409 | `PROFILE_CHANGED` | Profile change whose expected current profile is no longer the stored one (Phase 10, CM-T048) |
+| 503 | `POLICY_UNSUPPORTED` | The room's stored policy version is not one this server can evaluate; the room is refused instead of served under another version (Phase 10, CM-T046) |
 | 409 | `KEY_VERSION_STALE` | Write names a key version other than the current one |
 | 409 | `REVISION_CONFLICT` | Stale note revision |
 | 409 | `REKEY_IN_PROGRESS` | Another member's rekey operation holds a valid lease |
@@ -188,8 +190,8 @@ Reviewed readings:
 - **AZ-05:** the cell says Y, and the action is "Transfer ownership to an ADMIN", so the OWNER's rule is `targetRoles` with ADMIN only.
 - **AZ-12:** Y for every role; "own envelopes only" is enforced by selecting envelopes by recipient in the query (OL-05), not by an object rule.
 - **AZ-13:** Y for OWNER and ADMIN; the operation rules of OL-13 (only the starter finalizes, the starter or the OWNER cancels) need the operation row and belong to the rekey state machine (CM-T050).
-- **Notes that are profile conditions** (PC-03 to PC-16, including "blocked while REKEY_REQUIRED or REKEYING", PC-16) are not cells. They arrive with the policy gates (CM-T046, CM-T047). INV-07 still applies from the first invitation or content-write route on (Phase 6). Whether AZ-07, AZ-14 ("same checks as invitations") and AZ-26 count as invitations or content writes for PC-16 is decided when they are implemented.
-- **Step-up in every profile** (AZ-04, AZ-05) and the step-up of PA-03 and PA-04 are part of the catalogue, so a route that forgets them is refused at startup. Profile-dependent step-ups (PC-03, the AZ-03 downgrade) are not.
+- **Notes that are profile conditions** (PC-01 to PC-16, including "blocked while REKEY_REQUIRED or REKEYING", PC-16) are not cells. Since Phase 10 they are the versioned policy catalogue and its gates (section 9.11). INV-07 still applies from the first invitation or content-write route on (Phase 6). Whether AZ-07, AZ-14 ("same checks as invitations") and AZ-26 count as invitations or content writes for PC-16 is decided when they are implemented.
+- **Step-up in every profile** (AZ-04, AZ-05) and the step-up of PA-03 and PA-04 are part of the catalogue, so a route that forgets them is refused at startup. Profile-dependent step-ups are policy rules: a route declares the PC-03 operation it performs (`requires: { sensitive }`), the reviewed list of those routes is `tests/security/route-inventory.test.ts`, and the AZ-03 downgrade rule is applied by the profile change itself (section 9.11).
 
 ### 9.3 Route declarations
 
@@ -200,7 +202,7 @@ Reviewed readings:
 
 ### 9.4 Evaluation order and responses
 
-For a room route: authenticate the session (401) → path parameters (404) → query and body schemas (400) → central room authorization (404 or 403) → step-up gate (401) → handler → response projection. The matrix is checked before the step-up prompt, so a non-member learns nothing and a member without the permission gets 403 without being asked to step up.
+For a room route: authenticate the session (401) → path parameters (404) → query and body schemas (400) → central room authorization (404 or 403) → step-up gate (401) → handler → response projection. The matrix is checked before the step-up prompt, so a non-member learns nothing and a member without the permission gets 403 without being asked to step up. Since Phase 10 the central room authorization contains the policy gates in the order of security-policy-profiles.md section 6: membership (404), then PC-01 and PC-02 of the room's stored policy (403 `MFA_REQUIRED`, 401 `REAUTH_REQUIRED`, 503 `POLICY_UNSUPPORTED`), then the matrix (403), then PC-03 for a declared sensitive operation (401 `STEP_UP_REQUIRED`); section 9.11.
 
 | Reason codes | Response |
 |---|---|
@@ -312,3 +314,25 @@ PC-16 scope for AZ-26 (deferred in section 9.2) stays open: AZ-26 belongs to CM-
 Error answers follow section 7: non-members, non-recipients, secrets of another room and unknown secrets are the same 404. A recipient whose secret is already revealed, expired, revoked or wrapped to a retired key gets 409 `SECRET_UNAVAILABLE`; only the recipient (and, for revocation, the sender and administrators) can tell those states apart, and they see them in the list anyway. The BOLA suite attacks all four routes with secrets of another room (`tests/authz/bola.test.ts`, 31 room routes); a refused mutation leaves the `secrets` table byte-for-byte unchanged.
 
 Since Phase 9 `GET /rooms/{roomId}/members/{userId}/identity` (AZ-01) also returns the member's own signed grant and its authority chain with the signers' identities, so that a sender's browser can verify the recipient key itself (CD-32). These are statements every member of the room may already verify for the signers they meet in the key material; nothing in them counts until a browser verifies it.
+
+### 9.11 Security policy enforcement (Phase 10, CM-T046 to CM-T049)
+
+Authorization (sections 3 to 5) decides whether the caller's role may perform an action on a resource. The policy gates decide whether the room's security profile allows it for this session. Both must pass. The profile values are the versioned catalogue `packages/shared/src/policy.ts` (version 1 = the table of security-policy-profiles.md, compared with it by `tests/security/policy-catalogue.test.ts`); the gates read the room's stored `security_profile` and `policy_version`, the server-side session row and the server clock, never a field of the request.
+
+| Where | What |
+|---|---|
+| `createRoomAuthorizer` (`apps/api/src/authorization/rooms.ts`), every room route | After the membership decision (non-members get the generic 404 before any profile is consulted): PC-01 and PC-02 of the stored policy, an unknown stored version fails closed (503 `POLICY_UNSUPPORTED`); then the matrix; then PC-03 when the route declares a sensitive operation |
+| `reapplyRoomPolicy` (`apps/api/src/authorization/policy.ts`), inside every writing transaction | The same gates on the locked room row, after the locked matrix re-check: room service, invitations, files, notes, secrets. A profile change takes the same row lock, so a write that waited behind it is judged by the new profile (TOCTOU) |
+| Services | Profile-bounded values from the locked row's policy: PC-04 to PC-07 (invitations), PC-08 (files, notes), PC-09 and PC-10 (secrets), PC-12 (files), PC-13 (events), PC-16 (`REKEY_REQUIRED`) |
+| `POST /rooms/{roomId}/profile` | AZ-03, below |
+
+Routes that declare a PC-03 sensitive operation (reviewed list in `tests/security/route-inventory.test.ts`): `POST .../secrets/{secretId}/reveal` (SECRET_REVEAL), `POST .../files/{fileId}/download-url` (FILE_DOWNLOAD_URL), `POST .../invitations` (INVITE), `POST .../invitations/{invitationId}/approve` (APPROVE_INVITATION), `POST .../members/{userId}/remove` (REMOVE_MEMBER), `POST .../profile` (CHANGE_PROFILE), `POST .../delete` (DELETE_ROOM). START_REKEY has no route before Phase 11. PC-03 is checked after the matrix and the target lookup, so a non-recipient still gets 404 and a member without the permission 403 before any prompt; for a RESTRICTED VIEWER the download URL asks for the step-up first and is then refused by PC-12 (403), in the order of the profile document.
+
+| Route | Action | Rule |
+|---|---|---|
+| `POST /rooms/{roomId}/profile` | AZ-03 | OWNER only (matrix). Body `{ securityProfile, expectedProfile }` (strict). On the locked room row: the stored profile must equal `expectedProfile` (409 `PROFILE_CHANGED`); the direction is computed from the stored profile; an upgrade needs the new profile's PC-01 and PC-02 and, for RESTRICTED, its PC-03 step-up (decision D-10-03); a downgrade needs a step-up within 5 minutes (401 `STEP_UP_REQUIRED`, reason `PROFILE_DOWNGRADE_STEP_UP`). An upgrade shortens existing expiry dates and revokes open items that break the new rules in the same transaction; the room records the new profile with the current catalogue version. The same profile again is a no-op. Allowed while the room is REKEY_REQUIRED (decision D-10-06) |
+
+Refusals are recorded as `ROOM_ACCESS_DENIED` with the action and a reason code (`PROFILE_PC_01`, `PROFILE_PC_02`, `PROFILE_PC_03`, `PROFILE_PC_12`, `PROFILE_DOWNGRADE_STEP_UP`, `POLICY_UNSUPPORTED`); changes as `PROFILE_UPGRADED` and `PROFILE_DOWNGRADED` (severity HIGH). PLATFORM_ADMIN gains nothing from the policy gates: a platform administrator without a membership gets the 404 of every outsider, before any profile is read. `GET /rooms` (SS-06) still lists a room to a member whose session does not meet its profile (name, profile and role only), so the member can see why the room refuses them (decision D-10-07).
+
+Tests: `tests/policy/policy-matrix.test.ts` (every control and profile, PC-01 and PC-02 on every room route), `tests/policy/profile-change.test.ts` (who, upgrades, downgrades, stale and forged requests, concurrency with forced lock order), the BOLA suite (the new route attacked like the others), negative controls NC-10-01 to NC-10-12.
+

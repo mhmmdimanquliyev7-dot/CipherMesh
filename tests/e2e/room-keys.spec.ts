@@ -4,7 +4,6 @@ import { hkdfSync, randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import pg from 'pg';
-import { Secret, TOTP } from 'otpauth';
 import { contextBytes } from '../../packages/crypto/src/contexts';
 import { generateIdentity } from '../../packages/crypto/src/identity';
 import { createInitialRoomKey, createInvitationKeys, type RoomKeyBundle } from '../../packages/crypto/src/room-keys';
@@ -20,14 +19,17 @@ import { wrap32 } from '../../packages/crypto/src/rsa-oaep';
 import { signStatement } from '../../packages/crypto/src/signing';
 import { publicIdentityFromWire, type PublicIdentityWire } from '../../packages/crypto/src/vault-format';
 import { verifyPublicIdentity } from '../../packages/crypto/src/identity';
-import { captureRequests, collectCspViolations, newUser, readableStorage, type TestUser } from './helpers';
+import { captureRequests, collectCspViolations, newUser, readableStorage } from './helpers';
 import {
   acceptThroughUi,
   createRoomThroughUi,
+  enrollMfa,
   inviteThroughUi,
+  loginWithMfa,
   openRoomThroughUi,
   ownFingerprint,
   signedInWithVault,
+  totp,
   unlockVault,
   verifiedSafetyCode,
 } from './room-helpers';
@@ -147,52 +149,6 @@ test('an invited member verifies the room key through the signed grant and sees 
 });
 
 // ------------------------------------------------------------------ RESTRICTED (EV-06-02, PC-05)
-
-async function enrollMfa(page: Page, user: TestUser): Promise<string> {
-  await page.getByRole('link', { name: 'Account', exact: true }).click();
-  await page.getByRole('button', { name: 'Set up an authenticator app' }).click();
-  // The vault setup's step-up may still be fresh; otherwise the server asks for the password first.
-  const qr = page.getByRole('img', { name: 'QR code for the authenticator app' });
-  const confirm = page.getByText('Confirm your identity to continue');
-  await expect(qr.or(confirm)).toBeVisible();
-  if (await confirm.isVisible()) {
-    await page.getByLabel('Account password').first().fill(user.password);
-    await page.getByRole('button', { name: 'Confirm' }).click();
-    await expect(confirm).toHaveCount(0);
-    await page.getByRole('button', { name: 'Set up an authenticator app' }).click();
-  }
-  await expect(qr).toBeVisible();
-  const secret = (await page.locator('p.font-mono').innerText()).trim();
-  await page.getByLabel('Code from the app').fill(await totp(secret));
-  await page.getByRole('button', { name: 'Turn on' }).click();
-  await page.getByRole('button', { name: 'I have stored them' }).click();
-  return secret;
-}
-/**
- * A code for a time step this secret has not used yet: the API refuses a replayed step (CP-09), so
- * each enrollment, sign-in and step-up takes the next unused step, waiting for real time to reach
- * it when it is more than one step ahead (the accepted drift).
- */
-const usedSteps = new Map<string, number>();
-async function totp(secret: string): Promise<string> {
-  const now = (): number => Math.floor(Date.now() / 30_000);
-  const target = Math.max(now(), (usedSteps.get(secret) ?? -1) + 1);
-  while (target > now() + 1) await new Promise((resolve) => setTimeout(resolve, 1000));
-  usedSteps.set(secret, target);
-  return TOTP.generate({ secret: Secret.fromBase32(secret), digits: 6, period: 30, timestamp: target * 30_000 });
-}
-
-/** Signs in again with the second factor, which gives the session the MFA verification of PC-01. */
-async function loginWithMfa(page: Page, user: TestUser, secret: string): Promise<void> {
-  await page.getByRole('button', { name: 'Sign out' }).first().click();
-  await expect(page).toHaveURL(/\/login$/);
-  await page.getByLabel('Email address').fill(user.email);
-  await page.getByLabel('Account password').fill(user.password);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByLabel('Authentication code').fill(await totp(secret));
-  await page.getByRole('button', { name: 'Verify' }).click();
-  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
-}
 
 test('a RESTRICTED room invites only after the fingerprint was compared, with a step-up', async ({
   page,

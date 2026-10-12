@@ -1,0 +1,19 @@
+{
+  "name": "PROFILE_DOWNGRADED",
+  "outcome": "SUCCESS",
+  "actorUserId": "5e256c7e-5530-43fb-a50a-f66fab7c8ff2",
+  "requestId": "e618fb2c-2e56-41aa-9759-e4236566a033",
+  "details": {
+    "roomId": "1f0988c6-10f5-41b2-8089-77279eefee09",
+    "from": "RESTRICTED",
+    "to": "STANDARD",
+    "policyVersion": 1,
+    "severity": "HIGH",
+    "filesClamped": 0,
+    "notesClamped": 0,
+    "secretsClamped": 0,
+    "secretsRevoked": 0,
+    "invitationsClamped": 0,
+    "invitationsRevoked": 0
+  }
+}

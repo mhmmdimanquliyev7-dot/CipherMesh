@@ -1,6 +1,6 @@
 'use client';
 
-import { isUuidV4, ROOM_NAME_MAX_LENGTH, type RoomRole } from '@ciphermesh/shared';
+import { isUuidV4, resolveRoomPolicy, ROOM_NAME_MAX_LENGTH, type RoomRole } from '@ciphermesh/shared';
 import {
   memberListResponseSchema,
   memberRemovedResponseSchema,
@@ -23,6 +23,7 @@ import { FilePanel } from '../../../rooms/file-panel';
 import { InviteCard, RoomInvitations } from '../../../rooms/invitations';
 import { RoomKeyPanel } from '../../../rooms/key-panel';
 import { NotePanel } from '../../../rooms/note-panel';
+import { ProfilePanel } from '../../../rooms/profile-panel';
 import { SecretPanel } from '../../../rooms/secret-panel';
 import { roomKeys } from '../../../rooms/keys';
 import { describeRoomError, REKEY_NOTICE, ROOM_NAME_WARNING } from '../../../rooms/messages';
@@ -111,8 +112,30 @@ function Room({ roomId }: { readonly roomId: string }) {
   }
 
   if (missing) return <NotFound />;
-  if (room === undefined || selfId === undefined) return <p className="text-slate-400">Loading…</p>;
+  if (room === undefined || selfId === undefined) {
+    return message === undefined ? (
+      <p className="text-slate-400">Loading…</p>
+    ) : (
+      <div className="space-y-4">
+        <Alert kind={message.kind}>{message.text}</Alert>
+        <Link className="text-sky-400 underline" href="/rooms">
+          Back to your rooms
+        </Link>
+      </div>
+    );
+  }
   const role = room.membership.role;
+  // The rules come from the room's stored profile and policy version, as on the server. A version
+  // this client does not know is shown as such; nothing falls back to another version (CM-T046).
+  const policy = resolveRoomPolicy(room.room.securityProfile, room.room.policyVersion);
+  if (policy === undefined) {
+    return (
+      <Alert kind="error">This room uses a security policy version this version of CipherMesh does not know.</Alert>
+    );
+  }
+  const onStepUp = (reason: string, retry: () => Promise<void>): void => {
+    setStepUp({ reason, retry });
+  };
 
   return (
     <div className="space-y-6">
@@ -140,18 +163,25 @@ function Room({ roomId }: { readonly roomId: string }) {
         />
       )}
       <RoomKeyPanel roomId={roomId} profile={room.room.securityProfile} members={members} />
+      <ProfilePanel
+        roomId={roomId}
+        role={role}
+        policy={policy}
+        onAction={(action, reason, done) => act(action, reason, done)}
+      />
       <FilePanel
         roomId={roomId}
         role={role}
-        profile={room.room.securityProfile}
+        policy={policy}
         keyState={room.room.keyState}
         selfId={selfId}
         members={members}
+        onStepUp={onStepUp}
       />
       <NotePanel
         roomId={roomId}
         role={role}
-        profile={room.room.securityProfile}
+        policy={policy}
         keyState={room.room.keyState}
         selfId={selfId}
         members={members}
@@ -159,10 +189,11 @@ function Room({ roomId }: { readonly roomId: string }) {
       <SecretPanel
         roomId={roomId}
         role={role}
-        profile={room.room.securityProfile}
+        policy={policy}
         keyState={room.room.keyState}
         selfId={selfId}
         members={members}
+        onStepUp={onStepUp}
       />
       <Members
         roomId={roomId}
@@ -175,7 +206,7 @@ function Room({ roomId }: { readonly roomId: string }) {
         <InviteCard
           roomId={roomId}
           role={role}
-          profile={room.room.securityProfile}
+          policy={policy}
           onAction={(action, reason, done) => act(action, reason, done)}
         />
       ) : null}
@@ -310,7 +341,7 @@ function Members({
                             {},
                           );
                         },
-                        '',
+                        'Removing a member of a restricted room needs a recent identity confirmation.',
                         `${member.displayName} was removed. ${REKEY_NOTICE}`,
                       )
                     }

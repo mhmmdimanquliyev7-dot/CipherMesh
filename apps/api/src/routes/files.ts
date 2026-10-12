@@ -147,7 +147,7 @@ export function fileRoutes(files: FileService, store: RoomStore): readonly AnyRo
       method: 'POST',
       path: '/rooms/:roomId/files/:fileId/download-url',
       action: 'AZ-17-FILE-DOWNLOAD',
-      access: { kind: 'room' },
+      access: { kind: 'room', requires: { sensitive: 'FILE_DOWNLOAD_URL' } },
       params: fileParamsSchema,
       query: emptyQuerySchema,
       body: emptyBodySchema,

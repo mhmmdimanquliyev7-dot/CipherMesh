@@ -155,7 +155,7 @@ Ownership: the room OWNER. Content belongs to the room.
 | id | uuid | ID | Client-generated, used in cryptographic contexts |
 | name | text (max 100) | META | **Not encrypted**. The UI warns users not to put sensitive information in room names |
 | securityProfile | enum STANDARD, CONFIDENTIAL, RESTRICTED | META | |
-| policyVersion | int | META | Version of the code-defined policy catalogue |
+| policyVersion | int | META | Version of the code-defined policy catalogue that governs the room. New rooms and every profile change record the current version (1 since Phase 10); an unknown version makes the API refuse the room (fail closed) |
 | currentKeyVersion | int | META | |
 | keyState | enum ACTIVE, REKEY_REQUIRED, REKEYING | META | REKEY_REQUIRED and REKEYING block content writes and invitations (INV-07) |
 | rekeyReasons | enum set | META | MEMBER_REMOVED, MEMBER_LEFT, MEMBER_SUSPENDED, MEMBER_DELETED, IDENTITY_KEY_COMPROMISED, CRYPTOPERIOD_EXPIRED, WRAP_LIMIT_REACHED |
@@ -307,7 +307,7 @@ Ownership: the platform. Append-only (INV-09).
 Supporting tables: **AuditChainHead** (single row: last seq and hash, locked on append), **AuditCheckpoint** (seq, head hash, createdAt, signature algorithm, signing key ID, signature, anchor object key, witness reference, optional RFC 3161 token) and **AuditVerificationRun** (range, result VALID or INVALID or ERROR, first invalid seq, timestamps). The dashboard reads the latest verification run.
 
 ### 4.16 SecurityPolicy (code-defined catalogue, not a mutable table)
-Security profiles are defined as versioned, immutable constants in `packages/shared`, reviewed through pull requests. A room stores `securityProfile` and `policyVersion`. Profile changes are recorded as audit events.
+Security profiles are defined as versioned, immutable constants in `packages/shared`, reviewed through pull requests. A room stores `securityProfile` and `policyVersion`. Profile changes are recorded as audit events. Implemented in Phase 10 (CM-T046): `packages/shared/src/policy.ts`, catalogue version 1, deep-frozen; `resolveRoomPolicy(profile, version)` returns nothing for a version it does not know, and every gate refuses then. A new version is added next to the old ones, never edited in place.
 
 Why not a database table: a mutable policy table would let anyone with database write access silently weaken every room at once, and it would add a second source of truth. Policy distribution for the dashboard is a simple count of rooms per profile. See [../security/security-policy-profiles.md](../security/security-policy-profiles.md).
 

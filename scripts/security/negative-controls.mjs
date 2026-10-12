@@ -1,7 +1,8 @@
 // `pnpm security:negative-controls`: proves that the security tests are real (Phase 3, extended
 // with the vault and cryptography controls of Phase 4, the room authorization controls of Phase 5,
 // the cryptographic membership controls of Phase 6, the encrypted file controls of Phase 7, the
-// encrypted note controls of Phase 8 and the recipient-bound secret controls of Phase 9).
+// encrypted note controls of Phase 8, the recipient-bound secret controls of Phase 9 and the
+// security policy controls of Phase 10).
 // `--only=<prefix>` runs a subset, for example `--only=NC-05`.
 //
 // For each control, one deliberate defect is written into a source file in the working tree, the
@@ -319,9 +320,10 @@ const CONTROLS = [
     defect: 'The registry trusts the path and skips the membership check (everyone is OWNER)',
     file: 'apps/api/src/routes/registry.ts',
     edits: [
+      ['  describeMatrixAction,\n', '  currentPolicy,\n  describeMatrixAction,\n'],
       [
         '  return rooms.authorize({',
-        "  return Promise.resolve({ roomId, membershipId: roomId, role: 'OWNER', room: { keyState: 'ACTIVE', securityProfile: 'STANDARD' }, action, resource: undefined });\n  return rooms.authorize({",
+        "  return Promise.resolve({ roomId, membershipId: roomId, role: 'OWNER', room: { keyState: 'ACTIVE', securityProfile: 'STANDARD', policyVersion: 1 }, action, resource: undefined, policy: currentPolicy('STANDARD') });\n  return rooms.authorize({",
       ],
     ],
     tests: ['tests/authz/room-access.test.ts'],
@@ -369,7 +371,7 @@ const CONTROLS = [
     edits: [
       [
         '      const record = await deps.store.findActiveMembership(roomId, actor.userId);',
-        "      const found = await deps.store.findActiveMembership(roomId, actor.userId);\n      const record = found ?? (actor.user.platformRole === 'PLATFORM_ADMIN' ? { membershipId: roomId, roomId, userId: actor.userId, role: 'ADMIN' as const, status: 'ACTIVE' as const, room: { status: 'ACTIVE' as const, keyState: 'ACTIVE' as const, securityProfile: 'STANDARD' as const } } : null);",
+        "      const found = await deps.store.findActiveMembership(roomId, actor.userId);\n      const record = found ?? (actor.user.platformRole === 'PLATFORM_ADMIN' ? { membershipId: roomId, roomId, userId: actor.userId, role: 'ADMIN' as const, status: 'ACTIVE' as const, room: { status: 'ACTIVE' as const, keyState: 'ACTIVE' as const, securityProfile: 'STANDARD' as const, policyVersion: 1 } } : null);",
       ],
     ],
     tests: ['tests/authz/room-access.test.ts'],
@@ -599,7 +601,7 @@ const CONTROLS = [
     edits: [
       [
         '      const record = await deps.store.findActiveMembership(roomId, actor.userId);',
-        "      const found = await deps.store.findActiveMembership(roomId, actor.userId);\n      const record = found ?? (actor.user.platformRole === 'PLATFORM_ADMIN' ? { membershipId: roomId, roomId, userId: actor.userId, role: 'ADMIN' as const, status: 'ACTIVE' as const, room: { status: 'ACTIVE' as const, keyState: 'ACTIVE' as const, securityProfile: 'STANDARD' as const } } : null);",
+        "      const found = await deps.store.findActiveMembership(roomId, actor.userId);\n      const record = found ?? (actor.user.platformRole === 'PLATFORM_ADMIN' ? { membershipId: roomId, roomId, userId: actor.userId, role: 'ADMIN' as const, status: 'ACTIVE' as const, room: { status: 'ACTIVE' as const, keyState: 'ACTIVE' as const, securityProfile: 'STANDARD' as const, policyVersion: 1 } } : null);",
       ],
     ],
     also: [
@@ -836,8 +838,8 @@ const CONTROLS = [
     file: 'apps/api/src/files/service.ts',
     edits: [
       [
-        "    return access.role !== 'VIEWER' || FILE_RULES[access.room.securityProfile].viewerMayDownload;",
-        "    return access.role !== 'VIEWER' || FILE_RULES[access.room.securityProfile].viewerMayDownload || true;",
+        "    return access.role !== 'VIEWER' || access.policy.viewerMayObtainFileKeys;",
+        "    return access.role !== 'VIEWER' || access.policy.viewerMayObtainFileKeys || true;",
       ],
     ],
     tests: ['tests/files/files-access.test.ts'],
@@ -1117,8 +1119,8 @@ const CONTROLS = [
     file: 'apps/api/src/routes/secrets.ts',
     edits: [
       [
-        "      action: 'AZ-24-SECRET-REVEAL',\n      access: { kind: 'room', resource: recipientResource },",
-        "      action: 'AZ-32-SECRET-REVEAL',\n      access: { kind: 'room' },",
+        "      action: 'AZ-24-SECRET-REVEAL',\n      access: { kind: 'room', requires: { sensitive: 'SECRET_REVEAL' }, resource: recipientResource },",
+        "      action: 'AZ-32-SECRET-REVEAL',\n      access: { kind: 'room', requires: { sensitive: 'SECRET_REVEAL' } },",
       ],
     ],
     also: [
@@ -1179,6 +1181,178 @@ const CONTROLS = [
     ],
     tests: [],
     e2e: { spec: 'tests/e2e/secrets.spec.ts', title: 'revealed once on an explicit click' },
+  },
+  // ------------------------------------------------- Phase 10: security policies (CM-T046 to CM-T049)
+  {
+    id: 'NC-10-01',
+    defect: 'The room gate skips the profile access gates PC-01 and PC-02 (session facts replaced)',
+    file: 'apps/api/src/authorization/rooms.ts',
+    edits: [
+      [
+        '      const policy = enforceRoomAccess(deps.events, policyRequest, actor, record.room, request.now);',
+        '      const policy = enforceRoomAccess(deps.events, policyRequest, { ...actor, session: { ...actor.session, mfaVerifiedAt: request.now, authenticatedAt: request.now } }, record.room, request.now);',
+      ],
+    ],
+    tests: ['tests/policy/policy-matrix.test.ts'],
+  },
+  {
+    id: 'NC-10-02',
+    defect:
+      "The profile change trusts the client's claim of the current profile (stale check removed, direction from the request)",
+    file: 'apps/api/src/rooms/service.ts',
+    edits: [
+      [
+        '        if (room.securityProfile !== input.expectedProfile) {',
+        "        if ((room.securityProfile as string) === 'NEVER') {",
+      ],
+      [
+        '        const change = profileChangeDirection(from, to);',
+        '        const change = profileChangeDirection(currentPolicy(input.expectedProfile), to);',
+      ],
+      [
+        '        const decision = decideProfileChange(from, to, actor.session, now);',
+        '        const decision = decideProfileChange(currentPolicy(input.expectedProfile), to, actor.session, now);',
+      ],
+    ],
+    tests: ['tests/policy/profile-change.test.ts'],
+  },
+  {
+    id: 'NC-10-03',
+    defect: 'PC-03 removed: sensitive operations in RESTRICTED rooms need no step-up (gate and locked re-check)',
+    file: 'apps/api/src/authorization/rooms.ts',
+    edits: [
+      [
+        '      if (request.sensitive !== undefined) {',
+        "      if (request.sensitive !== undefined && actor.userId === '') {",
+      ],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/authorization/policy.ts',
+        edits: [
+          [
+            '  if (sensitive) enforceSensitiveOperation(events, request, actor, policy, now);',
+            "  if (sensitive && actor.userId === '') enforceSensitiveOperation(events, request, actor, policy, now);",
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/policy/policy-matrix.test.ts'],
+  },
+  {
+    id: 'NC-10-04',
+    defect: 'An expired step-up is accepted (the window of PC-03 and of the downgrade rule is not checked)',
+    file: 'packages/shared/src/policy.ts',
+    edits: [
+      [
+        '  return stepUpAt !== null && stepUpAt.getTime() <= now.getTime() && now.getTime() - stepUpAt.getTime() <= windowMs;',
+        '  return stepUpAt !== null && stepUpAt.getTime() <= now.getTime() && windowMs > 0;',
+      ],
+    ],
+    tests: ['tests/policy/policy-matrix.test.ts', 'tests/policy/profile-change.test.ts'],
+  },
+  {
+    id: 'NC-10-05',
+    defect: 'A profile downgrade needs no step-up within 5 minutes',
+    file: 'packages/shared/src/policy.ts',
+    edits: [
+      [
+        "    case 'DOWNGRADE':\n      return stepUpIsRecent(session.stepUpAt, PROFILE_CHANGE_RULES.downgradeStepUpMs, now)",
+        "    case 'DOWNGRADE':\n      return stepUpIsRecent(session.stepUpAt, PROFILE_CHANGE_RULES.downgradeStepUpMs, now) || now.getTime() > 0",
+      ],
+    ],
+    tests: ['tests/policy/profile-change.test.ts'],
+  },
+  {
+    id: 'NC-10-06',
+    defect: 'An upgrade does not shorten the expiry of existing files and notes (PC-08 clamping removed)',
+    file: 'apps/api/src/db/policy-store.ts',
+    edits: [['      if (contentMax !== null) {', '      if (contentMax !== null && contentMax < 0) {']],
+    tests: ['tests/policy/profile-change.test.ts'],
+  },
+  {
+    id: 'NC-10-07',
+    defect: 'An unsupported stored policy version falls back to version 1 instead of failing closed',
+    file: 'packages/shared/src/policy.ts',
+    edits: [
+      [
+        '  return Object.hasOwn(CATALOGUE, key) ? CATALOGUE[key]?.[profile] : undefined;',
+        "  return Object.hasOwn(CATALOGUE, key) ? CATALOGUE[key]?.[profile] : CATALOGUE['1']?.[profile];",
+      ],
+    ],
+    tests: ['tests/policy/policy-matrix.test.ts'],
+  },
+  {
+    id: 'NC-10-08',
+    defect:
+      'The locked re-check ignores the profile, so a change that commits first does not govern a waiting write (TOCTOU)',
+    file: 'apps/api/src/rooms/service.ts',
+    edits: [
+      [
+        '    const policy = reapplyRoomPolicy(events, { ...request, action }, actor, room, now, options.sensitive === true);',
+        '    const policy = currentPolicy(room.securityProfile);',
+      ],
+    ],
+    tests: ['tests/policy/profile-change.test.ts'],
+  },
+  {
+    id: 'NC-10-09',
+    defect: 'An upgrade keeps open invitations that break the new rules (PC-04, PC-05, PC-07 revocation removed)',
+    file: 'apps/api/src/db/policy-store.ts',
+    edits: [
+      [
+        '      const revokedIds = breaking.map((row) => row.id);',
+        '      const revokedIds = breaking.map((row) => row.id).slice(0, 0);',
+      ],
+    ],
+    tests: ['tests/policy/profile-change.test.ts'],
+  },
+  {
+    id: 'NC-10-10',
+    defect: 'An upgrade to RESTRICTED keeps re-readable secrets (mandatory burn not applied to existing secrets)',
+    file: 'apps/api/src/db/policy-store.ts',
+    edits: [
+      [
+        '      const secretsRevoked = to.secrets.burnMandatory',
+        '      const secretsRevoked = to.secrets.burnMandatory && to.rank < 0',
+      ],
+    ],
+    tests: ['tests/policy/profile-change.test.ts'],
+  },
+  {
+    id: 'NC-10-11',
+    defect: 'The FULL audit level records no envelope fetches or member-list views (PC-13)',
+    file: 'apps/api/src/rooms/keys.ts',
+    edits: [
+      [
+        "      if (auditLevelIncludes(access.policy.auditLevel, 'FULL')) {",
+        "      if (auditLevelIncludes(access.policy.auditLevel, 'FULL') && access.roomId === '') {",
+      ],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/rooms/service.ts',
+        edits: [
+          [
+            "      if (auditLevelIncludes(access.policy.auditLevel, 'FULL')) {",
+            "      if (auditLevelIncludes(access.policy.auditLevel, 'FULL') && access.roomId === '') {",
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/policy/policy-matrix.test.ts'],
+  },
+  {
+    id: 'NC-10-12',
+    defect: 'The download-URL route forgets its PC-03 declaration',
+    file: 'apps/api/src/routes/files.ts',
+    edits: [
+      [
+        "      access: { kind: 'room', requires: { sensitive: 'FILE_DOWNLOAD_URL' } },",
+        "      access: { kind: 'room' },",
+      ],
+    ],
+    tests: ['tests/security/route-inventory.test.ts', 'tests/policy/policy-matrix.test.ts'],
   },
 ];
 

@@ -812,6 +812,27 @@ describe('secret lifecycle (Phase 9, migration 20261009000000_burn_secrets)', ()
     expect(await run(destroy('EXPIRED', ', revealed_at = NULL'), [id])).toBe(SQLSTATE.integrityConstraintViolation);
     expect(await run(destroy('REVOKED'), [id])).toBe('none');
   });
+
+  // Phase 10 (CM-T048): a profile upgrade shortens the expiry of ACTIVE secrets; nothing extends it.
+  it('lets an ACTIVE secret expire earlier, never later, and keeps a final secret unchanged', async () => {
+    const room = await insertRoom(api);
+    const row = secretRow(room, recipientOf(room));
+    await insert(api, 'secrets', row);
+    const id = row['id'];
+    expect(await run("UPDATE secrets SET expires_at = expires_at - interval '1 minute' WHERE id = $1", [id])).toBe(
+      'none',
+    );
+    expect(await run("UPDATE secrets SET expires_at = expires_at + interval '1 second' WHERE id = $1", [id])).toBe(
+      SQLSTATE.integrityConstraintViolation,
+    );
+    expect(await run('UPDATE secrets SET expires_at = NULL WHERE id = $1', [id])).toBe(SQLSTATE.notNullViolation);
+    const revoke = `UPDATE secrets SET status = 'REVOKED', destroyed_at = now(), wrapped_sek = NULL,
+                      payload_ciphertext = NULL, payload_iv = NULL WHERE id = $1`;
+    expect(await run(revoke, [id])).toBe('none');
+    expect(await run("UPDATE secrets SET expires_at = expires_at - interval '1 minute' WHERE id = $1", [id])).toBe(
+      SQLSTATE.integrityConstraintViolation,
+    );
+  });
 });
 
 describe('write-once identity columns', () => {
@@ -905,8 +926,19 @@ describe('write-once identity columns', () => {
         SQLSTATE.integrityConstraintViolation,
       );
     }
+    // Phase 10 (CM-T048): an open invitation's validity may only shrink (profile upgrade).
+    expect(
+      await run(`UPDATE invitations SET expires_at = expires_at - interval '1 hour' WHERE id = $1`, [invitationId]),
+    ).toBe('none');
+    expect(
+      await run(`UPDATE invitations SET expires_at = expires_at + interval '1 second' WHERE id = $1`, [invitationId]),
+    ).toBe(SQLSTATE.integrityConstraintViolation);
     // Status and timestamps stay updatable.
     expect(await run(`UPDATE invitations SET status = 'REVOKED' WHERE id = $1`, [invitationId])).toBe('none');
+    // A closed invitation keeps its expiry.
+    expect(
+      await run(`UPDATE invitations SET expires_at = expires_at - interval '1 hour' WHERE id = $1`, [invitationId]),
+    ).toBe(SQLSTATE.integrityConstraintViolation);
     expect(await run(`UPDATE rooms SET name = 'Renamed' WHERE id = $1`, [room.roomId])).toBe('none');
   });
 

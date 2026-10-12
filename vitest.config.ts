@@ -10,7 +10,8 @@ export default defineConfig({
     // `pnpm test:coverage:crypto`: CLAUDE.md section 10 requires at least 90% of statements and
     // branches for packages/crypto. The run fails below the thresholds. `pnpm test:coverage:authz`
     // applies the same thresholds to the room authorization decision (Phase 5, CM-T029) by
-    // overriding `include` on the command line; the policy engine joins when it exists (Phase 10).
+    // overriding `include` on the command line, and since Phase 10 (CM-T046, CM-T047) to the
+    // policy engine (packages/shared/src/policy.ts).
     coverage: {
       provider: 'v8',
       include: ['packages/crypto/src/**'],
@@ -97,6 +98,19 @@ export default defineConfig({
         test: {
           name: 'secrets',
           include: ['tests/secrets/**/*.test.ts'],
+          fileParallelism: false,
+          globalSetup: ['tests/database/global-setup.ts'],
+          testTimeout: 60_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
+        // Policy enforcement matrix (Phase 10, CM-T049): the real API, real sessions with real MFA
+        // and step-ups, PostgreSQL as cm_api and the local object storage, every profile control
+        // with allowed and denied requests. One file at a time (shared connection limit).
+        test: {
+          name: 'policy',
+          include: ['tests/policy/**/*.test.ts'],
           fileParallelism: false,
           globalSetup: ['tests/database/global-setup.ts'],
           testTimeout: 60_000,

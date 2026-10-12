@@ -181,6 +181,19 @@ export const BOLA_CASES: readonly BolaCase[] = [
       () => ({ name: 'Hijacked name' }),
     ),
   },
+  // Phase 10 (CM-T048): a profile change is a room mutation (AZ-03, OWNER only). The body names
+  // profiles, never a role or a room: the stored profile decides the direction.
+  {
+    ...room,
+    key: 'POST /rooms/:roomId/profile',
+    action: 'AZ-03',
+    mutates: true,
+    classes: WRITE,
+    send: post(
+      (ref) => `/rooms/${ref.roomId}/profile`,
+      () => ({ securityProfile: 'CONFIDENTIAL', expectedProfile: 'STANDARD' }),
+    ),
+  },
   {
     ...room,
     key: 'POST /rooms/:roomId/delete',

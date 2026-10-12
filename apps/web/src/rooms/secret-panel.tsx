@@ -1,10 +1,11 @@
 'use client';
 
-import { roomRuleFor, SECRET_LIMITS, SECRET_RULES, type RoomRole, type SecurityProfile } from '@ciphermesh/shared';
+import { roomRuleFor, SECRET_LIMITS, type ProfilePolicy, type RoomRole } from '@ciphermesh/shared';
 import type { RoomMember, SecretMetadataView } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { Alert, Button, Card, SecondaryButton } from '../components/ui';
+import { ApiError } from '../lib/api';
 import { useVault } from '../vault/use-vault';
 import { describeSecretError, SECRET_REVEAL_WARNING, SECRETS_EXPLANATION } from './messages';
 import { mayAttempt } from './permissions';
@@ -24,8 +25,8 @@ const HOUR = 60 * MINUTE;
 const formatDate = (iso: string | null): string => (iso === null ? '' : new Date(iso).toLocaleString());
 
 /** Lifetime choices the profile allows (PC-09), with its default first. */
-function lifetimeChoices(profile: SecurityProfile): { readonly label: string; readonly ms: number }[] {
-  const rules = SECRET_RULES[profile];
+function lifetimeChoices(policy: ProfilePolicy): { readonly label: string; readonly ms: number }[] {
+  const rules = policy.secrets;
   const all = [
     { label: '15 minutes', ms: 15 * MINUTE },
     { label: '1 hour', ms: HOUR },
@@ -49,17 +50,21 @@ const inputClass =
 export function SecretPanel({
   roomId,
   role,
-  profile,
+  policy,
   keyState,
   selfId,
   members,
+  onStepUp,
 }: {
   readonly roomId: string;
   readonly role: RoomRole;
-  readonly profile: SecurityProfile;
+  /** The room's policy, resolved from its stored profile and version (CM-T046). */
+  readonly policy: ProfilePolicy;
   readonly keyState: string;
   readonly selfId: string;
   readonly members: readonly RoomMember[];
+  /** Asks the page for a step-up (PC-03 in RESTRICTED rooms), then runs `retry`. */
+  readonly onStepUp: (reason: string, retry: () => Promise<void>) => void;
 }) {
   const vault = useVault();
   const unlocked = vault.kind === 'unlocked';
@@ -99,7 +104,7 @@ export function SecretPanel({
     setConfirmReveal(undefined);
   }, [unlocked]);
 
-  const rules = SECRET_RULES[profile];
+  const rules = policy.secrets;
   const writable = keyState === 'ACTIVE';
   const canCreate = mayAttempt('AZ-23', role);
   const mayRevoke = (senderId: string): boolean => {
@@ -128,7 +133,12 @@ export function SecretPanel({
     try {
       await action();
     } catch (error) {
-      setMessage({ kind: 'error', text: describeSecretError(error) });
+      if (error instanceof ApiError && error.code === 'STEP_UP_REQUIRED') {
+        // PC-03: nothing was released or burned; the reveal runs again after the step-up.
+        onStepUp('Revealing a secret in a restricted room requires confirming your identity.', () => run(key, action));
+      } else {
+        setMessage({ kind: 'error', text: describeSecretError(error) });
+      }
     } finally {
       setBusy(undefined);
     }
@@ -288,7 +298,7 @@ export function SecretPanel({
                 data-testid="secret-lifetime"
                 className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
               >
-                {lifetimeChoices(profile).map((choice) => (
+                {lifetimeChoices(policy).map((choice) => (
                   <option key={choice.label} value={String(choice.ms)}>
                     {choice.label}
                   </option>

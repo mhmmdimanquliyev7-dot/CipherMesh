@@ -1,0 +1,153 @@
+EV-10-01 Policy enforcement matrix report (CM-T049), 2026-10-12, branch feature/CM-T046-security-policies, local PostgreSQL 17 and storage, synthetic data only.
+
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > has the three profiles of the document, in strictness order 2ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > documents exactly PC-01 to PC-16 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-01: an MFA-verified session 1ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-02: the maximum time since the last password authentication 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-03: step-up for sensitive actions, its window and the operations it covers 1ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-04: OWNER approval of invitations created by an ADMIN 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-05: the inviter confirms the invitee key fingerprint 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-06: the invitation validity set by the server 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-07: the key history given to new members 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-08: expiry of files and notes 1ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-09: the secret lifetime and its default 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-10: burn-after-reading 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-11: external one-time links (stretch, not built) 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-12: whether a VIEWER may obtain file key material and ciphertext 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-13: the audit level, and what each level adds (section 3) 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-14: the room-key cryptoperiod 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > PC-15 and PC-16: mandatory in every profile 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > policy catalogue version 1 against the profile table (CM-T046) > the global step-up windows: 15 minutes, and 5 minutes for a profile downgrade 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > catalogue versioning and immutability (CM-T046) > knows version 1 only, and new rooms get it 0ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > catalogue versioning and immutability (CM-T046) > resolves nothing for an unknown, malformed or forged version or profile (no fallback) 1ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > catalogue versioning and immutability (CM-T046) > is deeply frozen, so no code path can widen a value at runtime 1ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > catalogue versioning and immutability (CM-T046) > has no database table that could change policy values (data-model 4.16) 1ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > file and note limits > match CP-19 and CP-20 of the parameter register and the crypto package 3ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > file and note limits > match CP-28 of the parameter register and the crypto package 3ms
+ ✓ |security| tests/security/policy-catalogue.test.ts > file and note limits > are frozen 0ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > allows a member who meets the profile, in every profile 75ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId 136ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/members 111ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/rename 100ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/profile 86ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/delete 100ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/members/:userId/role 88ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/members/:userId/remove 88ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/members/:userId/transfer-ownership 93ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/key-versions 140ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/envelopes 141ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/members/:userId/identity 115ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/key-reports 93ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/safety-code 69ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/invitations 110ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/invitations 90ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/invitations/:invitationId/approve 73ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/invitations/:invitationId/revoke 92ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/files 116ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/files 83ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/files/:fileId 134ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/files/:fileId/complete 78ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/files/:fileId/download-url 71ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/files/:fileId/delete 62ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/notes 92ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/notes 76ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/notes/:noteId 89ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/notes/:noteId/update 84ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/notes/:noteId/delete 72ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on GET /rooms/:roomId/secrets 89ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/secrets 89ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/secrets/:secretId/reveal 49ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-01 on POST /rooms/:roomId/secrets/:secretId/revoke 61ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId 171ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/members 179ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/rename 164ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/profile 139ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/delete 149ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/members/:userId/role 143ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/members/:userId/remove 91ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/members/:userId/transfer-ownership 133ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/key-versions 131ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/envelopes 122ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/members/:userId/identity 116ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/key-reports 134ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/safety-code 168ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/invitations 136ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/invitations 170ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/invitations/:invitationId/approve 132ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/invitations/:invitationId/revoke 153ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/files 179ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/files 143ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/files/:fileId 121ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/files/:fileId/complete 140ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/files/:fileId/download-url 151ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/files/:fileId/delete 117ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/notes 93ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/notes 141ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/notes/:noteId 130ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/notes/:noteId/update 110ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/notes/:noteId/delete 133ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on GET /rooms/:roomId/secrets 126ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/secrets 129ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/secrets/:secretId/reveal 150ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 on POST /rooms/:roomId/secrets/:secretId/revoke 161ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > PC-02 allows a sign-in just inside each limit and refuses it just outside 163ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > applies each room's own profile: the same session passes STANDARD and is refused in CONFIDENTIAL 36ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-01 and PC-02: the access gates apply to every room route > never consults a profile for a non-member: outsiders get the generic 404 before any gate 733ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > reveal a secret (STANDARD) 190ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > reveal a secret (CONFIDENTIAL) 187ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > reveal a secret (RESTRICTED) 481ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > file download URL (STANDARD) 244ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > file download URL (CONFIDENTIAL) 206ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > file download URL (RESTRICTED) 530ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > invite and approve (STANDARD) 1461ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > invite and approve (CONFIDENTIAL) 2834ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > invite and approve (RESTRICTED) 4350ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > remove a member, change the profile, delete the room (STANDARD) 1071ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > remove a member, change the profile, delete the room (CONFIDENTIAL) 2160ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-03: sensitive operations need a step-up within 15 minutes in RESTRICTED only > remove a member, change the profile, delete the room (RESTRICTED) 1169ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-04 to PC-07: invitation rules > PC-04 and PC-06: approval of ADMIN invitations and the server-set validity (STANDARD) 3175ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-04 to PC-07: invitation rules > PC-04 and PC-06: approval of ADMIN invitations and the server-set validity (CONFIDENTIAL) 2901ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-04 to PC-07: invitation rules > PC-04 and PC-06: approval of ADMIN invitations and the server-set validity (RESTRICTED) 2488ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-04 to PC-07: invitation rules > PC-05: the fingerprint confirmation (STANDARD) 2947ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-04 to PC-07: invitation rules > PC-05: the fingerprint confirmation (CONFIDENTIAL) 1180ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-04 to PC-07: invitation rules > PC-05: the fingerprint confirmation (RESTRICTED) 1475ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-04 to PC-07: invitation rules > PC-07: history in STANDARD and CONFIDENTIAL, the current version only in RESTRICTED 0ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-08: expiry of files and notes > notes (STANDARD) 197ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-08: expiry of files and notes > notes (CONFIDENTIAL) 343ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-08: expiry of files and notes > notes (RESTRICTED) 341ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-08: expiry of files and notes > files (STANDARD) 233ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-08: expiry of files and notes > files (CONFIDENTIAL) 454ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-08: expiry of files and notes > files (RESTRICTED) 462ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-09 and PC-10: secret lifetime and burn-after-reading > STANDARD 397ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-09 and PC-10: secret lifetime and burn-after-reading > CONFIDENTIAL 394ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-09 and PC-10: secret lifetime and burn-after-reading > RESTRICTED 389ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-11 and PC-12 > PC-11: no external-link route exists before CM-T045, in any profile 45ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-11 and PC-12 > PC-12: file key material and download URLs for a VIEWER (STANDARD) 381ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-11 and PC-12 > PC-12: file key material and download URLs for a VIEWER (CONFIDENTIAL) 341ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-11 and PC-12 > PC-12: file key material and download URLs for a VIEWER (RESTRICTED) 491ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-13: what each audit level records > STANDARD 477ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-13: what each audit level records > CONFIDENTIAL 459ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-13: what each audit level records > RESTRICTED 487ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-14 to PC-16: key lifecycle rules > PC-14: the cryptoperiod is a catalogue value enforced by the rekey worker of CM-T052 (Phase 11) 0ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-14 to PC-16: key lifecycle rules > PC-15 and PC-16: losing a member write-locks the room in every profile (STANDARD) 3269ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-14 to PC-16: key lifecycle rules > PC-15 and PC-16: losing a member write-locks the room in every profile (CONFIDENTIAL) 3085ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > PC-14 to PC-16: key lifecycle rules > PC-15 and PC-16: losing a member write-locks the room in every profile (RESTRICTED) 2720ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > stored policy versions (CM-T046): an unknown version fails closed > refuses every request to a room whose version this server does not know, then serves it again 1616ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > stored policy versions (CM-T046): an unknown version fails closed > never takes a profile or policy version from the request 195ms
+ ✓ |policy| tests/policy/policy-matrix.test.ts > EV-10-02: denials in a RESTRICTED room (MFA, step-up, VIEWER download) > records the three API responses, with their reasons, for the report 566ms
+ ✓ |policy| tests/policy/profile-change.test.ts > who may change a profile (AZ-03) > only the OWNER; other roles get 403, outsiders and platform administrators 404, nothing changes 3809ms
+ ✓ |policy| tests/policy/profile-change.test.ts > who may change a profile (AZ-03) > refuses a stale expected profile, unknown profiles and fields that try to choose policy 775ms
+ ✓ |policy| tests/policy/profile-change.test.ts > upgrades (CM-T048) > STANDARD to CONFIDENTIAL: clamps expiry, revokes invitations that skipped approval, locks out members without MFA 5082ms
+ ✓ |policy| tests/policy/profile-change.test.ts > upgrades (CM-T048) > CONFIDENTIAL to RESTRICTED: needs a step-up, revokes non-burn secrets and unconfirmed or history invitations 5472ms
+ ✓ |policy| tests/policy/profile-change.test.ts > upgrades (CM-T048) > refuses an upgrade when the OWNER does not meet the new access requirements, changing nothing 954ms
+ ✓ |policy| tests/policy/profile-change.test.ts > upgrades (CM-T048) > PC-07: an invitation sharing older key versions is revoked when the room becomes RESTRICTED 1622ms
+ ✓ |policy| tests/policy/profile-change.test.ts > downgrades (CM-T048) > need a step-up within 5 minutes, extend nothing, and are recorded with high severity 931ms
+ ✓ |policy| tests/policy/profile-change.test.ts > downgrades (CM-T048) > CONFIDENTIAL to STANDARD needs the 5-minute step-up too 283ms
+ ✓ |policy| tests/policy/profile-change.test.ts > downgrades (CM-T048) > a profile change is allowed while the room is write-locked, and keeps the lock 951ms
+ ✓ |policy| tests/policy/profile-change.test.ts > concurrency: the profile that commits first decides (CM-T048) > two concurrent changes from the same stored profile: one wins, the other is stale 838ms
+ ✓ |policy| tests/policy/profile-change.test.ts > concurrency: the profile that commits first decides (CM-T048) > a note started under STANDARD is judged by RESTRICTED once the upgrade commits first 852ms
+ ✓ |policy| tests/policy/profile-change.test.ts > concurrency: the profile that commits first decides (CM-T048) > an ADMIN without MFA who started a write under STANDARD is refused once CONFIDENTIAL commits first 1904ms
+ ✓ |policy| tests/policy/profile-change.test.ts > concurrency: the profile that commits first decides (CM-T048) > a removal started without a step-up under STANDARD is refused once RESTRICTED commits first 2061ms
+ ✓ |policy| tests/policy/profile-change.test.ts > concurrency: the profile that commits first decides (CM-T048) > a non-burn secret started under CONFIDENTIAL is refused once RESTRICTED commits first 605ms
+ Test Files  3 passed (3)
+      Tests  149 passed (149)

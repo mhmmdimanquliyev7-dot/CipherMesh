@@ -92,6 +92,14 @@ export const SECURITY_EVENTS = [
   'SECRET_REVEALED',
   'SECRET_REVEAL_REFUSED',
   'SECRET_REVOKED',
+  // Security policies (Phase 10, CM-T047, CM-T048). Profile changes are BASELINE events; a
+  // downgrade carries severity HIGH. Details: room ID, profiles, policy version and counts of the
+  // items an upgrade shortened or revoked. PC-13 FULL adds envelope fetches and member-list views
+  // (room ID and a count only). Policy refusals are ROOM_ACCESS_DENIED with a PROFILE_* reason.
+  'PROFILE_UPGRADED',
+  'PROFILE_DOWNGRADED',
+  'ENVELOPES_FETCHED',
+  'MEMBER_LIST_VIEWED',
 ] as const;
 export type SecurityEventName = (typeof SECURITY_EVENTS)[number];
 

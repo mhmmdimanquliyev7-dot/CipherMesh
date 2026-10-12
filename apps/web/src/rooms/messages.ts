@@ -54,6 +54,12 @@ export function describeRoomError(error: unknown): string {
         return 'This security profile needs a session verified with an authentication code. Turn on two-step sign-in in Account, then sign in again.';
       case 'REAUTH_REQUIRED':
         return 'This security profile needs a recent sign-in. Sign in again.';
+      case 'STEP_UP_REQUIRED':
+        return 'Confirm your identity (account password, and authentication code if two-step sign-in is on), then try again.';
+      case 'POLICY_UNSUPPORTED':
+        return 'This room uses a security policy version the server cannot apply right now. Nothing was changed.';
+      case 'PROFILE_CHANGED':
+        return 'The security profile of this room was changed meanwhile. Check the new profile and try again.';
       case 'ROOM_ID_UNAVAILABLE':
         return 'That room identifier cannot be used. Please try again.';
       case 'VALIDATION_FAILED':

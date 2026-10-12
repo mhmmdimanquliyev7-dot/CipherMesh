@@ -46,10 +46,11 @@ describe('room membership lookup (OL-01)', () => {
       userId: owner,
       role: 'OWNER',
       status: 'ACTIVE',
-      room: { status: 'ACTIVE', keyState: 'ACTIVE', securityProfile: 'CONFIDENTIAL' },
+      // The stored policy version is read with the profile (CM-T046); the gates resolve both.
+      room: { status: 'ACTIVE', keyState: 'ACTIVE', securityProfile: 'CONFIDENTIAL', policyVersion: 1 },
     });
     expect(Object.keys(record ?? {}).sort()).toEqual(['membershipId', 'role', 'room', 'roomId', 'status', 'userId']);
-    expect(Object.keys(record?.room ?? {}).sort()).toEqual(['keyState', 'securityProfile', 'status']);
+    expect(Object.keys(record?.room ?? {}).sort()).toEqual(['keyState', 'policyVersion', 'securityProfile', 'status']);
   });
 
   it('never returns a membership of room A for room B, for any role (T-06)', async () => {

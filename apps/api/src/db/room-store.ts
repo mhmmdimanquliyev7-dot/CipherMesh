@@ -12,6 +12,7 @@ import { createAuthStore, type AuthStore } from './auth-store';
 import { fileStoreFunctions } from './file-store';
 import { invitationStoreFunctions } from './invitation-store';
 import { noteStoreFunctions } from './note-store';
+import { policyStoreFunctions } from './policy-store';
 import { roomKeyStoreFunctions } from './room-key-store';
 import { secretStoreFunctions } from './secret-store';
 
@@ -49,6 +50,7 @@ export interface RoomSummaryRecord {
 }
 
 export interface RoomDetailRecord extends RoomSummaryRecord {
+  readonly policyVersion: number;
   readonly updatedAt: Date;
 }
 
@@ -65,6 +67,7 @@ export interface LockedRoom {
   readonly status: RoomStatus;
   readonly keyState: RoomKeyState;
   readonly securityProfile: SecurityProfile;
+  readonly policyVersion: number;
   readonly currentKeyVersion: number;
 }
 
@@ -151,6 +154,7 @@ export function createRoomStore(db: Db) {
     ...fileStoreFunctions(db, requireRekey),
     ...noteStoreFunctions(db),
     ...secretStoreFunctions(db),
+    ...policyStoreFunctions(db),
 
     // ---------------------------------------------------------------------------------- creation
 
@@ -264,7 +268,15 @@ export function createRoomStore(db: Db) {
         select: {
           role: true,
           room: {
-            select: { id: true, name: true, securityProfile: true, keyState: true, createdAt: true, updatedAt: true },
+            select: {
+              id: true,
+              name: true,
+              securityProfile: true,
+              policyVersion: true,
+              keyState: true,
+              createdAt: true,
+              updatedAt: true,
+            },
           },
         },
       });
@@ -311,11 +323,12 @@ export function createRoomStore(db: Db) {
           status: RoomStatus;
           key_state: RoomKeyState;
           security_profile: SecurityProfile;
+          policy_version: number;
           current_key_version: number;
         }[]
       >`
         SELECT id::text AS id, status::text AS status, key_state::text AS key_state,
-               security_profile::text AS security_profile, current_key_version
+               security_profile::text AS security_profile, policy_version, current_key_version
           FROM rooms WHERE id = ${roomId}::uuid FOR UPDATE`;
       const row = rows[0];
       return row === undefined
@@ -325,6 +338,7 @@ export function createRoomStore(db: Db) {
             status: row.status,
             keyState: row.key_state,
             securityProfile: row.security_profile,
+            policyVersion: row.policy_version,
             currentKeyVersion: row.current_key_version,
           };
     },

@@ -19,7 +19,7 @@ import { errorCode, startAuthApi, type AuthTestApi } from '../helpers/auth';
 import { loadDatabaseTestEnv, testDatabase } from '../helpers/database';
 import { insert, secretRow } from '../helpers/db-fixtures';
 import { inviteAndAccept, vaultOf } from '../helpers/room-crypto';
-import { createRoom, personWithVault, stepUp, type Person } from '../helpers/rooms';
+import { createRoom, mfaPersonWithVault, personWithVault, stepUp, type Person } from '../helpers/rooms';
 import {
   createdSecret,
   createSecret,
@@ -95,11 +95,25 @@ const rowText = async (id: string): Promise<string> =>
   JSON.stringify((await db.query('SELECT * FROM secrets WHERE id = $1', [id])).rows);
 
 /** A room of the given profile (set in the database; the profile gates are CM-T047, L-42). */
-async function roomWithProfile(profile: 'CONFIDENTIAL' | 'RESTRICTED'): Promise<string> {
-  const id = await createRoom(owner, 'STANDARD', `Secrets ${profile} room`);
-  await inviteAndAccept(owner, id, member, 'MEMBER');
-  await db.query('UPDATE rooms SET security_profile = $2 WHERE id = $1', [id, profile]);
-  return id;
+/**
+ * A room created with the profile, with a sender and a recipient who meet its access requirements
+ * (PC-01, PC-02: MFA-verified sessions), since Phase 10 checks them on every room request.
+ */
+async function roomWithProfile(
+  profile: 'CONFIDENTIAL' | 'RESTRICTED',
+): Promise<{ readonly id: string; readonly sender: Person; readonly recipient: Person }> {
+  const roomOwner = await mfaPersonWithVault(api, db);
+  const sender = await mfaPersonWithVault(api, db);
+  const id = await createRoom(roomOwner, profile, `Secrets ${profile} room`);
+  if (profile === 'RESTRICTED') await stepUp(api, roomOwner, roomOwner.secret);
+  await inviteAndAccept(
+    roomOwner,
+    id,
+    sender,
+    'MEMBER',
+    profile === 'RESTRICTED' ? { confirmedFingerprint: vaultOf(sender).identity.fingerprint } : {},
+  );
+  return { id, sender, recipient: roomOwner };
 }
 
 // --------------------------------------------------------------- creation and reveal (DF-09)
@@ -334,25 +348,30 @@ describe('creation: who, for whom, how long (AZ-23, OL-03, PC-09, PC-10, D-09-03
     }
     expect((await status(roomId, inFromNow(7 * DAY - MINUTE))).status).toBe(201);
     expect(errorCode(await status(roomId, inFromNow(7 * DAY + MINUTE)))).toBe('EXPIRY_NOT_ALLOWED');
+    const inRoom = async (room: Awaited<ReturnType<typeof roomWithProfile>>, expiresAt: string) =>
+      (await createSecret(room.sender, room.id, room.recipient, 'x', { expiresAt })).response;
     const confidential = await roomWithProfile('CONFIDENTIAL');
-    expect((await status(confidential, inFromNow(72 * 60 * MINUTE - MINUTE), owner)).status).toBe(201);
-    expect(errorCode(await status(confidential, inFromNow(72 * 60 * MINUTE + MINUTE), owner))).toBe(
+    expect((await inRoom(confidential, inFromNow(72 * 60 * MINUTE - MINUTE, api.clock.now()))).status).toBe(201);
+    expect(errorCode(await inRoom(confidential, inFromNow(72 * 60 * MINUTE + MINUTE, api.clock.now())))).toBe(
       'EXPIRY_NOT_ALLOWED',
     );
     const restricted = await roomWithProfile('RESTRICTED');
-    expect((await status(restricted, inFromNow(DAY - MINUTE), owner)).status).toBe(201);
-    expect(errorCode(await status(restricted, inFromNow(DAY + MINUTE), owner))).toBe('EXPIRY_NOT_ALLOWED');
+    expect((await inRoom(restricted, inFromNow(DAY - MINUTE, api.clock.now()))).status).toBe(201);
+    expect(errorCode(await inRoom(restricted, inFromNow(DAY + MINUTE, api.clock.now())))).toBe('EXPIRY_NOT_ALLOWED');
   });
 
   it('burn-after-reading is mandatory in RESTRICTED rooms and optional elsewhere (PC-10)', async () => {
     const restricted = await roomWithProfile('RESTRICTED');
-    const refused = await createSecret(member, restricted, owner, 'x', { burnAfterReading: false });
+    const send = (room: Awaited<ReturnType<typeof roomWithProfile>>, burnAfterReading: boolean) =>
+      createSecret(room.sender, room.id, room.recipient, 'x', {
+        burnAfterReading,
+        expiresAt: inFromNow(60 * 60_000, api.clock.now()),
+      });
+    const refused = await send(restricted, false);
     expect([refused.response.status, errorCode(refused.response)]).toEqual([422, 'BURN_REQUIRED']);
-    expect((await createSecret(member, restricted, owner, 'x', { burnAfterReading: true })).response.status).toBe(201);
+    expect((await send(restricted, true)).response.status).toBe(201);
     const confidential = await roomWithProfile('CONFIDENTIAL');
-    expect((await createSecret(member, confidential, owner, 'x', { burnAfterReading: false })).response.status).toBe(
-      201,
-    );
+    expect((await send(confidential, false)).response.status).toBe(201);
   });
 
   it('refuses a reused secret ID, and fields the schema does not know', async () => {
