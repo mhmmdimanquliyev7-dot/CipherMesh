@@ -13,6 +13,7 @@ import { fromHex, toHex } from './encoding';
 import { CryptoErrorCode, isCryptoError } from './errors';
 import { importRsaOaepPrivateKeyForTest, rsaOaepDecryptRaw } from './internal/raw';
 import { exportSpki, generateEncryptionKeyPair, importEncryptionPublicKey, unwrap32, wrap32 } from './rsa-oaep';
+import { subtle } from './webcrypto';
 
 // RSA-OAEP-3072 / SHA-256 / MGF1-SHA-256 (CP-02). Vectors: Project Wycheproof test group 1 (all
 // 37 cases, valid and invalid) and one 32-byte value encrypted by OpenSSL to the same published
@@ -133,8 +134,9 @@ describe('unwrap32 on an engine that drops leading zero bytes (finding SF-11-01,
   // Playwright's Linux WebKit (libgcrypt) returns the OAEP message as an integer: 00 || x comes back
   // as x. This stub reproduces exactly that on top of the real decryption.
   async function withStrippingEngine<T>(run: () => Promise<T>): Promise<T> {
-    const original = globalThis.crypto.subtle.decrypt.bind(globalThis.crypto.subtle);
-    const spy = vi.spyOn(globalThis.crypto.subtle, 'decrypt').mockImplementation(async (...args) => {
+    const engine = subtle();
+    const original = engine.decrypt.bind(engine);
+    const spy = vi.spyOn(engine, 'decrypt').mockImplementation(async (...args) => {
       const out = new Uint8Array(await original(...args));
       let i = 0;
       while (i < out.length && out[i] === 0) i++;
