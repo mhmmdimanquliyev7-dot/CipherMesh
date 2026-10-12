@@ -1,18 +1,18 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-12, Prompt 11 (Phase 9 implemented and verified on `feature/CM-T043-burn-secrets`: CM-T043, CM-T044). Phases 1 to 8 are on `main`; Phase 9 arrives through its pull request. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-12, end of Prompt 11 (Phase 9 implemented, verified and merged into `main`: CM-T043, CM-T044). Phases 1 to 9 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
 | Item | State |
 |---|---|
-| Completed on `main` | Phases 1 to 8 (pull requests #1, #7, #8, #10, #13, #22, #24, #26). **Phase 8 (CM-T042) was merged through pull request #26, merge commit `faeb633` (`faeb633a5a2839383a3c6c095c1c34e9c694affe`; parents `111a193` and `44aabf0`).** CI run 38162650065 passed every job on attempt 2 (attempt 1 had one unrelated WebKit vault-creation timeout in a Phase 7 file test, EV-08-07); GitGuardian, the dependency audit and the secret scan passed. Traceability: [phase-08-traceability.md](phase-08-traceability.md) |
+| Completed on `main` | Phases 1 to 9 (pull requests #1, #7, #8, #10, #13, #22, #24, #26, #28). **Phase 9 (CM-T043, CM-T044) was merged through pull request #28, merge commit `208cdd9` (`208cdd946b9acac185a1b5d8adc4b6e228d9670d`; parents `e52f554` and `09584e5`).** CI run 38214636993 passed every job on the first attempt; GitGuardian, the dependency audit and the secret scan passed. Traceability: [phase-09-traceability.md](phase-09-traceability.md). Phase 8 (CM-T042) was merged through pull request #26, merge commit `faeb633` (`faeb633a5a2839383a3c6c095c1c34e9c694affe`; parents `111a193` and `44aabf0`).** CI run 38162650065 passed every job on attempt 2 (attempt 1 had one unrelated WebKit vault-creation timeout in a Phase 7 file test, EV-08-07); GitGuardian, the dependency audit and the secret scan passed. Traceability: [phase-08-traceability.md](phase-08-traceability.md) |
 | Phase 7 | Encrypted Files: client-side AES-256-GCM files of at most 50 MiB with a per-file FEK wrapped under RWK_v, ciphertext in the S3-compatible bucket through presigned URLs, quotas, expiry, deletion and worker cleanup (section 6b) |
 | Phase 8 | Secure Notes (CM-T042): title and body as one AES-256-GCM message under a fresh NEK per revision, the revision bound in both contexts, optimistic concurrency with 409 on stale saves, AZ-19 to AZ-22, text-only rendering (section 6c). Traceability: [phase-08-traceability.md](phase-08-traceability.md) |
 | Phase 9 | Burn Secrets (CM-T043, CM-T044): one AES-256-GCM message under a fresh SEK, only the 32-byte SEK RSA-OAEP-wrapped to a recipient key the sender's browser authenticated against the room's signed statements; POST-only reveal in a locking transaction that returns and, with burn-after-reading, destroys the ciphertext in one statement; AZ-23 to AZ-25 and the new AZ-32 (section 6d). CM-T045 (external links, stretch) not built. Traceability: [phase-09-traceability.md](phase-09-traceability.md) |
-| Branch | `feature/CM-T043-burn-secrets`, created from `main` at `e52f554` (the Phase 8 handoff merge, pull request #27) |
-| Next | **Prompt 12: Phase 10, Security Policies** (CM-T046 to CM-T049), after the Phase 9 pull request and its handoff are merged. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Secrets panel only follows the current style |
-| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 8 until the Phase 9 merge |
+| Branch | `feature/CM-T043-burn-secrets` (head `09584e5`) is merged and takes no further commits |
+| Next | **Prompt 12: Phase 10, Security Policies** (CM-T046 to CM-T049), after this Phase 9 handoff is merged. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Secrets panel only follows the current style |
+| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 9. After this handoff is merged it is the baseline for Prompt 12 |
 
 ## 2. Architecture implemented so far
 
@@ -221,8 +221,8 @@ Local notes: `.gitignore` now anchors `/secrets/` (an unanchored rule hid `apps/
 
 - Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including both coverage steps) as required checks, then capture EV-01-01 to EV-01-03.
 - Dependabot pull requests remain open (#2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24; the `next` update is covered by Phase 6, which pins 16.3.8).
-- Jira: import the backlog; move CM-T006 to CM-T042, CM-T085 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01, R-05-01 and SF-07-01 as `security-finding` items. Nothing is DONE yet.
-- Evidence still needing Jira or GitHub: the Jira history of CM-T042 (EV-08-01 to EV-08-07 are in `docs/report/evidence/phase-08/`; EV-08-07 is the CI run of pull request #26); EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 7. EV-07-01 to EV-07-11 are in `docs/report/evidence/phase-07/` (EV-07-11 is the CI run of pull request #24). EV-06-01 to EV-06-10 are in `docs/report/evidence/phase-06/` (EV-06-10 is the CI run of pull request #22).
+- Jira: import the backlog; move CM-T006 to CM-T044, CM-T085 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01, R-05-01 and SF-07-01 as `security-finding` items. Nothing is DONE yet.
+- Evidence still needing Jira or GitHub: the Jira history of CM-T043 and CM-T044 (EV-09-01 to EV-09-09 are in `docs/report/evidence/phase-09/`; EV-09-08 is the CI run of pull request #28); the Jira history of CM-T042 (EV-08-01 to EV-08-07 are in `docs/report/evidence/phase-08/`; EV-08-07 is the CI run of pull request #26); EV-00-05, EV-00-06, EV-00-10, the Jira history items of Phases 2 to 7. EV-07-01 to EV-07-11 are in `docs/report/evidence/phase-07/` (EV-07-11 is the CI run of pull request #24). EV-06-01 to EV-06-10 are in `docs/report/evidence/phase-06/` (EV-06-10 is the CI run of pull request #22).
 
 ## 13. Not implemented yet
 

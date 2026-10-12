@@ -154,7 +154,7 @@ Captured in Phase 8 (Prompt 10), with synthetic data only, in [evidence/phase-08
 | EV-09-08 | CI run of the Phase 9 pull request | CI summary | Change control through CI | ISMS |
 | EV-09-09 | Tampered reveal refused; XSS in a secret shown as text | Screenshot | Authenticated decryption and safe rendering | CRY, APP |
 
-Captured in Phase 9 (Prompt 11), with synthetic data only, in [evidence/phase-09/](evidence/phase-09/): EV-09-01 (the revealed page; the row after the reveal is asserted by `secrets-lifecycle.test.ts`), EV-09-02 (concurrency test output), EV-09-03 (the reveal warning), EV-09-04 (the stored row), EV-09-05 (canary scan output), EV-09-06 (gate results), EV-09-07 (negative controls) and EV-09-09 (tamper and XSS screenshot). EV-09-08 is the CI run of the Phase 9 pull request. Jira history items stay pending until the backlog is imported.
+Captured in Phase 9 (Prompt 11), with synthetic data only, in [evidence/phase-09/](evidence/phase-09/): EV-09-01 (the revealed page; the row after the reveal is asserted by `secrets-lifecycle.test.ts`), EV-09-02 (concurrency test output), EV-09-03 (the reveal warning), EV-09-04 (the stored row), EV-09-05 (canary scan output), EV-09-06 (gate results), EV-09-07 (negative controls) and EV-09-09 (tamper and XSS screenshot). EV-09-08 (the CI run of pull request #28) is in the same folder. Jira history items stay pending until the backlog is imported.
 
 ### Phase 10: Policies
 | ID | Evidence | How to capture | Demonstrates | Tags |
