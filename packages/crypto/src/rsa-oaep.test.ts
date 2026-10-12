@@ -106,7 +106,7 @@ describe('RSA-OAEP wrapper (INV-17: 32-byte values only, label always a canonica
     await expectCode(unwrap32(pair.privateKey, wrapped.slice(1), label), CryptoErrorCode.AUTHENTICATION_FAILED);
     // A correctly padded ciphertext of a 33-byte value, made by OpenSSL, is refused.
     const spki = await exportSpki(pair.publicKey);
-    const encryptByOpenSsl = (value: Buffer): Uint8Array =>
+    const encryptByOpenSsl = (value: Buffer): Uint8Array<ArrayBuffer> =>
       new Uint8Array(
         publicEncrypt(
           {
