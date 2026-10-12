@@ -1,6 +1,6 @@
 # Authorization Model
 
-Status: Phase 0.5 baseline. Normative. The central module and the shared matrix are implemented since Phase 5 (CM-T029); section 9 records how. Phase 6 added AZ-31 and the invitation and room-key routes (section 9.7). Related: [security-policy-profiles.md](security-policy-profiles.md), [../architecture/data-model.md](../architecture/data-model.md), [../threat-model/threat-model.md](../threat-model/threat-model.md) (T-05, T-06).
+Status: Phase 0.5 baseline. Normative. The central module and the shared matrix are implemented since Phase 5 (CM-T029); section 9 records how. Phase 6 added AZ-31 and the invitation and room-key routes (section 9.7). Phase 9 added AZ-32 and the secret routes (section 9.10). Related: [security-policy-profiles.md](security-policy-profiles.md), [../architecture/data-model.md](../architecture/data-model.md), [../threat-model/threat-model.md](../threat-model/threat-model.md) (T-05, T-06).
 
 ## 1. Principles
 
@@ -70,6 +70,7 @@ Legend: **Y** allowed, **N** denied, **own** only on items the caller created. P
 | AZ-29 | Report a key-commitment mismatch | Y | Y | Y | Y | Creates a security event |
 | AZ-30 | Record a Room Safety Code comparison or report a mismatch | Y | Y | Y | Y | Stores the key version only, never the code (INV-18) |
 | AZ-31 | View the room's invitations | Y | Y | N | N | OL-11; added in Phase 6 (CM-T034) |
+| AZ-32 | View the room's secret metadata | Y | Y | Y | Y | OL-14; added in Phase 9 (CM-T043). No ciphertext |
 
 ## 4. Platform and self-service actions
 
@@ -104,6 +105,7 @@ Legend: **Y** allowed, **N** denied, **own** only on items the caller created. P
 | OL-11 | Invitees see only their own invitations; room OWNER and ADMIN see the invitations of their room. |
 | OL-12 | Removing, suspending or losing a member deletes that member's envelopes in the same transaction, so every later request fails at OL-01. |
 | OL-13 | Rekey operations are loaded by operation ID and room ID. Only the starter can finalize. The recipient set is computed by the server from the database and never taken from the client. |
+| OL-14 | Secret metadata lists (AZ-32) filter inside the query: MEMBER and VIEWER see only secrets they sent or received; OWNER and ADMIN see every secret of the room, so they can revoke (AZ-25). No list returns a payload or a wrapped SEK; those leave the server only in the reveal transaction (OL-06). Added in Phase 9. |
 
 ## 6. Enforcement architecture
 
@@ -291,3 +293,22 @@ Five room routes, declared in the registry with their matrix action and listed i
 | `POST /rooms/{roomId}/notes/{noteId}/delete` | AZ-22 | `own` cell as for updates; tombstone; allowed while the room is REKEY_REQUIRED (only content writes are locked) |
 
 Error answers follow section 7: non-members, notes of another room, deleted, expired and unknown notes are the same 404. A MEMBER who later becomes a VIEWER can no longer edit or delete their own notes (the role decides first). The BOLA suite attacks all five routes with notes of another room (`tests/authz/bola.test.ts`, 160 tests over 27 room routes).
+
+### 9.10 Recipient-bound secrets (Phase 9, CM-T043, CM-T044)
+
+Four room routes, declared in the registry with their matrix action and listed in `tests/security/route-inventory.test.ts` and `tests/helpers/bola-cases.ts` (a secret target needs `targetsSecret`). One action was added: **AZ-32**, because the secret list needs a matrix action and none covered it; its object rule is OL-14. AZ-23 to AZ-25 are used as specified in section 3.
+
+| Route | Action | Object rule |
+|---|---|---|
+| `GET /rooms/{roomId}/secrets` | AZ-32 | OL-14: the query filters by room ID and the caller's ACTIVE membership in an ACTIVE room, and for MEMBER and VIEWER by sender or recipient = caller; OWNER and ADMIN see every secret of the room. Metadata only: no payload or wrapped SEK |
+| `POST /rooms/{roomId}/secrets` | AZ-23 | Locks user, room, the sender's and the recipient's membership; the recipient must be an ACTIVE member other than the sender with exactly that ACTIVE identity key (OL-03); REKEY_REQUIRED (PC-16), PC-09 lifetime, PC-10 burn rule, unused secret ID and the per-account limit (D-09-04) on locked state |
+| `POST /rooms/{roomId}/secrets/{secretId}/reveal` | AZ-24 | `recipient` cell: the stored recipient decides (OL-06); the gate loads the secret by secret ID AND room ID, and the transaction locks it by secret ID AND room ID AND recipient = caller and decides again. Everyone else gets the generic 404 before any row is touched, so nobody can burn another person's secret by guessing its ID |
+| `POST /rooms/{roomId}/secrets/{secretId}/revoke` | AZ-25 | `own` cell: the stored sender decides for MEMBERs; VIEWERs are refused; OWNER and ADMIN may revoke any ACTIVE secret. Allowed while the room is REKEY_REQUIRED |
+
+Reading of AZ-25: "unrevealed" means not REVEALED. A secret without burn-after-reading that was already revealed is still ACTIVE and can be revoked, which stops further reveals; it cannot take back what was delivered (D-09-05).
+
+PC-16 scope for AZ-26 (deferred in section 9.2) stays open: AZ-26 belongs to CM-T045, which was not built.
+
+Error answers follow section 7: non-members, non-recipients, secrets of another room and unknown secrets are the same 404. A recipient whose secret is already revealed, expired, revoked or wrapped to a retired key gets 409 `SECRET_UNAVAILABLE`; only the recipient (and, for revocation, the sender and administrators) can tell those states apart, and they see them in the list anyway. The BOLA suite attacks all four routes with secrets of another room (`tests/authz/bola.test.ts`, 31 room routes); a refused mutation leaves the `secrets` table byte-for-byte unchanged.
+
+Since Phase 9 `GET /rooms/{roomId}/members/{userId}/identity` (AZ-01) also returns the member's own signed grant and its authority chain with the signers' identities, so that a sender's browser can verify the recipient key itself (CD-32). These are statements every member of the room may already verify for the signers they meet in the key material; nothing in them counts until a browser verifies it.

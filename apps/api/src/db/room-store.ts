@@ -13,6 +13,7 @@ import { fileStoreFunctions } from './file-store';
 import { invitationStoreFunctions } from './invitation-store';
 import { noteStoreFunctions } from './note-store';
 import { roomKeyStoreFunctions } from './room-key-store';
+import { secretStoreFunctions } from './secret-store';
 
 /**
  * Data access for rooms and memberships (Phase 5, CM-T030, CM-T031). The only module that writes
@@ -130,6 +131,7 @@ export class RoomIdUnavailableError extends Error {
 }
 
 export function createRoomStore(db: Db) {
+  const secrets = secretStoreFunctions(db);
   /** Moves an ACTIVE room to REKEY_REQUIRED (reasons accumulate) and increments its epoch. */
   async function requireRekey(roomId: string, reason: RekeyReason, now: Date): Promise<void> {
     await db.$executeRaw`
@@ -148,6 +150,7 @@ export function createRoomStore(db: Db) {
     ...invitationStoreFunctions(db),
     ...fileStoreFunctions(db, requireRekey),
     ...noteStoreFunctions(db),
+    ...secretStoreFunctions(db),
 
     // ---------------------------------------------------------------------------------- creation
 
@@ -385,7 +388,8 @@ export function createRoomStore(db: Db) {
 
     /**
      * Removes a member (AZ-09) with the full member-loss transaction of INV-07: status REMOVED,
-     * the member's envelopes deleted, the epoch incremented and the room REKEY_REQUIRED.
+     * the member's envelopes deleted, the epoch incremented and the room REKEY_REQUIRED. Since
+     * Phase 9 the ACTIVE secrets addressed to the member in the room are revoked too (D-09-06).
      */
     async removeMember(membership: LockedMembership, removedById: string, now: Date): Promise<boolean> {
       const result = await db.roomMember.updateMany({
@@ -398,6 +402,7 @@ export function createRoomStore(db: Db) {
       });
       if (result.count !== 1) return false;
       await db.keyEnvelope.deleteMany({ where: { roomId: membership.roomId, recipientUserId: membership.userId } });
+      await secrets.revokeSecretsToMember([membership.roomId], membership.userId, now);
       await requireRekey(membership.roomId, 'MEMBER_REMOVED', now);
       return true;
     },
@@ -405,7 +410,8 @@ export function createRoomStore(db: Db) {
     /**
      * Account disabled (PA-03, key-lifecycle R3): every ACTIVE membership of the user becomes
      * SUSPENDED, the user's envelopes in those rooms are deleted, and each affected ACTIVE room
-     * enters REKEY_REQUIRED with MEMBER_SUSPENDED. The rooms are locked first, in ID order. The
+     * enters REKEY_REQUIRED with MEMBER_SUSPENDED (and, since Phase 9, the ACTIVE secrets addressed
+     * to the user there are revoked). The rooms are locked first, in ID order. The
      * caller has already updated the user row, so a room creation by the same user either
      * finished before (and is suspended here) or sees the disabled account and stops.
      */
@@ -423,6 +429,8 @@ export function createRoomStore(db: Db) {
         data: { status: 'SUSPENDED', removedAt: now, removedById: suspendedById, removalReason: 'ACCOUNT_DISABLED' },
       });
       await db.keyEnvelope.deleteMany({ where: { recipientUserId: userId, roomId: { in: roomIds } } });
+      // Phase 9 (D-09-06): the secrets addressed to the user in those rooms are revoked as well.
+      await secrets.revokeSecretsToMember(roomIds, userId, now);
       const suspended: SuspendedRoom[] = [];
       for (const room of rooms) {
         // A room that is being deleted gets no new key version, so it needs no rekey.

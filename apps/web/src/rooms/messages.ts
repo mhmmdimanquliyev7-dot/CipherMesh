@@ -20,6 +20,10 @@ export function describeRoomError(error: unknown): string {
         return NOTE_INTEGRITY_ERROR;
       case 'NOTE_FORMAT_UNSUPPORTED':
         return NOTE_UNSUPPORTED;
+      case 'SECRET_INTEGRITY_FAILED':
+        return SECRET_INTEGRITY_ERROR;
+      case 'SECRET_FORMAT_UNSUPPORTED':
+        return 'This secret was encrypted in a format this version of CipherMesh does not support. Nothing was shown.';
       default:
         return 'A cryptographic check failed. Nothing was used or sent.';
     }
@@ -32,6 +36,9 @@ export function describeRoomError(error: unknown): string {
       return 'Files can be at most 50 MiB (they are encrypted in this browser in one piece).';
     if (error.code === 'NOTE_TOO_LONG')
       return 'This note is too long: a note can hold at most 64 KiB of text (title and body together).';
+    if (error.code === 'SECRET_TOO_LONG') return 'This secret is too long: a secret can hold at most 16 KiB of text.';
+    if (error.code === 'SECRET_FOR_OTHER_KEY')
+      return 'This secret was sent to an earlier identity key of yours, so this vault cannot open it. Nothing was requested.';
     if (error.code === 'STORAGE_TRANSFER_FAILED')
       return 'The encrypted file could not be transferred to or from storage. Check your connection and try again.';
   }
@@ -97,6 +104,17 @@ export function describeRoomError(error: unknown): string {
         return 'That note identifier cannot be used. Please try again.';
       case 'NOTE_LIMIT_REACHED':
         return 'This room holds the most notes it can (1000). Delete notes you no longer need first.';
+      // Recipient-bound secrets (Phase 9).
+      case 'SECRET_UNAVAILABLE':
+        return SECRET_UNAVAILABLE;
+      case 'SECRET_RECIPIENT_INVALID':
+        return 'That person cannot receive secrets in this room right now (not an active member, or their identity key changed).';
+      case 'BURN_REQUIRED':
+        return 'Secrets in this room are always destroyed after they are revealed (restricted profile).';
+      case 'SECRET_LIMIT_REACHED':
+        return 'You have sent the most active secrets allowed (100). Revoke secrets that are no longer needed, or wait until they are revealed or expire.';
+      case 'SECRET_ID_UNAVAILABLE':
+        return 'That secret identifier cannot be used. Please try again.';
     }
   }
   return describeError(error);
@@ -132,6 +150,35 @@ export function describeNoteError(error: unknown): string {
   }
   if (error instanceof ApiError && error.code === 'KEY_VERSION_STALE') {
     return 'The room key changed while you were editing. Reload the room and save again; your text is still in the editor.';
+  }
+  return describeRoomError(error);
+}
+
+/** Any failed check of a revealed secret (CM-T043, T-07): nothing was shown. */
+export const SECRET_INTEGRITY_ERROR =
+  'This secret failed its integrity check: it was changed or damaged after it was encrypted, or it was not encrypted for your key. Nothing was shown. Tell the sender through another channel.';
+/** The server refused the reveal: already revealed, expired or revoked. */
+export const SECRET_UNAVAILABLE =
+  'This secret can no longer be revealed: it was already revealed, it expired, or it was revoked.';
+
+/** Recipient-bound secrets (security-ui, L-03, L-12, L-55, L-56): what the feature does and does not do. */
+export const SECRETS_EXPLANATION =
+  'A secret is encrypted in your browser for one member; only their identity key can open it, and the server stores only ciphertext. The server sees who sent it to whom, when, its size and whether it was revealed. Once a secret is revealed, it cannot be retrieved again through CipherMesh, but the recipient can copy what they see, and database backups keep the ciphertext until they expire.';
+
+/** Shown before an explicit reveal of a burn-after-reading secret (DF-09: at most once). */
+export const SECRET_REVEAL_WARNING =
+  'Revealing destroys this secret on the server at the moment it is sent to this browser. If this page closes or the connection drops before it is shown, it cannot be recovered. Make sure you can read it now.';
+
+/** Any authentication failure while opening a secret (the generic crypto codes included). */
+export function describeSecretError(error: unknown): string {
+  if (
+    isCryptoError(error) &&
+    (error.code === 'CRYPTO_AUTHENTICATION_FAILED' || error.code === 'CRYPTO_INVALID_INPUT')
+  ) {
+    return SECRET_INTEGRITY_ERROR;
+  }
+  if (isCryptoError(error) && error.code === 'KEY_AUTHENTICATION_FAILED') {
+    return "The recipient's identity key could not be confirmed from the room's signed records, so nothing was encrypted or sent. Ask the room owner to check the member's fingerprint.";
   }
   return describeRoomError(error);
 }

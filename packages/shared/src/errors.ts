@@ -83,6 +83,21 @@ export const ErrorCode = {
   REVISION_CONFLICT: 'REVISION_CONFLICT',
   /** The room holds the most notes D-08-01 allows, or the note reached the last revision. */
   NOTE_LIMIT_REACHED: 'NOTE_LIMIT_REACHED',
+  // Recipient-bound secrets (Phase 9, DF-09). The API sees only the payload ciphertext and the
+  // wrapped SEK (INV-01, INV-17). Callers who are not the recipient get NOT_FOUND (OL-06).
+  /** The client-chosen secret ID was used before; secret IDs enter both contexts of the secret (CD-08). */
+  SECRET_ID_UNAVAILABLE: 'SECRET_ID_UNAVAILABLE',
+  /** The recipient is not an ACTIVE member with that ACTIVE identity key, or is the sender. */
+  SECRET_RECIPIENT_INVALID: 'SECRET_RECIPIENT_INVALID',
+  /** Burn-after-reading is mandatory in this room's profile (PC-10). */
+  BURN_REQUIRED: 'BURN_REQUIRED',
+  /** The sender has the most ACTIVE secrets D-09-04 allows. */
+  SECRET_LIMIT_REACHED: 'SECRET_LIMIT_REACHED',
+  /**
+   * For the recipient or sender only: the secret was already revealed and burned, expired or was
+   * revoked, or the recipient's identity key changed since it was sent. Nothing was released.
+   */
+  SECRET_UNAVAILABLE: 'SECRET_UNAVAILABLE',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

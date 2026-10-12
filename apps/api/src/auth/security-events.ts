@@ -85,6 +85,13 @@ export const SECURITY_EVENTS = [
   'NOTE_UPDATED',
   'NOTE_READ',
   'NOTE_DELETED',
+  // Recipient-bound secrets (Phase 9; DF-09: creation, reveals and revocations at every level).
+  // Details carry the room and secret IDs, the burn flag and reason codes only: never secret text,
+  // ciphertext or a wrapped SEK.
+  'SECRET_CREATED',
+  'SECRET_REVEALED',
+  'SECRET_REVEAL_REFUSED',
+  'SECRET_REVOKED',
 ] as const;
 export type SecurityEventName = (typeof SECURITY_EVENTS)[number];
 

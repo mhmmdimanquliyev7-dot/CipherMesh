@@ -76,7 +76,7 @@ flowchart LR
 | RSC_v (Room Safety Code) | 256-bit HKDF output, 66 bits displayed | Each member's browser (HKDF) | Derived; displaying it reveals nothing useful about RKM_v | Never; displayed only | While the room view is open | On vault lock or navigation |
 | FEK | AES-256 | Uploader's browser | RWK_v | PostgreSQL, wrapped | Lifetime of the file | Wrapped FEK set to NULL on delete or expiry |
 | NEK | AES-256 | Author's browser, per revision | RWK_v | PostgreSQL, wrapped | Until the next revision | Replaced on save; NULL on delete |
-| SEK | AES-256 | Sender's browser | Recipient key pair (RSA-OAEP wrap of the 32-byte key) | PostgreSQL, wrapped | Until reveal or expiry | Wrapped SEK set to NULL on burn, expiry or revoke |
+| SEK | AES-256 | Sender's browser | Recipient key pair (RSA-OAEP wrap of the 32-byte key) | PostgreSQL, wrapped | Until the first reveal (burn-after-reading), otherwise until expiry or revocation (D-09-02) | Wrapped SEK set to NULL on burn, expiry or revoke, and when the recipient leaves the room or resets their vault (Phase 9) |
 | Session token | 256 random bits | Server | Bearer secret in cookie | Cookie; PostgreSQL stores SHA-256 digest | At most 12 hours | Revocation or expiry |
 | TOTP secret | 160 random bits | Server | TOTP_ENCRYPTION_KEY | PostgreSQL, server-encrypted | Until MFA is disabled | Set to NULL |
 | TOTP_ENCRYPTION_KEY | AES-256 | Operator | File permissions, VM hardening | Secret file on the VM | Rotated yearly or on suspicion | Old key kept only until re-encryption completes |

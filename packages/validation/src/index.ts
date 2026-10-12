@@ -10,3 +10,4 @@ export * from './rooms';
 export * from './room-keys';
 export * from './files';
 export * from './notes';
+export * from './secrets';

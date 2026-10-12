@@ -1,0 +1,12 @@
+EV-09-02 Concurrent reveal test output (INV-13), 2026-10-12, branch feature/CM-T043-burn-secrets, local PostgreSQL 17, synthetic data only.
+
+ ✓ |secrets| tests/secrets/secrets-concurrency.test.ts > many simultaneous reveals produce exactly one success (INV-13) > two reveals from two tabs on one API instance 181ms
+ ✓ |secrets| tests/secrets/secrets-concurrency.test.ts > many simultaneous reveals produce exactly one success (INV-13) > twenty reveals spread over two API instances: one winner, nineteen refusals, one decryptable copy 408ms
+ ✓ |secrets| tests/secrets/secrets-concurrency.test.ts > many simultaneous reveals produce exactly one success (INV-13) > a double click after the first reveal committed is refused 179ms
+ ✓ |secrets| tests/secrets/secrets-concurrency.test.ts > reveal races revocation, removal and expiry > reveal against revocation: exactly one of them takes effect 571ms
+ ✓ |secrets| tests/secrets/secrets-concurrency.test.ts > reveal races revocation, removal and expiry > reveal against the removal of the recipient: the reveal wins and burns, or the removal revokes 701ms
+ ✓ |secrets| tests/secrets/secrets-concurrency.test.ts > reveal races revocation, removal and expiry > a secret that expires while the reveal waits is refused at the moment of the reveal (INV-14) 195ms
+ ✓ |secrets| tests/secrets/secrets-concurrency.test.ts > failures at the delivery boundary > a transaction that fails (lock held past the five-second limit) releases nothing and burns nothing 15207ms
+ ✓ |secrets| tests/secrets/secrets-concurrency.test.ts > failures at the delivery boundary > a client that disconnects while waiting loses the secret: the committed burn is final (at most once) 237ms
+ Test Files  1 passed (1)
+      Tests  8 passed (8)

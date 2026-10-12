@@ -5,13 +5,15 @@ import { runNoteCleanup } from '../db/note-cleanup';
 import { expireInvitations } from '../db/invitation-store';
 import { runAuthRetention } from '../db/retention';
 import { runRoomCleanup } from '../db/room-cleanup';
+import { runSecretCleanup } from '../db/secret-store';
 import { createLogger } from '../logging/logger';
 import { createObjectStore } from '../storage/object-store';
 
 /**
  * One-shot retention job (`pnpm worker:retention`), connecting as cm_worker (CM-T017, CM-T018),
  * which also finishes room deletions (CM-T030), expires invitations (CM-T035) and cleans up files
- * and their storage objects (CM-T040) and expired and room-deleted notes (CM-T042).
+ * and their storage objects (CM-T040), expired and room-deleted notes (CM-T042) and secrets
+ * (CM-T043, CM-T044).
  * Scheduling belongs to the worker container (Phase 12) and the deployment (Phase 17); until then
  * the job is run on demand. It logs counts only.
  */
@@ -39,6 +41,9 @@ async function main(): Promise<void> {
     );
     // Expired notes and the notes of rooms being deleted become tombstones (CM-T042).
     logger.info('note cleanup completed', await runNoteCleanup(database.prisma, new Date()));
+    // Expired secrets become EXPIRED and the secrets of rooms being deleted REVOKED, both without
+    // payload or wrapped SEK (CM-T043, CM-T044). Before the room step, which waits for them.
+    logger.info('secret cleanup completed', await runSecretCleanup(database.prisma, new Date()));
     // Finishes room deletions (CM-T030): DELETING rooms with nothing left to clean become DELETED.
     logger.info('room cleanup completed', await runRoomCleanup(database.prisma));
   } finally {

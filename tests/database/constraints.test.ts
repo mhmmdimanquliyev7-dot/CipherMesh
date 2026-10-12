@@ -732,6 +732,88 @@ describe('encrypted note lifecycle (Phase 8, migration 20261008000000_encrypted_
   });
 });
 
+describe('secret lifecycle (Phase 9, migration 20261009000000_burn_secrets)', () => {
+  const recipientOf = (room: RoomFixture) => ({ userId: room.ownerId, keyId: room.ownerKeyId });
+
+  it('bounds the payload by CP-29, the lifetime by PC-09, and REVEALED to burn-after-reading secrets', async () => {
+    const room = await insertRoom(api);
+    const to = recipientOf(room);
+    expect(await attempt('secrets', secretRow(room, to, { payload_ciphertext: DUMMY.ciphertext(16_400) }))).toBe(
+      'none',
+    );
+    expect(await attempt('secrets', secretRow(room, to, { payload_ciphertext: DUMMY.ciphertext(16_401) }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+    const now = Date.now();
+    const lifetime = (ms: number) => ({ created_at: new Date(now), expires_at: new Date(now + ms) });
+    expect(await attempt('secrets', secretRow(room, to, lifetime(7 * 86_400_000)))).toBe('none');
+    expect(await attempt('secrets', secretRow(room, to, lifetime(7 * 86_400_000 + 1)))).toBe(SQLSTATE.checkViolation);
+    const burned = {
+      status: 'REVEALED',
+      revealed_at: new Date(),
+      destroyed_at: new Date(),
+      wrapped_sek: null,
+      payload_ciphertext: null,
+      payload_iv: null,
+    };
+    expect(await attempt('secrets', secretRow(room, to, burned))).toBe('none');
+    expect(await attempt('secrets', secretRow(room, to, { ...burned, burn_after_reading: false }))).toBe(
+      SQLSTATE.checkViolation,
+    );
+  });
+
+  it('burns once and makes every final state final; an ACTIVE secret keeps its ciphertext', async () => {
+    const room = await insertRoom(api);
+    const row = secretRow(room, recipientOf(room));
+    await insert(api, 'secrets', row);
+    const id = row['id'];
+    const someoneElse = await insertUser(api);
+    for (const [sql, values] of [
+      ['UPDATE secrets SET sender_id = $2 WHERE id = $1', [someoneElse]],
+      ['UPDATE secrets SET burn_after_reading = false WHERE id = $1', []],
+      ["UPDATE secrets SET expires_at = expires_at + interval '1 minute' WHERE id = $1", []],
+      ['UPDATE secrets SET wrapped_sek = $2 WHERE id = $1', [randomBytes(384)]],
+      ['UPDATE secrets SET payload_iv = $2 WHERE id = $1', [randomBytes(12)]],
+      // A burn-after-reading secret cannot be marked revealed and stay ACTIVE.
+      ['UPDATE secrets SET revealed_at = now() WHERE id = $1', []],
+    ] as [string, unknown[]][]) {
+      expect(await run(sql, [id, ...values]), sql).toBe(SQLSTATE.integrityConstraintViolation);
+    }
+    const burn = `UPDATE secrets SET status = 'REVEALED', revealed_at = now(), destroyed_at = now(),
+                    wrapped_sek = NULL, payload_ciphertext = NULL, payload_iv = NULL WHERE id = $1`;
+    expect(await run(burn, [id])).toBe('none');
+    for (const [sql, values] of [
+      [
+        "UPDATE secrets SET status = 'ACTIVE', destroyed_at = NULL, wrapped_sek = $2, payload_ciphertext = $3, payload_iv = $4 WHERE id = $1",
+        [randomBytes(384), randomBytes(64), randomBytes(12)],
+      ],
+      ["UPDATE secrets SET status = 'REVOKED' WHERE id = $1", []],
+      ["UPDATE secrets SET revealed_at = now() + interval '1 hour' WHERE id = $1", []],
+    ] as [string, unknown[]][]) {
+      expect(await run(sql, [id, ...values]), sql).toBe(SQLSTATE.integrityConstraintViolation);
+    }
+  });
+
+  it('records a non-burn reveal once, and expiry or revocation never invents one', async () => {
+    const room = await insertRoom(api);
+    const row = secretRow(room, recipientOf(room), { burn_after_reading: false });
+    await insert(api, 'secrets', row);
+    const id = row['id'];
+    expect(await run('UPDATE secrets SET revealed_at = now() WHERE id = $1', [id])).toBe('none');
+    expect(await run("UPDATE secrets SET revealed_at = now() + interval '1 hour' WHERE id = $1", [id])).toBe(
+      SQLSTATE.integrityConstraintViolation,
+    );
+    // A non-burn secret never becomes REVEALED (the trigger refuses before the CHECK would), only
+    // EXPIRED or REVOKED.
+    const destroy = (status: string, extra = '') =>
+      `UPDATE secrets SET status = '${status}', destroyed_at = now(), wrapped_sek = NULL, payload_ciphertext = NULL,
+         payload_iv = NULL${extra} WHERE id = $1`;
+    expect(await run(destroy('REVEALED'), [id])).toBe(SQLSTATE.integrityConstraintViolation);
+    expect(await run(destroy('EXPIRED', ', revealed_at = NULL'), [id])).toBe(SQLSTATE.integrityConstraintViolation);
+    expect(await run(destroy('REVOKED'), [id])).toBe('none');
+  });
+});
+
 describe('write-once identity columns', () => {
   it('never changes a public identity key after upload, but allows status changes', async () => {
     const user = await insertUser(api);

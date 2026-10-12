@@ -61,11 +61,23 @@ export function createRoomKeyService(deps: RoomKeyServiceDependencies) {
       return store.listOwnEnvelopes(access.roomId, actor.userId);
     },
 
-    /** AZ-01: the current public identity of an ACTIVE member (for grants and fingerprint checks). */
-    async memberIdentity(actor: Actor, access: RoomAccess, memberId: string): Promise<IdentityRecord> {
+    /**
+     * AZ-01: the current public identity of an ACTIVE member (for grants, fingerprint checks and,
+     * since Phase 9, secret recipients), with the member's own grant, its authority chain and the
+     * signers' identities. The chain starts from the member's stored grant, exactly as the member's
+     * own key material does; the browser verifies all of it (CM-T043).
+     */
+    async memberIdentity(
+      actor: Actor,
+      access: RoomAccess,
+      memberId: string,
+    ): Promise<{ identity: IdentityRecord; grants: GrantRecord[]; identities: IdentityRecord[] }> {
       const identity = await store.findMemberIdentity(access.roomId, actor.userId, memberId);
       if (identity === null) throw notFound();
-      return identity;
+      // The caller is an ACTIVE member (the route's authorization) and so is the member (above).
+      const grants = await store.grantChain(access.roomId, memberId, []);
+      const signers: IdentityRef[] = grants.map((g) => ({ userId: g.grantorUserId, keyId: g.grantorKeyId }));
+      return { identity, grants, identities: await store.identities(signers) };
     },
 
     /** AZ-29: a member's browser refused a key version; recorded with the version and reason only. */

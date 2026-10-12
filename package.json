@@ -26,6 +26,7 @@
     "test:authz": "vitest run --project authz",
     "test:files": "vitest run --project files",
     "test:notes": "vitest run --project notes",
+    "test:secrets": "vitest run --project secrets",
     "test:coverage:crypto": "vitest run --project unit packages/crypto --coverage.enabled",
     "test:coverage:authz": "vitest run --project unit packages/shared/src/authorization --coverage.enabled --coverage.include=packages/shared/src/authorization.ts",
     "test:e2e": "playwright test",

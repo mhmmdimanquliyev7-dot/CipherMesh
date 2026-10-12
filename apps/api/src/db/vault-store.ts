@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from '../generated/prisma/client';
 import { createAuthStore, type AuthStore } from './auth-store';
 import { invitationStoreFunctions, type InvitationStoreFunctions } from './invitation-store';
+import { secretStoreFunctions, type SecretStoreFunctions } from './secret-store';
 
 /**
  * Data access for the cryptographic identity and Vault (Phase 4, CM-T025 to CM-T028). The only
@@ -242,6 +243,8 @@ export interface VaultTransactionStores {
   readonly vault: VaultStore;
   readonly auth: AuthStore;
   readonly invitations: InvitationStoreFunctions;
+  /** Phase 9: a reset revokes the ACTIVE secrets wrapped to the retired identity (D-09-06). */
+  readonly secrets: SecretStoreFunctions;
 }
 
 export function vaultDataAccess(prisma: PrismaClient): {
@@ -253,7 +256,12 @@ export function vaultDataAccess(prisma: PrismaClient): {
     transaction: (fn) =>
       prisma.$transaction(
         (tx) =>
-          fn({ vault: createVaultStore(tx), auth: createAuthStore(tx), invitations: invitationStoreFunctions(tx) }),
+          fn({
+            vault: createVaultStore(tx),
+            auth: createAuthStore(tx),
+            invitations: invitationStoreFunctions(tx),
+            secrets: secretStoreFunctions(tx),
+          }),
         {
           isolationLevel: 'ReadCommitted',
         },

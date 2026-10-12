@@ -86,6 +86,7 @@ The admin confirms before the browser creates envelopes. This is where an unexpe
 - **Before sending:** "The recipient can copy this secret. Burn after reading removes CipherMesh's copy after the first view. Backups keep an encrypted copy until their retention ends."
 - **Before revealing:** "This secret can be shown once. If the connection drops, it cannot be shown again."
 - **Expiring items** show a countdown and the profile's maximum lifetime.
+- *As implemented in Phase 9* (`apps/web/src/rooms/secret-panel.tsx`, `messages.ts`): before sending, "Once this secret is revealed, it cannot be retrieved again through CipherMesh. The recipient can still copy what they see."; before revealing a burn-after-reading secret, "Revealing destroys this secret on the server at the moment it is sent to this browser. If this page closes or the connection drops before it is shown, it cannot be recovered. Make sure you can read it now." The card explains what the server sees and that backups keep the ciphertext (L-55, L-12). Secrets show their expiry time and lifetime choices limited to the profile, not a countdown. Reveal is never automatic, and revealed text is shown as plain text until "Hide", a vault lock or leaving the page. No step-up is asked before a reveal: PC-03 covers invitations and rekeys only, and the profile access gates are CM-T047 (L-42).
 
 ### 2.8 Step-up and freshness prompts
 

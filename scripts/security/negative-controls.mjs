@@ -1,7 +1,8 @@
 // `pnpm security:negative-controls`: proves that the security tests are real (Phase 3, extended
 // with the vault and cryptography controls of Phase 4, the room authorization controls of Phase 5,
-// the cryptographic membership controls of Phase 6, the encrypted file controls of Phase 7 and the
-// encrypted note controls of Phase 8). `--only=<prefix>` runs a subset, for example `--only=NC-05`.
+// the cryptographic membership controls of Phase 6, the encrypted file controls of Phase 7, the
+// encrypted note controls of Phase 8 and the recipient-bound secret controls of Phase 9).
+// `--only=<prefix>` runs a subset, for example `--only=NC-05`.
 //
 // For each control, one deliberate defect is written into a source file in the working tree, the
 // tests that must catch it are run, and the original file is restored immediately afterwards
@@ -994,6 +995,190 @@ const CONTROLS = [
     ],
     tests: [],
     e2e: { spec: 'tests/e2e/notes.spec.ts', title: 'is read by another member' },
+  },
+  // ------------------------------------------------------------ Phase 9: recipient-bound secrets
+  {
+    id: 'NC-09-01',
+    defect: 'The SEK wrap label (cm.secret.sek-wrap) no longer binds the recipient key',
+    file: 'packages/crypto/src/secrets.ts',
+    edits: [['    recipientKeyId: keyId,\n', '    recipientKeyId: userId,\n']],
+    tests: ['packages/crypto/src/secrets.test.ts'],
+  },
+  {
+    id: 'NC-09-02',
+    defect: 'The secret payload is no longer bound to its secret ID in the AES-GCM AAD (cm.secret.payload)',
+    file: 'packages/crypto/src/secrets.ts',
+    edits: [
+      [
+        "  return contextBytes('cm.secret.payload', { roomId, secretId });",
+        "  return contextBytes('cm.secret.payload', { roomId, secretId: roomId });",
+      ],
+    ],
+    tests: ['packages/crypto/src/secrets.test.ts'],
+  },
+  {
+    id: 'NC-09-03',
+    defect: 'A secret can be encrypted for a recipient key that was never authenticated against the room statements',
+    file: 'packages/crypto/src/secrets.ts',
+    edits: [
+      [
+        '  if (!authenticated.has(recipient) || !isSecretText(input.text)) throw invalidInput();',
+        '  if (!isSecretText(input.text)) throw invalidInput();',
+      ],
+    ],
+    tests: ['packages/crypto/src/secrets.test.ts'],
+  },
+  {
+    id: 'NC-09-04',
+    defect: 'Recipient authentication accepts any self-consistent identity the server names (key substitution, T-25)',
+    file: 'packages/crypto/src/room-keys.ts',
+    edits: [
+      [
+        '  if (!verified.isKeyHolder({ userId: identity.userId, keyId: identity.keyId })) throw authenticationFailed();\n',
+        '',
+      ],
+    ],
+    tests: ['packages/crypto/src/secrets.test.ts'],
+  },
+  {
+    id: 'NC-09-05',
+    defect: 'A burn-after-reading reveal no longer destroys the secret: it can be revealed again (INV-13)',
+    file: 'apps/api/src/db/secret-store.ts',
+    edits: [
+      [
+        `          status = CASE WHEN s.burn_after_reading THEN 'REVEALED'::"SecretStatus" ELSE s.status END,
+          revealed_at = COALESCE(s.revealed_at, \${now}),
+          destroyed_at = CASE WHEN s.burn_after_reading THEN \${now} ELSE s.destroyed_at END,
+          wrapped_sek = CASE WHEN s.burn_after_reading THEN NULL ELSE s.wrapped_sek END,
+          payload_iv = CASE WHEN s.burn_after_reading THEN NULL ELSE s.payload_iv END,
+          payload_ciphertext = CASE WHEN s.burn_after_reading THEN NULL ELSE s.payload_ciphertext END`,
+        `          status = s.status,
+          revealed_at = CASE WHEN s.burn_after_reading THEN s.revealed_at ELSE COALESCE(s.revealed_at, \${now}) END`,
+      ],
+    ],
+    tests: ['tests/secrets/secrets-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-09-06',
+    defect:
+      'The reveal reads the secret without locks and checks its state in application memory (double release race)',
+    file: 'apps/api/src/secrets/service.ts',
+    edits: [
+      [
+        `        if (!(await tx.lockUploader(actor.userId))) throw notFound();
+        let target: LockedSecret | null = null;
+        await lockAndReauthorize(tx, actor, access.roomId, meta, 'AZ-24', async () => {`,
+        `        let target: LockedSecret | null = null;
+        await (async (_t: unknown, _a: unknown, _r: unknown, _m: unknown, _x: unknown, load: () => Promise<unknown>) => {
+          await load();
+        })(tx, actor, access.roomId, meta, 'AZ-24', async () => {`,
+      ],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/db/secret-store.ts',
+        edits: [
+          [
+            '::uuid AND s.recipient_user_id = ${userId}::uuid\n           FOR UPDATE OF s`;',
+            '::uuid AND s.recipient_user_id = ${userId}::uuid`;',
+          ],
+          ["             AND status = 'ACTIVE' AND expires_at > ${now}\n", '             AND expires_at > ${now}\n'],
+          [
+            "WHERE s.id = r.id AND s.status = 'ACTIVE' AND s.expires_at > ${now}",
+            'WHERE s.id = r.id AND s.expires_at > ${now}',
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/secrets/secrets-concurrency.test.ts'],
+  },
+  {
+    id: 'NC-09-07',
+    defect: 'Expiry is no longer checked at the moment of the reveal (INV-14): an expired secret is released',
+    file: 'apps/api/src/secrets/service.ts',
+    edits: [["    if (secret.expiresAt.getTime() <= now.getTime()) return 'EXPIRED';\n", '']],
+    also: [
+      {
+        file: 'apps/api/src/db/secret-store.ts',
+        edits: [
+          ["             AND status = 'ACTIVE' AND expires_at > ${now}\n", "             AND status = 'ACTIVE'\n"],
+          [
+            "WHERE s.id = r.id AND s.status = 'ACTIVE' AND s.expires_at > ${now}",
+            "WHERE s.id = r.id AND s.status = 'ACTIVE'",
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/secrets/secrets-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-09-08',
+    defect: 'Any member may reveal a secret addressed to someone else (recipient rule removed at every layer, OL-06)',
+    file: 'apps/api/src/routes/secrets.ts',
+    edits: [
+      [
+        "      action: 'AZ-24-SECRET-REVEAL',\n      access: { kind: 'room', resource: recipientResource },",
+        "      action: 'AZ-32-SECRET-REVEAL',\n      access: { kind: 'room' },",
+      ],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/secrets/service.ts',
+        edits: [["meta, 'AZ-24', async () => {", "meta, 'AZ-32', async () => {"]],
+      },
+      {
+        file: 'apps/api/src/db/secret-store.ts',
+        edits: [
+          [' AND s.recipient_user_id = ${userId}::uuid\n', '\n'],
+          ['             AND recipient_user_id = ${recipientUserId}::uuid\n', ''],
+        ],
+      },
+    ],
+    tests: ['tests/secrets/secrets-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-09-09',
+    defect: 'Secret revocation is authorized for every member (AZ-25 own and deny cells bypassed)',
+    file: 'apps/api/src/routes/secrets.ts',
+    edits: [
+      [
+        "      action: 'AZ-25-SECRET-REVOKE',\n      access: { kind: 'room', resource: senderResource },",
+        "      action: 'AZ-32-SECRET-REVOKE',\n      access: { kind: 'room' },",
+      ],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/secrets/service.ts',
+        edits: [["meta, 'AZ-25', async () => {", "meta, 'AZ-32', async () => {"]],
+      },
+    ],
+    tests: ['tests/secrets/secrets-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-09-10',
+    defect: 'The browser reveals waiting secrets automatically when the list loads (no explicit action)',
+    file: 'apps/web/src/rooms/secrets.ts',
+    edits: [
+      [
+        '  return { secrets: page.secrets, nextCursor: page.nextCursor };',
+        "  for (const s of page.secrets) if (s.status === 'ACTIVE') await revealSecret(roomId, s).catch(() => undefined);\n  return { secrets: page.secrets, nextCursor: page.nextCursor };",
+      ],
+    ],
+    tests: [],
+    e2e: { spec: 'tests/e2e/secrets.spec.ts', title: 'revealed once on an explicit click' },
+  },
+  {
+    id: 'NC-09-11',
+    defect: 'The browser keeps revealed secret text in sessionStorage',
+    file: 'apps/web/src/rooms/secrets.ts',
+    edits: [
+      [
+        '    return { secret: response.secret, text: opened.text };',
+        '    sessionStorage.setItem(`cm-secret-${view.id}`, opened.text);\n    return { secret: response.secret, text: opened.text };',
+      ],
+    ],
+    tests: [],
+    e2e: { spec: 'tests/e2e/secrets.spec.ts', title: 'revealed once on an explicit click' },
   },
 ];
 

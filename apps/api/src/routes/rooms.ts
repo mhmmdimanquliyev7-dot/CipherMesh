@@ -372,13 +372,28 @@ export function roomRoutes(
       body: undefined,
       response: memberIdentityResponseSchema,
       handler: async (ctx) => {
-        const identity = await keys.memberIdentity(actorOf(ctx), roomOf(ctx), ctx.params.userId);
+        const { identity, grants, identities } = await keys.memberIdentity(
+          actorOf(ctx),
+          roomOf(ctx),
+          ctx.params.userId,
+        );
         const { userId: _userId, ...wire } = identityToWire(identity);
         return {
           status: 200,
           body: {
             userId: identity.userId,
             identity: { ...wire, suite: 'CM1' as const, createdAt: iso(identity.createdAt) },
+            authority: {
+              grants: grants.map((g) => ({
+                subjectUserId: g.subjectUserId,
+                subjectKeyId: g.subjectKeyId,
+                role: g.role,
+                grantorUserId: g.grantorUserId,
+                grantorKeyId: g.grantorKeyId,
+                signature: b64(g.signature),
+              })),
+              identities: identities.map((i) => ({ ...identityToWire(i), suite: 'CM1' as const })),
+            },
           },
         };
       },

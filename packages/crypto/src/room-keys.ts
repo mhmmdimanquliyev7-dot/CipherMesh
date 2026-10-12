@@ -207,6 +207,11 @@ async function resolveAuthority(
 interface Verified {
   readonly creator: VerifiedIdentity;
   readonly authorization: RecipientAuthorization;
+  /**
+   * Whether the verified statements make (user, key) a holder of this key version: named in its
+   * signed recipient list, or the subject of a grant the verified authority chain accepts.
+   */
+  readonly isKeyHolder: (who: RecipientRef) => boolean;
 }
 
 /** Steps 1 to 4 of the verification rule: statements, authority and this client's authorization. */
@@ -249,14 +254,17 @@ async function verifyStatements(vault: UnlockedVault, bundle: RoomKeyBundle): Pr
     throw authenticationFailed();
   }
 
+  const listed = (who: RecipientRef): boolean =>
+    keyVersion.recipients.some((r) => r.userId === who.userId && r.keyId === who.keyId);
+  const isKeyHolder = (who: RecipientRef): boolean => listed(who) || authority.grantFor(who) !== undefined;
   const self = selfOf(vault);
-  if (keyVersion.recipients.some((r) => r.userId === self.userId && r.keyId === self.keyId)) {
-    return { creator, authorization: { kind: 'recipient-list' } };
+  if (listed(self)) {
+    return { creator, authorization: { kind: 'recipient-list' }, isKeyHolder };
   }
   const grant = authority.grantFor(self);
   const grantor = grant === undefined ? undefined : identities.get(ref(grant.grantorUserId, grant.grantorKeyId));
   if (grant === undefined || grantor === undefined) throw authenticationFailed();
-  return { creator, authorization: { kind: 'grant', role: grant.role, grantor } };
+  return { creator, authorization: { kind: 'grant', role: grant.role, grantor }, isKeyHolder };
 }
 
 /** Steps 5 and 6: opens this client's envelope and checks the key against the signed commitment. */
@@ -329,6 +337,39 @@ export async function openRoomKey(vault: UnlockedVault, bundle: RoomKeyBundle): 
   } catch (error) {
     throw controlled(error);
   }
+}
+
+/**
+ * Authenticates another member's identity from this client's point of view (Phase 9, CM-T043):
+ * the room's statements must pass the verification rule for this client (steps 1 to 4 of ADR-015
+ * section 4), the candidate identity must verify on its own (binding signature and fingerprint),
+ * and the verified statements must make exactly that (user, key) a holder of the key version:
+ * named in its signed recipient list or the subject of an accepted grant. A key the server merely
+ * claims for a member is refused, so the server cannot substitute a recipient key without a
+ * signature from a room member's key (T-25, T-36; L-07 and L-22 remain).
+ *
+ * What this cannot show: whether the member is still in the room. Grants are statements, not
+ * revocable credentials (L-46); the API refuses recipients who are not ACTIVE members.
+ */
+export async function authenticateRoomMember(
+  vault: UnlockedVault,
+  bundle: RoomKeyBundle,
+  candidate: PublicIdentity,
+): Promise<VerifiedIdentity> {
+  let verified: Verified;
+  try {
+    verified = await verifyStatements(vault, bundle);
+  } catch (error) {
+    throw controlled(error);
+  }
+  let identity: VerifiedIdentity;
+  try {
+    identity = await verifyPublicIdentity(candidate);
+  } catch {
+    throw authenticationFailed();
+  }
+  if (!verified.isKeyHolder({ userId: identity.userId, keyId: identity.keyId })) throw authenticationFailed();
+  return identity;
 }
 
 // ------------------------------------------------------------------------- room creation (DF-05)

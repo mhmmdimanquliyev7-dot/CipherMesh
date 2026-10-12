@@ -11,12 +11,13 @@ import type { PrismaClient } from '../generated/prisma/client';
  * plaintext key material, which never reaches the server; deleting the envelopes removes the live
  * copies of the wrapped keys (backups keep them until their retention ends, L-12).
  *
- * It stays fail-safe: a room becomes DELETED only when no envelope or secret row is left in it,
+ * It stays fail-safe: a room becomes DELETED only when no envelope and no ACTIVE secret is left in it,
  * every file is a tombstone whose storage object is gone (Phase 7: the file cleanup tombstones the
  * files of DELETING rooms and deletes their objects first, file-cleanup.ts), and every note is a
  * tombstone without ciphertext or wrapped NEK (Phase 8, note-cleanup.ts, which runs first). The
- * tombstone rows stay for audit (data-model 5). Secrets arrive in Phase 9 with their own cleanup
- * step; until then such a room stays DELETING and inaccessible rather than becoming DELETED with
+ * tombstone rows stay for audit (data-model 5). Since Phase 9 every secret must have left ACTIVE
+ * (secret-store.ts runSecretCleanup, which runs first, revokes them and removes their payload and
+ * wrapped SEK); a room with an ACTIVE secret stays DELETING rather than becoming DELETED with
  * ciphertext left behind.
  */
 export async function runRoomCleanup(prisma: PrismaClient): Promise<{
@@ -44,7 +45,8 @@ export async function runRoomCleanup(prisma: PrismaClient): Promise<{
           envelopes: { none: {} },
           files: { none: { OR: [{ status: { not: 'DELETED' } }, { objectDeletedAt: null }] } },
           notes: { none: { deletedAt: null } },
-          secrets: { none: {} },
+          // Phase 9: the secret cleanup runs first and leaves only tombstones without material.
+          secrets: { none: { status: 'ACTIVE' } },
         },
         data: { status: 'DELETED' },
       });

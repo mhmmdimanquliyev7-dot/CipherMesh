@@ -1,4 +1,5 @@
 import {
+  authenticateSecretRecipient,
   computeSafetyCode,
   CryptoErrorCode,
   createInitialRoomKey,
@@ -15,6 +16,7 @@ import {
   type OpenedRoomKey,
   type RoomKeyBundle,
   type SafetyCode,
+  type SecretRecipient,
   type UnlockedVault,
   type VerifiedIdentity,
 } from '@ciphermesh/crypto';
@@ -206,6 +208,38 @@ class RoomKeys {
         ...invitationKeysToWire(keys),
       });
       return created.invitation;
+    });
+  }
+
+  /**
+   * Authenticates the member a secret is for (Phase 9, CM-T043): the member's current identity,
+   * with the member's own signed grant chain, must be named by the room's verified statements for
+   * this client (ADR-015 section 4). The server's word about the member's key is never enough; a
+   * key it substituted is refused before anything is wrapped to it (T-25).
+   */
+  async secretRecipient(roomId: string, memberId: string): Promise<SecretRecipient> {
+    return vaultController.withUnlockedVault(async (vault) => {
+      const [member, material, envelopes] = await Promise.all([
+        api('GET', `/rooms/${roomId}/members/${memberId}/identity`, memberIdentityResponseSchema),
+        api('GET', `/rooms/${roomId}/key-versions`, keyVersionsResponseSchema),
+        api('GET', `/rooms/${roomId}/envelopes`, envelopesResponseSchema),
+      ]);
+      const bundles = roomKeyBundlesFromWire(
+        roomId,
+        { userId: vault.identity.userId, keyId: vault.identity.keyId },
+        {
+          ...material,
+          grants: [...material.grants, ...member.authority.grants],
+          identities: [...material.identities, ...member.authority.identities],
+        },
+        envelopes.envelopes,
+      );
+      const newest = bundles.at(-1);
+      if (newest === undefined) throw new RoomKeyMissing();
+      // Chain the newest version to the previous one when this tab verified it (as open() does).
+      const previous = this.version(roomId, newest.keyVersion.keyVersion - 1);
+      const bundle = previous === undefined ? newest : { ...newest, verifiedPreviousCommitment: previous.commitment };
+      return authenticateSecretRecipient(vault, bundle, publicIdentityFromWire(member.identity, member.userId));
     });
   }
 

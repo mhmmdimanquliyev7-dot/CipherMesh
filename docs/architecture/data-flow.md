@@ -382,6 +382,12 @@ Security notes:
 - Secrets cannot be created while the room is write-locked for a rekey (409 `REKEY_REQUIRED`).
 - Database backups keep the ciphertext and the wrapped SEK until their retention expires. They stay protected by the recipient's key (limitation L-12).
 
+Implemented in Phase 9 (CM-T043, CM-T044) with this shape:
+- Before step 3 the sender's browser fetches the recipient's identity with the recipient's own grant chain (`GET /api/rooms/{roomId}/members/{userId}/identity`) and the room's statements, and wraps only to a key those verified statements name for that member (CD-32, T-25). Step 6 also requires the recipient to differ from the sender, a lifetime of at least 5 minutes (CP-29) and at most the PC-09 maximum, and the sender's ACTIVE-secret limit (D-09-04). The audit events of steps 8 and 13 go to the redacted security-event log until the Phase 12 chain exists (INV-09).
+- The list (step 9) is `GET /api/rooms/{roomId}/secrets` (AZ-32, OL-14): metadata only. The reveal body is the empty JSON object. A refused reveal (`SECRET_UNAVAILABLE`: already revealed, expired, revoked, or the recipient's key changed) changes nothing; a caller who is not the recipient gets 404 before any row is touched.
+- Revocation is `POST /api/rooms/{roomId}/secrets/{secretId}/revoke` (AZ-25). Removing or suspending the recipient and a vault reset of the recipient revoke their ACTIVE secrets in the same transaction (D-09-06). The worker marks expired secrets EXPIRED and revokes the secrets of rooms being deleted, both with the material removed.
+- A secret without burn-after-reading (allowed outside RESTRICTED rooms, PC-10) is returned on every reveal until it expires or is revoked (D-09-02).
+
 ## DF-10 Member removal and rekey
 
 Removal and rekey are separate steps joined by a write lock ([ADR-013](adr/ADR-013-rekey-state-machine.md)). In the usual case the admin's browser runs all three requests back to back, so the lock lasts seconds.
