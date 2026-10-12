@@ -1,4 +1,4 @@
-import { ErrorCode } from '@ciphermesh/shared';
+import { auditLevelIncludes, ErrorCode } from '@ciphermesh/shared';
 import type { SecurityEventSink } from '../auth/security-events';
 import type { Actor, RequestMeta } from '../auth/sessions';
 import type { RoomAccess } from '../authorization/rooms';
@@ -57,8 +57,19 @@ export function createRoomKeyService(deps: RoomKeyServiceDependencies) {
     },
 
     /** AZ-12, OL-05: the caller's own ACTIVE envelopes; PENDING envelopes are never served. */
-    ownEnvelopes(actor: Actor, access: RoomAccess): Promise<EnvelopeRecord[]> {
-      return store.listOwnEnvelopes(access.roomId, actor.userId);
+    async ownEnvelopes(actor: Actor, access: RoomAccess, meta: RequestMeta): Promise<EnvelopeRecord[]> {
+      const envelopes = await store.listOwnEnvelopes(access.roomId, actor.userId);
+      // PC-13: envelope fetches are recorded at the FULL audit level (versions and count only).
+      if (auditLevelIncludes(access.policy.auditLevel, 'FULL')) {
+        events.record({
+          name: 'ENVELOPES_FETCHED',
+          outcome: 'SUCCESS',
+          actorUserId: actor.userId,
+          requestId: meta.requestId,
+          details: { roomId: access.roomId, count: envelopes.length },
+        });
+      }
+      return envelopes;
     },
 
     /**

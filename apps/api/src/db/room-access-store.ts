@@ -28,6 +28,8 @@ export interface RoomMembershipRecord {
     readonly status: RoomStatus;
     readonly keyState: RoomKeyState;
     readonly securityProfile: SecurityProfile;
+    /** The catalogue version the room is governed by (CM-T046); resolved by the policy gates. */
+    readonly policyVersion: number;
   };
 }
 
@@ -45,7 +47,7 @@ export function createRoomAccessStore(db: Db) {
           userId: true,
           role: true,
           status: true,
-          room: { select: { status: true, keyState: true, securityProfile: true } },
+          room: { select: { status: true, keyState: true, securityProfile: true, policyVersion: true } },
         },
       });
       if (row === null) return null;
@@ -55,7 +57,12 @@ export function createRoomAccessStore(db: Db) {
         userId: row.userId,
         role: row.role,
         status: row.status,
-        room: { status: row.room.status, keyState: row.room.keyState, securityProfile: row.room.securityProfile },
+        room: {
+          status: row.room.status,
+          keyState: row.room.keyState,
+          securityProfile: row.room.securityProfile,
+          policyVersion: row.room.policyVersion,
+        },
       };
     },
 

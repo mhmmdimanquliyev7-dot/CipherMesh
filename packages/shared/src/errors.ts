@@ -98,6 +98,14 @@ export const ErrorCode = {
    * revoked, or the recipient's identity key changed since it was sent. Nothing was released.
    */
   SECRET_UNAVAILABLE: 'SECRET_UNAVAILABLE',
+  // Security policies (Phase 10, CM-T046 to CM-T048).
+  /**
+   * The room's stored policy version is not one this server can evaluate. The room is refused
+   * rather than served under another version or a weaker profile (fail closed).
+   */
+  POLICY_UNSUPPORTED: 'POLICY_UNSUPPORTED',
+  /** A profile change named a current profile that is no longer the stored one (stale request). */
+  PROFILE_CHANGED: 'PROFILE_CHANGED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

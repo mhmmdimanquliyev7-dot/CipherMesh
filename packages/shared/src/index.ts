@@ -5,6 +5,7 @@ export * from './files';
 export * from './http';
 export * from './identifiers';
 export * from './notes';
+export * from './policy';
 export * from './product';
 export * from './rooms';
 export * from './secrets';

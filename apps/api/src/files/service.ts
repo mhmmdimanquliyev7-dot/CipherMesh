@@ -3,12 +3,13 @@ import {
   ErrorCode,
   FILE_LIMITS,
   FILE_QUOTAS,
-  FILE_RULES,
+  auditLevelIncludes,
   type RoomActionId,
   type RoomResourceFacts,
 } from '@ciphermesh/shared';
 import type { SecurityEventSink } from '../auth/security-events';
 import type { Actor, RequestMeta } from '../auth/sessions';
+import { policyOf, reapplyRoomPolicy } from '../authorization/policy';
 import { reauthorizeRoomAction, roomDenial, type RoomAccess } from '../authorization/rooms';
 import { FileIdUnavailableError, type FileRecord } from '../db/file-store';
 import type { ListPosition, LockedMembership, LockedRoom, RoomStore } from '../db/room-store';
@@ -90,7 +91,10 @@ const CANCEL_ERROR: Readonly<Record<CancelReason, () => HttpError>> = {
 export function createFileService(deps: FileServiceDependencies) {
   const { store, transaction, storage, events, clock } = deps;
 
-  /** Locks the room and the actor's membership (in that order) and decides again on that state. */
+  /**
+   * Locks the room and the actor's membership (in that order) and decides again on that state:
+   * the matrix, then the room's policy gates on the locked profile (PC-01, PC-02; CM-T047).
+   */
   async function lockAndReauthorize(
     tx: RoomStore,
     actor: Actor,
@@ -116,12 +120,13 @@ export function createFileService(deps: FileServiceDependencies) {
       ...(facts === undefined ? {} : { resource: facts }),
     });
     if (room === null || member === null) throw notFound();
+    reapplyRoomPolicy(events, { ...request, action }, actor, room, clock(), false);
     return { room, member };
   }
 
   /** PC-12: VIEWERs in RESTRICTED rooms never obtain file key material or ciphertext. */
   function mayObtainKeyMaterial(access: RoomAccess): boolean {
-    return access.role !== 'VIEWER' || FILE_RULES[access.room.securityProfile].viewerMayDownload;
+    return access.role !== 'VIEWER' || access.policy.viewerMayObtainFileKeys;
   }
 
   function requireKeyMaterialAccess(actor: Actor, access: RoomAccess, meta: RequestMeta): void {
@@ -138,15 +143,15 @@ export function createFileService(deps: FileServiceDependencies) {
 
   /** PC-08: the expiry the profile requires and allows, measured from now. */
   function checkExpiry(room: LockedRoom, expiresAt: Date | null, now: Date): void {
-    const rules = FILE_RULES[room.securityProfile];
+    const rules = policyOf(room).contentExpiry;
     const refuse = (): HttpError =>
       new HttpError(422, ErrorCode.EXPIRY_NOT_ALLOWED, 'The expiry is missing or outside what this room allows');
     if (expiresAt === null) {
-      if (rules.expiryRequired) throw refuse();
+      if (rules.required) throw refuse();
       return;
     }
     if (expiresAt.getTime() <= now.getTime()) throw refuse();
-    if (rules.maxExpiryMs !== null && expiresAt.getTime() > now.getTime() + rules.maxExpiryMs) throw refuse();
+    if (rules.maxMs !== null && expiresAt.getTime() > now.getTime() + rules.maxMs) throw refuse();
   }
 
   function decode(value: string): Uint8Array {
@@ -343,7 +348,7 @@ export function createFileService(deps: FileServiceDependencies) {
         throw storageUnavailable();
       }
       // PC-13: download-URL issuance is recorded at the EXTENDED and FULL audit levels.
-      if (FILE_RULES[access.room.securityProfile].auditDownloadUrls) {
+      if (auditLevelIncludes(access.policy.auditLevel, 'EXTENDED')) {
         record('FILE_DOWNLOAD_ISSUED', actor, meta, { roomId: access.roomId, fileId });
       }
       return download;

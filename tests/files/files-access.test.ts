@@ -190,6 +190,9 @@ describe('PC-12: VIEWERs in RESTRICTED rooms obtain no key material or ciphertex
     expect(errorCode(await restrictedViewer.browser.request('GET', `/rooms/${room}/files/${fileId}`))).toBe(
       'FORBIDDEN',
     );
+    // A download URL is also a PC-03 sensitive operation, checked first (evaluation order step 5):
+    // with a fresh step-up the VIEWER still gets the PC-12 refusal.
+    await stepUp(api, restrictedViewer, restrictedViewer.secret);
     expect(
       errorCode(await restrictedViewer.browser.request('POST', `/rooms/${room}/files/${fileId}/download-url`, {})),
     ).toBe('FORBIDDEN');

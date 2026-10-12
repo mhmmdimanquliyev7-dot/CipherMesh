@@ -64,6 +64,17 @@ export const roomCreateRequestSchema = z.strictObject({
 export const roomRenameRequestSchema = z.strictObject({ name: roomNameSchema });
 
 /**
+ * AZ-03 (CM-T048). `securityProfile` is the profile to change to. `expectedProfile` is the profile
+ * the client believes the room has: a precondition only, compared with the locked room row, so a
+ * stale request is refused (409 PROFILE_CHANGED). Whether the change is an upgrade or a downgrade,
+ * and which rules apply, is decided from the stored profile, never from either field.
+ */
+export const profileChangeRequestSchema = z.strictObject({
+  securityProfile: securityProfileSchema,
+  expectedProfile: securityProfileSchema,
+});
+
+/**
  * OWNER is not assignable: ownership changes only through a transfer (AZ-05). Granting ADMIN
  * carries the OWNER's signed membership grant for the member's identity key (ADR-015 section 4);
  * other roles carry none.
@@ -101,6 +112,8 @@ export const roomDetailResponseSchema = z.strictObject({
     id: uuidV4Schema,
     name: z.string(),
     securityProfile: securityProfileSchema,
+    /** The policy catalogue version the room is governed by (CM-T046). */
+    policyVersion: z.number().int().min(1),
     keyState: keyStateSchema,
     createdAt: isoTimestampSchema,
     updatedAt: isoTimestampSchema,
@@ -130,6 +143,13 @@ export const roomRenamedResponseSchema = z.strictObject({
 });
 
 export const roomDeletedResponseSchema = z.strictObject({ status: z.literal('deleting') });
+
+/** The stored result of a profile change; `change` is UNCHANGED when the room already had it. */
+export const profileChangedResponseSchema = z.strictObject({
+  securityProfile: securityProfileSchema,
+  policyVersion: z.number().int().min(1),
+  change: z.enum(['UPGRADE', 'DOWNGRADE', 'UNCHANGED']),
+});
 
 export const memberRoleChangedResponseSchema = z.strictObject({ userId: uuidV4Schema, role: roomRoleSchema });
 

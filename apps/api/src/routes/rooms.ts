@@ -26,6 +26,8 @@ import {
   ownershipTransferredResponseSchema,
   ownershipTransferRequestSchema,
   parseListCursor,
+  profileChangedResponseSchema,
+  profileChangeRequestSchema,
   recordedResponseSchema,
   roomInvitationListResponseSchema,
   roomCreateRequestSchema,
@@ -166,6 +168,7 @@ export function roomRoutes(
               id: room.id,
               name: room.name,
               securityProfile: room.securityProfile,
+              policyVersion: room.policyVersion,
               keyState: room.keyState,
               createdAt: iso(room.createdAt),
               updatedAt: iso(room.updatedAt),
@@ -186,7 +189,7 @@ export function roomRoutes(
       response: memberListResponseSchema,
       handler: async (ctx) => {
         const after = ctx.query.cursor === undefined ? undefined : parseListCursor(ctx.query.cursor);
-        const items = await rooms.listMembers(actorOf(ctx), roomOf(ctx), after, MEMBER_LIST_PAGE_SIZE + 1);
+        const items = await rooms.listMembers(actorOf(ctx), roomOf(ctx), after, MEMBER_LIST_PAGE_SIZE + 1, ctx.request);
         const { visible, nextCursor } = page(items, MEMBER_LIST_PAGE_SIZE, (m) => ({ at: m.joinedAt, id: m.userId }));
         return {
           status: 200,
@@ -219,9 +222,26 @@ export function roomRoutes(
     }),
     defineRoute({
       method: 'POST',
+      path: '/rooms/:roomId/profile',
+      action: 'AZ-03-PROFILE-CHANGE',
+      // PC-03 applies under the room's current profile here; the service adds the rules of the
+      // change itself (new access requirements on an upgrade, a 5-minute step-up on a downgrade)
+      // on the locked room row (CM-T048).
+      access: { kind: 'room', requires: { sensitive: 'CHANGE_PROFILE' } },
+      params: roomParamsSchema,
+      query: emptyQuerySchema,
+      body: profileChangeRequestSchema,
+      response: profileChangedResponseSchema,
+      handler: async (ctx) => {
+        const changed = await rooms.changeProfile(actorOf(ctx), roomOf(ctx), ctx.body, ctx.request);
+        return { status: 200, body: changed };
+      },
+    }),
+    defineRoute({
+      method: 'POST',
       path: '/rooms/:roomId/delete',
       action: 'AZ-04-ROOM-DELETE',
-      access: { kind: 'room', requires: { stepUp: 'standard' } },
+      access: { kind: 'room', requires: { stepUp: 'standard', sensitive: 'DELETE_ROOM' } },
       params: roomParamsSchema,
       query: emptyQuerySchema,
       body: emptyBodySchema,
@@ -259,7 +279,11 @@ export function roomRoutes(
       method: 'POST',
       path: '/rooms/:roomId/members/:userId/remove',
       action: 'AZ-09-MEMBER-REMOVE',
-      access: { kind: 'room', resource: ({ room, params }) => currentTarget(room.roomId, params.userId) },
+      access: {
+        kind: 'room',
+        requires: { sensitive: 'REMOVE_MEMBER' },
+        resource: ({ room, params }) => currentTarget(room.roomId, params.userId),
+      },
       params: roomMemberParamsSchema,
       query: emptyQuerySchema,
       body: emptyBodySchema,
@@ -354,7 +378,7 @@ export function roomRoutes(
       handler: async (ctx) => ({
         status: 200,
         body: {
-          envelopes: (await keys.ownEnvelopes(actorOf(ctx), roomOf(ctx))).map((e) => ({
+          envelopes: (await keys.ownEnvelopes(actorOf(ctx), roomOf(ctx), ctx.request)).map((e) => ({
             keyVersion: e.keyVersion,
             recipientKeyId: e.recipientKeyId,
             wrappedKey: b64(e.wrappedKey),
@@ -454,6 +478,7 @@ export function roomRoutes(
       action: 'AZ-06-INVITATION-CREATE',
       access: {
         kind: 'room',
+        requires: { sensitive: 'INVITE' },
         // The requested role is what the cell restricts (ADMINs invite only MEMBER or VIEWER).
         resource: ({ room, body }) => Promise.resolve({ roomId: room.roomId, roles: [body.role] }),
       },
@@ -474,7 +499,7 @@ export function roomRoutes(
       method: 'POST',
       path: '/rooms/:roomId/invitations/:invitationId/approve',
       action: 'AZ-07-INVITATION-APPROVE',
-      access: { kind: 'room' },
+      access: { kind: 'room', requires: { sensitive: 'APPROVE_INVITATION' } },
       params: invitationParamsSchema,
       query: emptyQuerySchema,
       body: emptyBodySchema,

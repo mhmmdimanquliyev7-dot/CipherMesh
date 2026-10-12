@@ -2,13 +2,13 @@ import { fromBase64Url } from '@ciphermesh/crypto/identity';
 import {
   ErrorCode,
   SECRET_LIMITS,
-  SECRET_RULES,
   type RoomActionId,
   type RoomResourceFacts,
   type SecretStatus,
 } from '@ciphermesh/shared';
 import type { SecurityEventSink } from '../auth/security-events';
 import type { Actor, RequestMeta } from '../auth/sessions';
+import { policyOf, reapplyRoomPolicy } from '../authorization/policy';
 import { reauthorizeRoomAction, roomDenial, type RoomAccess } from '../authorization/rooms';
 import type { ListPosition, LockedRoom, RoomStore } from '../db/room-store';
 import {
@@ -103,7 +103,11 @@ export function viewOf(secret: SecretMetadata, now: Date): SecretView {
 export function createSecretService(deps: SecretServiceDependencies) {
   const { store, transaction, events, clock } = deps;
 
-  /** Locks the room and the actor's membership (in that order) and decides again on that state. */
+  /**
+   * Locks the room and the actor's membership (in that order) and decides again on that state:
+   * the matrix, then the room's policy gates on the locked profile (PC-01, PC-02, and PC-03 for a
+   * reveal; CM-T047). A refusal throws before the reveal's destroying UPDATE, so it burns nothing.
+   */
   async function lockAndReauthorize(
     tx: RoomStore,
     actor: Actor,
@@ -129,12 +133,13 @@ export function createSecretService(deps: SecretServiceDependencies) {
       ...(facts === undefined ? {} : { resource: facts }),
     });
     if (room === null || member === null) throw notFound();
+    reapplyRoomPolicy(events, { ...request, action }, actor, room, clock(), action === 'AZ-24');
     return room;
   }
 
   /** PC-09 and D-09-03: a required expiry, at least the minimum and at most the profile's maximum. */
   function checkExpiry(room: LockedRoom, expiresAt: Date, now: Date): void {
-    const { maxLifetimeMs } = SECRET_RULES[room.securityProfile];
+    const { maxLifetimeMs } = policyOf(room).secrets;
     const lifetime = expiresAt.getTime() - now.getTime();
     if (!Number.isFinite(lifetime) || lifetime < SECRET_LIMITS.minLifetimeMs || lifetime > maxLifetimeMs) {
       throw new HttpError(422, ErrorCode.EXPIRY_NOT_ALLOWED, 'The expiry is outside what this room allows');
@@ -215,7 +220,7 @@ export function createSecretService(deps: SecretServiceDependencies) {
         if (recipient === null || recipient.status !== 'ACTIVE') throw recipientInvalid();
         if (!(await tx.lockActiveIdentity(input.recipientUserId, input.recipientKeyId))) throw recipientInvalid();
         checkExpiry(room, expiresAt, now);
-        if (SECRET_RULES[room.securityProfile].burnMandatory && !input.burnAfterReading) {
+        if (policyOf(room).secrets.burnMandatory && !input.burnAfterReading) {
           throw new HttpError(422, ErrorCode.BURN_REQUIRED, 'Burn-after-reading is mandatory in this room');
         }
         if (await tx.secretIdUsed(input.secretId)) throw new SecretIdUnavailableError();

@@ -1,6 +1,6 @@
 'use client';
 
-import { NOTE_RULES, roomRuleFor, type RoomRole, type SecurityProfile } from '@ciphermesh/shared';
+import { roomRuleFor, type ProfilePolicy, type RoomRole } from '@ciphermesh/shared';
 import type { RoomMember } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
@@ -42,15 +42,15 @@ const notOpen = (): boolean => false;
 const formatDate = (iso: string | null): string => (iso === null ? 'Never' : new Date(iso).toLocaleString());
 
 /** Expiry choices the profile allows (PC-08), with its default first. */
-function expiryChoices(profile: SecurityProfile): { readonly label: string; readonly days: number | null }[] {
-  const rules = NOTE_RULES[profile];
-  const days = [1, 7, 30, 90].filter((d) => rules.maxExpiryMs === null || d * DAY <= rules.maxExpiryMs);
+function expiryChoices(policy: ProfilePolicy): { readonly label: string; readonly days: number | null }[] {
+  const rules = policy.contentExpiry;
+  const days = [1, 7, 30, 90].filter((d) => rules.maxMs === null || d * DAY <= rules.maxMs);
   const choices: { label: string; days: number | null }[] = days.map((d) => ({
     label: d === 1 ? '1 day' : `${String(d)} days`,
     days: d,
   }));
-  if (!rules.expiryRequired) choices.unshift({ label: 'No expiry', days: null });
-  const preferred = rules.defaultExpiryMs === null ? null : rules.defaultExpiryMs / DAY;
+  if (!rules.required) choices.unshift({ label: 'No expiry', days: null });
+  const preferred = rules.defaultMs === null ? null : rules.defaultMs / DAY;
   return [...choices].sort((a, b) => (a.days === preferred ? -1 : b.days === preferred ? 1 : 0));
 }
 
@@ -128,14 +128,15 @@ type Editing = { readonly noteId: string; readonly baseRevision: number; title: 
 export function NotePanel({
   roomId,
   role,
-  profile,
+  policy,
   keyState,
   selfId,
   members,
 }: {
   readonly roomId: string;
   readonly role: RoomRole;
-  readonly profile: SecurityProfile;
+  /** The room's policy, resolved from its stored profile and version (CM-T046). */
+  readonly policy: ProfilePolicy;
   readonly keyState: string;
   readonly selfId: string;
   readonly members: readonly RoomMember[];
@@ -350,7 +351,7 @@ export function NotePanel({
                 data-testid="note-expiry"
                 className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
               >
-                {expiryChoices(profile).map((choice) => (
+                {expiryChoices(policy).map((choice) => (
                   <option key={choice.label} value={choice.days === null ? '' : String(choice.days)}>
                     {choice.label}
                   </option>

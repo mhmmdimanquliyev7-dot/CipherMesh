@@ -1,6 +1,6 @@
 'use client';
 
-import { INVITATION_RULES, type RoomRole, type SecurityProfile } from '@ciphermesh/shared';
+import type { ProfilePolicy, RoomRole } from '@ciphermesh/shared';
 import {
   invitationApprovedResponseSchema,
   invitationClosedResponseSchema,
@@ -27,19 +27,20 @@ type Act = (action: () => Promise<void>, stepUpReason: string, done?: string) =>
 export function InviteCard({
   roomId,
   role,
-  profile,
+  policy,
   onAction,
 }: {
   readonly roomId: string;
   readonly role: RoomRole;
-  readonly profile: SecurityProfile;
+  /** The room's policy, resolved from its stored profile and version (CM-T046). */
+  readonly policy: ProfilePolicy;
   readonly onAction: Act;
 }) {
   const [found, setFound] = useState<DirectoryResult | undefined>();
   const [lookupError, setLookupError] = useState<string | undefined>();
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const rules = INVITATION_RULES[profile];
+  const rules = policy.invitations;
   const roles = (['ADMIN', 'MEMBER', 'VIEWER'] as const).filter((r) => mayAttempt('AZ-06', role, [r]));
 
   async function onLookup(event: SyntheticEvent<HTMLFormElement>) {

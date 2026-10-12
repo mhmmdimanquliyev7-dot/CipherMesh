@@ -72,6 +72,8 @@ describe('route inventory', () => {
       'GET /rooms/:roomId AZ-01-ROOM-READ',
       'GET /rooms/:roomId/members AZ-01-MEMBER-LIST',
       'POST /rooms/:roomId/rename AZ-02-ROOM-RENAME',
+      // Phase 10 (CM-T048): the OWNER changes the room's security profile.
+      'POST /rooms/:roomId/profile AZ-03-PROFILE-CHANGE',
       'POST /rooms/:roomId/delete AZ-04-ROOM-DELETE',
       'POST /rooms/:roomId/members/:userId/role AZ-10-MEMBER-ROLE',
       'POST /rooms/:roomId/members/:userId/remove AZ-09-MEMBER-REMOVE',
@@ -104,6 +106,27 @@ describe('route inventory', () => {
       'POST /rooms/:roomId/secrets/:secretId/reveal AZ-24-SECRET-REVEAL',
       'POST /rooms/:roomId/secrets/:secretId/revoke AZ-25-SECRET-REVOKE',
     ]);
+  });
+
+  it('declares the PC-03 sensitive operations on exactly the reviewed routes (CM-T047)', () => {
+    const { routes } = productionApp();
+    const sensitive = routes
+      .filter((r) => r.sensitive !== undefined)
+      .map((r) => `${r.method} ${r.path} ${String(r.sensitive)}`);
+    // security-policy-profiles.md PC-03: reveal secret, file download URL, invite, approve,
+    // remove member, start a rekey (no route before Phase 11), change profile, delete room.
+    expect(sensitive.sort()).toEqual(
+      [
+        'POST /rooms/:roomId/secrets/:secretId/reveal SECRET_REVEAL',
+        'POST /rooms/:roomId/files/:fileId/download-url FILE_DOWNLOAD_URL',
+        'POST /rooms/:roomId/invitations INVITE',
+        'POST /rooms/:roomId/invitations/:invitationId/approve APPROVE_INVITATION',
+        'POST /rooms/:roomId/members/:userId/remove REMOVE_MEMBER',
+        'POST /rooms/:roomId/profile CHANGE_PROFILE',
+        'POST /rooms/:roomId/delete DELETE_ROOM',
+      ].sort(),
+    );
+    expect(routes.filter((r) => r.sensitive !== undefined).every((r) => r.access === 'room')).toBe(true);
   });
 
   it('the allowlists contain exactly the reviewed public routes', () => {

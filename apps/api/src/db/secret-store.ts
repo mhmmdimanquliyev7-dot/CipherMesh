@@ -118,7 +118,7 @@ const fromRow = (row: SecretRow): SecretMetadata => ({
  * The destruction write: material removed (crypto-shredding of the live copy), destroyed_at set.
  * Conditional on ACTIVE wherever it is used.
  */
-const destroyed = (status: 'EXPIRED' | 'REVOKED', now: Date) => ({
+export const destroyed = (status: 'EXPIRED' | 'REVOKED', now: Date) => ({
   status,
   wrappedSek: null,
   payloadCiphertext: null,

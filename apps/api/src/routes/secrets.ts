@@ -107,7 +107,7 @@ export function secretRoutes(secrets: SecretService, store: RoomStore): readonly
       method: 'POST',
       path: '/rooms/:roomId/secrets/:secretId/reveal',
       action: 'AZ-24-SECRET-REVEAL',
-      access: { kind: 'room', resource: recipientResource },
+      access: { kind: 'room', requires: { sensitive: 'SECRET_REVEAL' }, resource: recipientResource },
       params: secretParamsSchema,
       query: emptyQuerySchema,
       body: emptyBodySchema,

@@ -1,15 +1,11 @@
-import type { SecurityProfile } from './rooms';
-
 /**
  * Encrypted files (Phase 7, CM-T037 to CM-T041). Constants shared by the API and the web client.
- * Every value comes from the parameter register (docs/crypto/crypto-decisions.md) or from the
- * profile table (docs/security/security-policy-profiles.md); tests compare them with both
- * documents, so code and documentation cannot drift apart before the versioned policy catalogue
- * (CM-T046) takes over.
+ * Every value comes from the parameter register (docs/crypto/crypto-decisions.md); tests compare
+ * them with it. The profile rules for files (PC-08, PC-12, PC-13) are in the versioned policy
+ * catalogue (./policy.ts, CM-T046).
  */
 
 const MINUTE = 60_000;
-const DAY = 24 * 60 * MINUTE;
 const MIB = 1024 * 1024;
 
 /** AES-GCM tag length; a file's ciphertext is its plaintext length plus this (CP-01). */
@@ -56,47 +52,6 @@ export const FILE_QUOTAS = Object.freeze({
 
 /** Largest page of a room's file list (OL-08). */
 export const FILE_LIST_PAGE_SIZE = 50;
-
-/**
- * File rules of each profile, from the table in security-policy-profiles.md:
- *   PC-08  whether an expiry is required, its maximum and the default the client proposes;
- *   PC-12  whether a VIEWER may obtain file key material and ciphertext (download);
- *   PC-13  whether issuing a download URL is an audit event (EXTENDED and FULL levels).
- */
-export const FILE_RULES: Readonly<
-  Record<
-    SecurityProfile,
-    {
-      readonly expiryRequired: boolean;
-      readonly maxExpiryMs: number | null;
-      readonly defaultExpiryMs: number | null;
-      readonly viewerMayDownload: boolean;
-      readonly auditDownloadUrls: boolean;
-    }
-  >
-> = Object.freeze({
-  STANDARD: Object.freeze({
-    expiryRequired: false,
-    maxExpiryMs: null,
-    defaultExpiryMs: null,
-    viewerMayDownload: true,
-    auditDownloadUrls: false,
-  }),
-  CONFIDENTIAL: Object.freeze({
-    expiryRequired: true,
-    maxExpiryMs: 90 * DAY,
-    defaultExpiryMs: 30 * DAY,
-    viewerMayDownload: true,
-    auditDownloadUrls: true,
-  }),
-  RESTRICTED: Object.freeze({
-    expiryRequired: true,
-    maxExpiryMs: 30 * DAY,
-    defaultExpiryMs: 7 * DAY,
-    viewerMayDownload: false,
-    auditDownloadUrls: true,
-  }),
-});
 
 /**
  * Image types a member may preview in the page after decryption (CM-T041, T-11): raster formats
