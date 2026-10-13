@@ -365,28 +365,47 @@ export function createVaultService(deps: VaultDependencies) {
      * the current session is rotated (session-and-csrf.md section 4). All in one transaction.
      * Since Phase 6 (CM-T034) the same transaction revokes the open invitations addressed to the
      * old identity and deletes their PENDING envelopes: they name a key that no longer exists, so
-     * they could never be opened. Deleting the old identity's ACTIVE envelopes and re-sharing to
-     * the new identity belong to the identity-reset procedure of Phase 11 (CM-T053, AZ-14).
-     * Since Phase 9 it also revokes the ACTIVE secrets wrapped to the old identity (D-09-06).
+     * they could never be opened. Since Phase 9 it also revokes the ACTIVE secrets wrapped to the
+     * old identity (D-09-06). Since Phase 11 (CM-T053) it deletes every envelope wrapped to the old
+     * identity, advances the epoch of each of the user's rooms and, when the user reports the old
+     * key or device as compromised, sets every one of those rooms to REKEY_REQUIRED (R5).
+     * Re-sharing to the new identity is AZ-14 (rooms/rekey.ts).
      */
-    async resetVault(actor: Actor, supersedesKeyId: string, wire: VaultWire, meta: RequestMeta) {
+    async resetVault(
+      actor: Actor,
+      supersedesKeyId: string,
+      wire: VaultWire,
+      meta: RequestMeta,
+      identityCompromised = false,
+    ) {
       limit(limits.write, actor.userId);
       const record = decodeVault(actor, meta, wire);
       await verifyUploadedIdentity(actor, meta, record.identity);
       const now = clock();
       // Any thrown error rolls the whole transaction back: no half-reset identity can remain.
-      const outcome = await deps.transaction(async ({ vault, auth, invitations, secrets }) => {
+      const outcome = await deps.transaction(async ({ vault, auth, invitations, secrets, rooms }) => {
         // Locks the old identity row first: an invitation acceptance or creation that holds it
         // finishes first (and its invitation is then no longer open), or waits and is refused.
         if (!(await vault.supersede(actor.userId, supersedesKeyId, now))) return undefined;
         const invalidated = await invitations.invalidateInvitationsForKey(actor.userId, supersedesKeyId);
         // Phase 9 (D-09-06): secrets wrapped to the retired key could never be opened again.
         const revokedSecrets = await secrets.revokeSecretsToKey(actor.userId, supersedesKeyId, now);
+        // Phase 11 (CM-T053): the old key's envelopes go, each room's epoch advances (a rekey
+        // snapshot naming the old key becomes STALE), and with the compromise flag every room of
+        // the user needs a rekey (R5). The new identity gets room keys only through a re-share by an
+        // OWNER or ADMIN (AZ-14) or the next rekey, which includes it automatically.
+        const roomsAffected = await rooms.replaceMemberIdentity(
+          actor.userId,
+          supersedesKeyId,
+          identityCompromised,
+          now,
+        );
+        const staled = rooms.takeStaledOperations();
         if ((await vault.insertIdentity(identityRow(record, now))) === 'CONFLICT') throw conflict();
         const otherSessionsRevoked = await auth.revokeUserSessions(actor.userId, 'VAULT_RESET', now, actor.sessionId);
         const session: IssuedSession | undefined = await rotateSession(auth, actor, now);
         if (session === undefined) throw new HttpError(401, ErrorCode.UNAUTHENTICATED, 'Authentication required');
-        return { otherSessionsRevoked, session, invalidated, revokedSecrets };
+        return { otherSessionsRevoked, session, invalidated, revokedSecrets, roomsAffected, staled };
       });
       if (outcome === undefined) throw conflict();
       for (const invitation of outcome.invalidated) {
@@ -407,6 +426,39 @@ export function createVaultService(deps: VaultDependencies) {
           details: { roomId: secret.roomId, secretId: secret.id, reason: 'RECIPIENT_KEY_CHANGED' },
         });
       }
+      for (const room of outcome.roomsAffected) {
+        // Shown to the room's administrators: an unexpected identity change can be substitution (T-25).
+        events.record({
+          name: 'MEMBER_IDENTITY_REPLACED',
+          outcome: 'SUCCESS',
+          actorUserId: actor.userId,
+          requestId: meta.requestId,
+          details: { roomId: room.roomId, compromised: identityCompromised },
+        });
+        if (room.rekeyNewlyRequired) {
+          events.record({
+            name: 'REKEY_REQUIRED',
+            outcome: 'SUCCESS',
+            actorUserId: actor.userId,
+            requestId: meta.requestId,
+            details: { roomId: room.roomId, reason: 'IDENTITY_KEY_COMPROMISED' },
+          });
+        }
+      }
+      for (const stale of outcome.staled) {
+        events.record({
+          name: 'REKEY_STALE',
+          outcome: 'SUCCESS',
+          actorUserId: actor.userId,
+          requestId: meta.requestId,
+          details: {
+            roomId: stale.roomId,
+            operationId: stale.operationId,
+            mode: stale.mode,
+            reason: 'MEMBERSHIP_CHANGED',
+          },
+        });
+      }
       events.record({
         name: 'VAULT_RESET',
         outcome: 'SUCCESS',
@@ -416,6 +468,8 @@ export function createVaultService(deps: VaultDependencies) {
           supersededKeyId: supersedesKeyId,
           keyId: record.identity.keyId,
           otherSessionsRevoked: outcome.otherSessionsRevoked,
+          identityCompromised,
+          rooms: outcome.roomsAffected.length,
         },
       });
       return {

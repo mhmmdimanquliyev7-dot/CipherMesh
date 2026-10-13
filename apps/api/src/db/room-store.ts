@@ -13,6 +13,7 @@ import { fileStoreFunctions } from './file-store';
 import { invitationStoreFunctions } from './invitation-store';
 import { noteStoreFunctions } from './note-store';
 import { policyStoreFunctions } from './policy-store';
+import { rekeyStoreFunctions } from './rekey-store';
 import { roomKeyStoreFunctions } from './room-key-store';
 import { secretStoreFunctions } from './secret-store';
 
@@ -69,6 +70,9 @@ export interface LockedRoom {
   readonly securityProfile: SecurityProfile;
   readonly policyVersion: number;
   readonly currentKeyVersion: number;
+  /** Phase 11 (ADR-013): the rekey snapshot's epoch and the accumulated reasons. */
+  readonly membershipEpoch: bigint;
+  readonly rekeyReasons: readonly RekeyReason[];
 }
 
 export interface LockedMembership {
@@ -133,28 +137,59 @@ export class RoomIdUnavailableError extends Error {
   }
 }
 
+/** A PENDING rekey operation that a membership or key change made STALE (ADR-013 step 5). */
+export interface StaledOperation {
+  readonly roomId: string;
+  readonly operationId: string;
+  readonly mode: 'MANDATORY' | 'MANUAL';
+}
+
 export function createRoomStore(db: Db) {
   const secrets = secretStoreFunctions(db);
-  /** Moves an ACTIVE room to REKEY_REQUIRED (reasons accumulate) and increments its epoch. */
+  /** Operations this store's transaction made STALE, for the events the service records after commit. */
+  const staled: StaledOperation[] = [];
+
+  /**
+   * Every change of the recipient set goes through here (ADR-013 step 5): the room's PENDING
+   * operation becomes STALE (a MANDATORY one returns the room to REKEY_REQUIRED) and the epoch is
+   * incremented, so a snapshot taken before can never be finalized. The database trigger
+   * rooms_key_state_guard does the same for any other writer of the epoch.
+   */
+  async function advanceEpoch(roomId: string, now: Date): Promise<void> {
+    const closed = await db.$queryRaw<{ id: string; mode: 'MANDATORY' | 'MANUAL' }[]>`
+      UPDATE rekey_operations SET status = 'STALE', closed_at = ${now}, closed_reason = 'MEMBERSHIP_CHANGED'
+       WHERE room_id = ${roomId}::uuid AND status = 'PENDING'
+      RETURNING id::text AS id, mode::text AS mode`;
+    for (const op of closed) staled.push({ roomId, operationId: op.id, mode: op.mode });
+    await db.$executeRaw`
+      UPDATE rooms SET
+        key_state = CASE WHEN key_state = 'REKEYING' THEN 'REKEY_REQUIRED'::"RoomKeyState" ELSE key_state END,
+        membership_epoch = membership_epoch + 1,
+        updated_at = ${now}
+      WHERE id = ${roomId}::uuid`;
+  }
+
+  /** Moves a room to REKEY_REQUIRED (reasons accumulate) and advances its epoch (INV-07). */
   async function requireRekey(roomId: string, reason: RekeyReason, now: Date): Promise<void> {
+    await advanceEpoch(roomId, now);
     await db.$executeRaw`
       UPDATE rooms SET
         key_state = 'REKEY_REQUIRED',
         rekey_reasons = CASE WHEN ${reason}::"RekeyReason" = ANY (rekey_reasons) THEN rekey_reasons
                              ELSE array_append(rekey_reasons, ${reason}::"RekeyReason") END,
         rekey_required_since = COALESCE(rekey_required_since, ${now}),
-        membership_epoch = membership_epoch + 1,
         updated_at = ${now}
       WHERE id = ${roomId}::uuid`;
   }
 
   return {
     ...roomKeyStoreFunctions(db),
-    ...invitationStoreFunctions(db),
+    ...invitationStoreFunctions(db, advanceEpoch),
     ...fileStoreFunctions(db, requireRekey),
     ...noteStoreFunctions(db),
     ...secretStoreFunctions(db),
     ...policyStoreFunctions(db),
+    ...rekeyStoreFunctions(db),
 
     // ---------------------------------------------------------------------------------- creation
 
@@ -325,10 +360,13 @@ export function createRoomStore(db: Db) {
           security_profile: SecurityProfile;
           policy_version: number;
           current_key_version: number;
+          membership_epoch: bigint;
+          rekey_reasons: RekeyReason[];
         }[]
       >`
         SELECT id::text AS id, status::text AS status, key_state::text AS key_state,
-               security_profile::text AS security_profile, policy_version, current_key_version
+               security_profile::text AS security_profile, policy_version, current_key_version,
+               membership_epoch, rekey_reasons::text[] AS rekey_reasons
           FROM rooms WHERE id = ${roomId}::uuid FOR UPDATE`;
       const row = rows[0];
       return row === undefined
@@ -340,6 +378,8 @@ export function createRoomStore(db: Db) {
             securityProfile: row.security_profile,
             policyVersion: row.policy_version,
             currentKeyVersion: row.current_key_version,
+            membershipEpoch: row.membership_epoch,
+            rekeyReasons: row.rekey_reasons,
           };
     },
 
@@ -392,12 +432,15 @@ export function createRoomStore(db: Db) {
       return result.count === 1;
     },
 
-    async incrementMembershipEpoch(roomId: string, now: Date): Promise<void> {
-      await db.room.update({
-        where: { id: roomId },
-        data: { membershipEpoch: { increment: 1 }, updatedAt: now },
-        select: { id: true },
-      });
+    /** A membership change that keeps the room's key state (role changes, transfers, AZ-14). */
+    incrementMembershipEpoch: advanceEpoch,
+
+    /** INV-07 for callers outside this module (leaving, identity compromise, the worker's R6). */
+    requireRekey,
+
+    /** The operations this transaction made STALE; read once, after the writes. */
+    takeStaledOperations(): StaledOperation[] {
+      return staled.splice(0);
     },
 
     /**
@@ -455,6 +498,38 @@ export function createRoomStore(db: Db) {
         });
       }
       return suspended;
+    },
+
+    /**
+     * Vault reset in the rooms of the user (CM-T053, key-lifecycle section 3 and R5). In the same
+     * transaction that supersedes the identity: every envelope wrapped to the old identity key is
+     * deleted (it can never be opened again, and nobody may wrap to it), and every ACTIVE room where
+     * the user is an ACTIVE member advances its epoch, so a PENDING rekey snapshot naming the old
+     * key becomes STALE. With `compromised`, each of those rooms also enters REKEY_REQUIRED with
+     * IDENTITY_KEY_COMPROMISED, because whoever holds the old key holds every RKM wrapped to it and
+     * can sign as the old identity. Rooms are locked in ID order, after the identity row.
+     */
+    async replaceMemberIdentity(
+      userId: string,
+      oldKeyId: string,
+      compromised: boolean,
+      now: Date,
+    ): Promise<SuspendedRoom[]> {
+      const rooms = await db.$queryRaw<{ id: string; key_state: RoomKeyState }[]>`
+        SELECT r.id::text AS id, r.key_state::text AS key_state
+          FROM rooms r
+         WHERE r.status = 'ACTIVE'
+           AND r.id IN (SELECT m.room_id FROM room_members m WHERE m.user_id = ${userId}::uuid AND m.status = 'ACTIVE')
+         ORDER BY r.id
+           FOR UPDATE OF r`;
+      await db.keyEnvelope.deleteMany({ where: { recipientUserId: userId, recipientKeyId: oldKeyId } });
+      const affected: SuspendedRoom[] = [];
+      for (const room of rooms) {
+        if (compromised) await requireRekey(room.id, 'IDENTITY_KEY_COMPROMISED', now);
+        else await advanceEpoch(room.id, now);
+        affected.push({ roomId: room.id, rekeyNewlyRequired: compromised && room.key_state === 'ACTIVE' });
+      }
+      return affected;
     },
 
     /**

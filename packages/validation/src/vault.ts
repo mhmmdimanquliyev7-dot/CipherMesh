@@ -80,6 +80,11 @@ export const vaultRewrapResponseSchema = z.strictObject({ status: z.literal('ok'
 export const vaultResetRequestSchema = z.strictObject({
   supersedesKeyId: uuidV4Schema,
   vault: vaultSchema,
+  /**
+   * Phase 11 (CM-T053, key-lifecycle R5): the old identity key or device may be compromised, so
+   * every room of the user needs a rekey. Absent means a lost passphrase only.
+   */
+  identityCompromised: z.boolean().optional(),
 });
 
 export const vaultResetResponseSchema = z.strictObject({

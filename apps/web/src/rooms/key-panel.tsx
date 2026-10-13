@@ -30,10 +30,13 @@ export function RoomKeyPanel({
   roomId,
   profile,
   members,
+  refreshKey = 0,
 }: {
   readonly roomId: string;
   readonly profile: SecurityProfile;
   readonly members: readonly RoomMember[];
+  /** Changes after a room change (Phase 11: a new key version), so the keys are opened again. */
+  readonly refreshKey?: number;
 }) {
   const vault = useVault();
   // Re-render when the opened keys change: dropped on a lock, the code must disappear at once.
@@ -63,7 +66,7 @@ export function RoomKeyPanel({
     return () => {
       run.cancelled = true;
     };
-  }, [roomId, vault.kind]);
+  }, [roomId, vault.kind, refreshKey]);
 
   if (vault.kind !== 'unlocked' || state.kind === 'locked' || (state.kind === 'open' && !held)) {
     return (

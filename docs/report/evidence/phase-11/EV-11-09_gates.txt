@@ -1,0 +1,21 @@
+EV-11-09 Gate results of the final Phase 11 code, 2026-10-13, branch feature/CM-T050-key-rotation (head b8b5fa8 plus the Phase 11 documentation commit), local PostgreSQL 17 and S3-compatible storage, synthetic data only.
+
+pnpm format:check, pnpm lint, pnpm typecheck ......... pass
+pnpm test ............................................ 88 files, 2302 tests, all pass (before Phase 11: 2201 in 84; new: tests/rekey, rekey-guards, packages/crypto rekey.test.ts)
+  rekey project ...................................... 36 integration tests in 2 files, pass
+  database project ................................... 140 tests, pass (includes rekey-guards and the privilege matrix)
+pnpm test:e2e (Chromium, Firefox, WebKit) ............ 128 passed, 0 failed, 16 skipped by design (Chromium-driven cross-engine specs and single-engine flows)
+  rekey.spec.ts A, B, C in three engines ............. 9 of 9 pass
+pnpm security:negative-controls
+  NC-11-01 to NC-11-13 ............................... 13 of 13 caught; baseline pass; 7 source files restored byte for byte
+  31 older controls on files Phase 11 changed ........ 31 of 31 caught; both baselines pass; 16 source files restored byte for byte
+  anchor check, all controls ......................... 115 controls, every anchor matches exactly once
+pnpm test:coverage:crypto ............................ 98.36% statements, 93.85% branches (gate 90%)
+pnpm test:coverage:authz ............................. 96.92% statements, 97.24% branches; authorization.ts 97.26 / 98.3; policy.ts 96.49 / 96
+pnpm build, pnpm smoke:api ........................... pass
+pnpm db:validate, db:check-schema, db:drift .......... pass; 17 models, 241 classified fields, no drift
+pnpm audit:deps ...................................... no known vulnerabilities; no dependency added or changed (package.json: one script)
+pnpm sbom:generate ................................... generated (git-ignored)
+pnpm scan:secrets --staged (gitleaks) ................ 73 commits and the staged Phase 11 changes: no leaks found
+
+Findings of the run: one deterministic E2E failure in the first full run (rooms.spec.ts, three engines): a stale assertion on the Phase 6 banner wording that Phase 11 changed; updated, then 128 of 128 pass. SF-11-01 (RSA-OAEP leading zero bytes in the WebKit build used by Playwright) fixed in unwrap32 (CD-33).

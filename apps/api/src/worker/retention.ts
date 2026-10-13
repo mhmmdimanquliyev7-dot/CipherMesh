@@ -4,6 +4,7 @@ import { runFileCleanup } from '../db/file-cleanup';
 import { runNoteCleanup } from '../db/note-cleanup';
 import { expireInvitations } from '../db/invitation-store';
 import { runAuthRetention } from '../db/retention';
+import { runRekeyMaintenance } from '../db/rekey-cleanup';
 import { runRoomCleanup } from '../db/room-cleanup';
 import { runSecretCleanup } from '../db/secret-store';
 import { createLogger } from '../logging/logger';
@@ -13,7 +14,7 @@ import { createObjectStore } from '../storage/object-store';
  * One-shot retention job (`pnpm worker:retention`), connecting as cm_worker (CM-T017, CM-T018),
  * which also finishes room deletions (CM-T030), expires invitations (CM-T035) and cleans up files
  * and their storage objects (CM-T040), expired and room-deleted notes (CM-T042) and secrets
- * (CM-T043, CM-T044).
+ * (CM-T043, CM-T044), and maintains the rekey state machine and key versions (CM-T050, CM-T052).
  * Scheduling belongs to the worker container (Phase 12) and the deployment (Phase 17); until then
  * the job is run on demand. It logs counts only.
  */
@@ -44,6 +45,9 @@ async function main(): Promise<void> {
     // Expired secrets become EXPIRED and the secrets of rooms being deleted REVOKED, both without
     // payload or wrapped SEK (CM-T043, CM-T044). Before the room step, which waits for them.
     logger.info('secret cleanup completed', await runSecretCleanup(database.prisma, new Date()));
+    // Rekey maintenance (Phase 11, CM-T050, CM-T052): expired operations ABANDONED, cryptoperiods
+    // (PC-14), unreferenced RETIRED versions DESTROYED, closed operations purged after 90 days.
+    logger.info('rekey maintenance completed', { ...(await runRekeyMaintenance(database.prisma, new Date())) });
     // Finishes room deletions (CM-T030): DELETING rooms with nothing left to clean become DELETED.
     logger.info('room cleanup completed', await runRoomCleanup(database.prisma));
   } finally {

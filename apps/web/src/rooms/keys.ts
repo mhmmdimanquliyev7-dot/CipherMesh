@@ -4,11 +4,16 @@ import {
   CryptoErrorCode,
   createInitialRoomKey,
   createInvitationKeys,
+  createRekeyKeys,
+  formatFingerprint,
   grantProofToWire,
+  grantsFromWire,
   invitationKeysToWire,
   isCryptoError,
   openRoomKey,
   publicIdentityFromWire,
+  rekeyKeysToWire,
+  reviewRekeyRecipients,
   roomCreationKeysToWire,
   roomKeyBundlesFromWire,
   signMembershipGrant,
@@ -26,8 +31,15 @@ import {
   keyVersionsResponseSchema,
   memberIdentityResponseSchema,
   recordedResponseSchema,
+  rekeyCancelledResponseSchema,
+  rekeyFinalizedResponseSchema,
+  rekeyStartedResponseSchema,
+  reshareResponseSchema,
+  roomKeyStateResponseSchema,
   roomSummarySchema,
+  type RekeyStartedResponse,
   type RoomInvitation,
+  type RoomKeyStateResponse,
 } from '@ciphermesh/validation';
 import { api } from '../lib/api';
 import { vaultController } from '../vault/controller';
@@ -58,9 +70,38 @@ export class RoomKeyMissing extends Error {
 
 type Listener = () => void;
 
+/** One recipient of a rekey as this browser checked it, for the review list (no keys). */
+export interface RekeyRecipientView {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly kind: 'MEMBER' | 'INVITEE';
+  /** The fingerprint computed here from the verified keys, in groups of four. */
+  readonly fingerprint: string;
+  /** False for a key the room's signed statements never named (after a vault reset): compare it. */
+  readonly knownHolder: boolean;
+}
+
+/** A started rekey operation, reviewed in this tab and waiting for the reviewer's confirmation. */
+interface PendingReview {
+  readonly roomId: string;
+  readonly started: RekeyStartedResponse;
+  readonly recipients: readonly VerifiedIdentity[];
+}
+
+/** Thrown when a rekey is finalized in a tab that did not review its snapshot (or the vault locked). */
+export class RekeyReviewMissing extends Error {
+  readonly code = 'REKEY_REVIEW_MISSING';
+  constructor() {
+    super('Start the rotation again');
+    this.name = 'RekeyReviewMissing';
+  }
+}
+
 class RoomKeys {
   readonly #opened = new Map<string, readonly OpenedRoomKey[]>();
   readonly #listeners = new Set<Listener>();
+  /** Reviewed rekey snapshots by operation ID: public identities only, dropped with the vault keys. */
+  readonly #reviews = new Map<string, PendingReview>();
 
   constructor() {
     vaultController.onKeysDropped(() => {
@@ -79,6 +120,7 @@ class RoomKeys {
   }
 
   clear(): void {
+    this.#reviews.clear();
     if (this.#opened.size === 0) return;
     this.#opened.clear();
     for (const listener of this.#listeners) listener();
@@ -241,6 +283,125 @@ class RoomKeys {
       const bundle = previous === undefined ? newest : { ...newest, verifiedPreviousCommitment: previous.commitment };
       return authenticateSecretRecipient(vault, bundle, publicIdentityFromWire(member.identity, member.userId));
     });
+  }
+
+  // ------------------------------------------------------------------- key rotation (Phase 11)
+
+  /** AZ-15: the room's key state, reasons, cryptoperiod and live rekey operation. */
+  keyState(roomId: string): Promise<RoomKeyStateResponse> {
+    return api('GET', `/rooms/${roomId}/rekey-operations/current`, roomKeyStateResponseSchema);
+  }
+
+  /**
+   * Starts a rekey (AZ-13, ADR-013 step 1) and checks the server's recipient snapshot here before any
+   * key is made (step 2.1): the room's statements must verify for this browser and every recipient's
+   * identity must verify on its own. Returns the list to show for review; nothing is created yet.
+   */
+  async startRekey(roomId: string): Promise<{ started: RekeyStartedResponse; recipients: RekeyRecipientView[] }> {
+    return vaultController.withUnlockedVault(async (vault) => {
+      const started = await api('POST', `/rooms/${roomId}/rekey-operations`, rekeyStartedResponseSchema, {});
+      const base = await this.#base(vault, roomId, started.operation.baseVersion);
+      const reviewed = await reviewRekeyRecipients(
+        vault,
+        {
+          ...base,
+          grants: [...base.grants, ...grantsFromWire(roomId, started.grants)],
+          identities: [...base.identities, ...started.identities.map((i) => publicIdentityFromWire(i, i.userId))],
+        },
+        started.recipients.map((r) => publicIdentityFromWire(r.identity, r.userId)),
+      );
+      this.#reviews.set(started.operation.id, { roomId, started, recipients: reviewed.map((r) => r.identity) });
+      return {
+        started,
+        recipients: reviewed.map((r, i) => ({
+          userId: r.identity.userId,
+          displayName: started.recipients[i]?.displayName ?? '',
+          kind: started.recipients[i]?.kind ?? 'MEMBER',
+          fingerprint: formatFingerprint(r.identity.fingerprint).join(' '),
+          knownHolder: r.knownHolder,
+        })),
+      };
+    });
+  }
+
+  /**
+   * Makes key version v+1 for the reviewed recipients (ADR-013 step 2), sends the commitment, the
+   * signed statement and the envelopes (step 3), and then opens the room's keys again from what the
+   * server serves: the new version counts only after it passed the verification rule here, never
+   * because the server answered 200. Returns the verified new version.
+   */
+  async finalizeRekey(roomId: string, operationId: string): Promise<number> {
+    const review = this.#reviews.get(operationId);
+    if (review === undefined || review.roomId !== roomId) throw new RekeyReviewMissing();
+    const target = await vaultController.withUnlockedVault(async (vault) => {
+      const base = await this.#base(vault, roomId, review.started.operation.baseVersion);
+      const { keys } = await createRekeyKeys(vault, { roomId, base, recipients: review.recipients });
+      const done = await api(
+        'POST',
+        `/rooms/${roomId}/rekey-operations/${operationId}/finalize`,
+        rekeyFinalizedResponseSchema,
+        rekeyKeysToWire(keys),
+      );
+      return done.keyVersion;
+    });
+    this.#reviews.delete(operationId);
+    const opened = await this.open(roomId);
+    if (opened.at(-1)?.keyVersion !== target) throw new RoomKeyMissing();
+    return target;
+  }
+
+  /** AZ-13, OL-13: the starter or the OWNER cancels a live operation; the room stays as locked as it was. */
+  async cancelRekey(roomId: string, operationId: string): Promise<void> {
+    this.#reviews.delete(operationId);
+    await api('POST', `/rooms/${roomId}/rekey-operations/${operationId}/cancel`, rekeyCancelledResponseSchema, {});
+  }
+
+  /** A member's current identity, verified here, for the fingerprint shown before a re-share. */
+  async memberIdentity(roomId: string, memberId: string): Promise<VerifiedIdentity> {
+    const response = await api('GET', `/rooms/${roomId}/members/${memberId}/identity`, memberIdentityResponseSchema);
+    return verifyPublicIdentity(publicIdentityFromWire(response.identity, response.userId));
+  }
+
+  /**
+   * AZ-14 (CM-T053): wraps the versions the profile allows to the member's verified current identity
+   * and signs a grant for the member's role, exactly as for an invitation; the server re-checks it.
+   */
+  async reshare(input: {
+    readonly roomId: string;
+    readonly member: VerifiedIdentity;
+    readonly role: 'ADMIN' | 'MEMBER' | 'VIEWER';
+    readonly confirmedFingerprint: string | null;
+    readonly currentVersionOnly: boolean;
+  }): Promise<number[]> {
+    return vaultController.withUnlockedVault(async (vault) => {
+      const all = await this.#bundles(vault, input.roomId);
+      const newest = all.at(-1);
+      if (newest === undefined) throw new RoomKeyMissing();
+      const keys = await createInvitationKeys(vault, {
+        roomId: input.roomId,
+        bundles: input.currentVersionOnly ? [newest] : all,
+        invitee: input.member,
+        role: input.role,
+      });
+      const wire = invitationKeysToWire(keys);
+      const path = `/rooms/${input.roomId}/members/${input.member.userId}/reshare`;
+      const done = await api('POST', path, reshareResponseSchema, {
+        subjectKeyId: input.member.keyId,
+        confirmedFingerprint: input.confirmedFingerprint,
+        grantSignature: wire.grantSignature,
+        envelopes: wire.envelopes,
+      });
+      return done.keyVersions;
+    });
+  }
+
+  /** The bundle of the base version (the newest this identity holds), chained when this tab verified v-1. */
+  async #base(vault: UnlockedVault, roomId: string, baseVersion: number): Promise<RoomKeyBundle> {
+    const bundles = await this.#bundles(vault, roomId);
+    const base = bundles.at(-1);
+    if (base?.keyVersion.keyVersion !== baseVersion) throw new RoomKeyMissing();
+    const previous = this.version(roomId, baseVersion - 1);
+    return previous === undefined ? base : { ...base, verifiedPreviousCommitment: previous.commitment };
   }
 
   /**

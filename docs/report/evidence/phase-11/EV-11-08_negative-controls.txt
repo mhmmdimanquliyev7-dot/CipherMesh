@@ -1,0 +1,24 @@
+EV-11-08 Phase 11 negative controls (NC-11-01 to NC-11-13), 2026-10-13, branch feature/CM-T050-key-rotation, local PostgreSQL 17 and storage, synthetic data only.
+
+| ID | Deliberate defect | Detected by | Result |
+|---|---|---|---|
+| NC-11-01 | Any OWNER or ADMIN may finalize another member’s rekey operation (OL-13) | tests/rekey/rekey-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-11-02 | Any ADMIN may cancel the OWNER’s rekey operation (OL-13) | tests/rekey/rekey-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-11-03 | The key-version statement signature is not checked at finalize (T-36) | tests/rekey/rekey-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-11-04 | The recipient snapshot includes removed and departed members (T-21) | tests/rekey/rekey-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-11-05 | A membership change no longer makes a pending rekey STALE (API and database trigger) | tests/rekey/rekey-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-11-06 | An expired lease is still accepted at finalize (ADR-013 step 6) | tests/rekey/rekey-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-11-07 | A different payload is answered as a retry of a completed rekey (idempotency) | tests/rekey/rekey-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-11-08 | Starting a rekey in a RESTRICTED room needs no step-up (PC-03, route and locked row) | tests/rekey/rekey-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-11-09 | An ADMIN may re-share keys to another ADMIN (AZ-14 without the invitation role ceilings) | tests/rekey/identity-reshare.test.ts | CAUGHT (tests failed) |
+| NC-11-10 | A vault reset leaves the old identity’s envelopes in its rooms (CM-T053) | tests/rekey/identity-reshare.test.ts | CAUGHT (tests failed) |
+| NC-11-11 | The grant history is not recorded, so a re-shared ADMIN’s earlier statements lose their authority | tests/rekey/identity-reshare.test.ts | CAUGHT (tests failed) |
+| NC-11-12 | The browser accepts a rekey snapshot that lists one user twice (recipient review) | packages/crypto/src/rekey.test.ts | CAUGHT (tests failed) |
+| NC-11-13 | SF-11-01 regression: a 32-byte value with dropped leading zeros is refused again | packages/crypto/src/rsa-oaep.test.ts | CAUGHT (tests failed) |
+
+Baseline on unmodified code (Vitest): PASS
+Sources restored byte for byte (SHA-256, 7 files): YES
+ M packages/crypto/src/boundary.test.ts
+ M scripts/security/negative-controls.mjs
+
+[exited with code 0]

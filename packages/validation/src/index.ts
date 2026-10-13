@@ -8,6 +8,7 @@ export * from './auth';
 export * from './vault';
 export * from './rooms';
 export * from './room-keys';
+export * from './rekey';
 export * from './files';
 export * from './notes';
 export * from './secrets';

@@ -8,6 +8,7 @@ import {
   ownershipTransferredResponseSchema,
   roomDeletedResponseSchema,
   roomDetailResponseSchema,
+  roomLeftResponseSchema,
   roomRenamedResponseSchema,
   sessionInfoResponseSchema,
   type RoomDetail,
@@ -24,6 +25,7 @@ import { InviteCard, RoomInvitations } from '../../../rooms/invitations';
 import { RoomKeyPanel } from '../../../rooms/key-panel';
 import { NotePanel } from '../../../rooms/note-panel';
 import { ProfilePanel } from '../../../rooms/profile-panel';
+import { RekeyPanel } from '../../../rooms/rekey-panel';
 import { SecretPanel } from '../../../rooms/secret-panel';
 import { roomKeys } from '../../../rooms/keys';
 import { describeRoomError, REKEY_NOTICE, ROOM_NAME_WARNING } from '../../../rooms/messages';
@@ -35,7 +37,8 @@ import { assignableRoles, mayAttempt, ROLE_LABEL } from '../../../rooms/permissi
  * (ADR-011). The page shows controls the shared matrix allows for the user's role, as UX only; the
  * API authorizes every request against the stored membership and answers 404 to anyone who is not
  * a member. The room key is opened and verified on this device (RoomKeyPanel); invitations and
- * grants are made with the unlocked vault.
+ * grants are made with the unlocked vault. Phase 11: the key rotation panel (RekeyPanel) rotates
+ * the room key in this browser, and a member who is not the OWNER can leave the room (AZ-11).
  */
 export default function RoomPage() {
   return (
@@ -162,7 +165,17 @@ function Room({ roomId }: { readonly roomId: string }) {
           }}
         />
       )}
-      <RoomKeyPanel roomId={roomId} profile={room.room.securityProfile} members={members} />
+      <RoomKeyPanel roomId={roomId} profile={room.room.securityProfile} members={members} refreshKey={refreshKey} />
+      <RekeyPanel
+        roomId={roomId}
+        role={role}
+        selfId={selfId}
+        members={members}
+        policy={policy}
+        refreshKey={refreshKey}
+        onChanged={() => act(() => Promise.resolve(), '')}
+        onStepUp={onStepUp}
+      />
       <ProfilePanel
         roomId={roomId}
         role={role}
@@ -225,6 +238,21 @@ function Room({ roomId }: { readonly roomId: string }) {
             act(async () => {
               await api('POST', `/rooms/${roomId}/rename`, roomRenamedResponseSchema, { name });
             }, '')
+          }
+        />
+      ) : null}
+      {mayAttempt('AZ-11', role) ? (
+        <Leave
+          onLeave={() =>
+            act(
+              async () => {
+                await api('POST', `/rooms/${roomId}/leave`, roomLeftResponseSchema, {});
+                router.push('/rooms');
+              },
+              '',
+              undefined,
+              false,
+            )
           }
         />
       ) : null}
@@ -392,6 +420,31 @@ function Rename({
           Rename
         </Button>
       </form>
+    </Card>
+  );
+}
+
+function Leave({ onLeave }: { readonly onLeave: () => Promise<void> }) {
+  const [confirmed, setConfirmed] = useState(false);
+  return (
+    <Card title="Leave the room">
+      <p className="text-sm text-slate-400">
+        You lose access at once and your room keys are deleted from the server. The room is locked for new content until
+        an owner or admin rotates its key. Leaving does not erase anything you already downloaded.
+      </p>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={confirmed}
+          onChange={(event) => {
+            setConfirmed(event.target.checked);
+          }}
+        />
+        I want to leave this room.
+      </label>
+      <Button type="button" disabled={!confirmed} onClick={() => void onLeave()}>
+        Leave room
+      </Button>
     </Card>
   );
 }

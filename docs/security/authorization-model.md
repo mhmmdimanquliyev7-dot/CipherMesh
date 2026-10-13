@@ -265,7 +265,7 @@ Error codes added: `REKEY_REQUIRED` (409), `ROOM_STATEMENT_INVALID` (422), `ENVE
 
 **Concurrency.** Acceptance takes, in order, the invitee's user row, the invitee's identity row, the room, the invitation and the memberships; room administration takes the room first; account suspension takes the user row first; a vault reset takes the identity row first. No transaction takes these in the opposite order, so none can deadlock with an acceptance, and each re-checks on the state it locked. `tests/authz/invitation-concurrency.test.ts` forces the races: account disable, revocation, double acceptance, room deletion, member loss and vault reset against an acceptance.
 
-**What is not implemented:** re-sharing keys to a member (AZ-14, CM-T053), leaving a room (AZ-11, CM-T051), profile changes (AZ-03).
+**Later phases:** re-sharing keys to a member (AZ-14), leaving a room (AZ-11) and the rekey (AZ-13) arrived in Phase 11 (section 9.12); profile changes (AZ-03) in Phase 10 (section 9.11).
 
 ### 9.8 Encrypted files (Phase 7, CM-T037 to CM-T041)
 
@@ -336,3 +336,25 @@ Refusals are recorded as `ROOM_ACCESS_DENIED` with the action and a reason code 
 
 Tests: `tests/policy/policy-matrix.test.ts` (every control and profile, PC-01 and PC-02 on every room route), `tests/policy/profile-change.test.ts` (who, upgrades, downgrades, stale and forged requests, concurrency with forced lock order), the BOLA suite (the new route attacked like the others), negative controls NC-10-01 to NC-10-12.
 
+### 9.12 Key rotation, leaving and re-sharing (Phase 11, CM-T050 to CM-T053)
+
+The matrix is unchanged: AZ-11, AZ-13, AZ-14 and AZ-15 had their cells since Phase 0.5, and Phase 11 builds the routes behind them. The rekey routes are room routes, so the registry runs the central room authorizer first (404 for non-members, PC-01 and PC-02, the matrix cell, and PC-03 for the routes that declare `requires: { sensitive }`). The service then repeats the matrix cell on the locked membership, the policy gates on the locked room row (`reapplyRoomPolicy`) and the operation rules below.
+
+| Route | Action | Rule |
+|---|---|---|
+| `GET /rooms/{roomId}/rekey-operations/current` | AZ-15 | Key state, reasons, epoch and the live operation (IDs, mode, lease, recipient snapshot with public keys) for ACTIVE members; no key material exists server-side to return |
+| `POST /rooms/{roomId}/rekey-operations` | AZ-13 | OWNER and ADMIN; declares PC-03 `START_REKEY` (a step-up within five minutes in RESTRICTED rooms, 401 `STEP_UP_REQUIRED`, repeated on the locked row). One live operation per room: another member's unexpired lease gives 409 `REKEY_IN_PROGRESS`, the starter's own restart supersedes; at most 10 starts per room per hour (429, CP-25). Records the recipient snapshot (ACTIVE members and open invitees, never removed or departed members) and its digest |
+| `POST /rooms/{roomId}/rekey-operations/{operationId}/finalize` | AZ-13 | OL-13: the operation is loaded by its ID **and** the room's ID (another room's operation is the generic 404); only the starter (403 `REKEY_NOT_STARTER`). One transaction on the locked room and operation checks: PENDING and unexpired lease, the room's version and epoch still the snapshot's, the recipient set recomputed from the database still has the snapshot digest, the envelope set equals it exactly (422 `REKEY_RECIPIENTS_MISMATCH`), the `cm.room.key-version` statement verifies under the starter's ACTIVE identity, the target version is the next one and the commitment was never used. Then the new version is ACTIVE, the previous RETIRED and the room unlocked. A repeated identical finalize returns the stored result; a different payload is 409 `REKEY_PAYLOAD_MISMATCH` |
+| `POST /rooms/{roomId}/rekey-operations/{operationId}/cancel` | AZ-13 | The starter or the OWNER (OL-13); cancelling a mandatory rekey never unlocks the room |
+| `POST /rooms/{roomId}/leave` | AZ-11 | ADMIN, MEMBER, VIEWER; the OWNER is refused until ownership is transferred. One transaction: membership LEFT, every envelope of the member deleted, epoch increased, room REKEY_REQUIRED (`MEMBER_LEFT`), a pending operation STALE (INV-07) |
+| `POST /rooms/{roomId}/members/{userId}/reshare` | AZ-14 | OWNER and ADMIN; declares PC-03 `INVITE`. Target: an ACTIVE or SUSPENDED member whose current identity differs from the one holding their envelopes. The AZ-06 role ceilings apply to the member's stored role (an ADMIN re-shares to MEMBER and VIEWER only; nobody to the OWNER or to themselves, 403), the member's stored grant must still verify, the room must not be locked (409 `REKEY_REQUIRED`), and the profile's PC-05 (fingerprint) and PC-07 (versions) apply. A member who already holds the current version under the current identity is 409 `RESHARE_NOT_NEEDED`. A SUSPENDED member is reinstated only by this explicit call (`MEMBER_REINSTATED`) |
+
+**Staleness.** Any change to the room's recipient set or authority (removal, leaving, acceptance, invitation created or revoked, role change, a vault reset of a member) moves the membership epoch, and the database trigger of `20261011000000_key_rotation` closes a PENDING operation as STALE and returns a REKEYING room to REKEY_REQUIRED whichever code path made the change. A stale operation can never finalize.
+
+**What the server cannot decide.** It checks the set, the signature and the order of versions; it cannot check that the envelopes contain the key the starter's browser made. Every member's browser verifies the version itself before using it (ADR-015 section 4.1), and a version activated without the starter's signature is refused by every member (tested). A compromised server or a compromised ADMIN can still inject a key (T-36, L-23).
+
+**Worker.** `runRekeyMaintenance` (as `cm_worker`) abandons expired operations, applies the PC-14 cryptoperiod, destroys unreferenced RETIRED versions (their envelopes; the commitment and signed statement stay) and purges closed operations after 90 days. It holds no key material.
+
+Events (fixed catalogue in `apps/api/src/auth/security-events.ts`, no key material in details): `MEMBER_LEFT`, `REKEY_REQUIRED`, `REKEY_STARTED`, `REKEY_COMPLETED`, `REKEY_ABANDONED`, `REKEY_SUPERSEDED`, `REKEY_CANCELLED`, `REKEY_STALE`, `REKEY_REJECTED`, `KEY_VERSION_RETIRED`, `KEY_VERSION_DESTROYED`, `KEYS_RESHARED`, `MEMBER_REINSTATED`, `MEMBER_IDENTITY_REPLACED`.
+
+Tests: `tests/rekey/rekey-lifecycle.test.ts` (who may start, finalize and cancel; lease, idempotency, concurrency; recipient, signature and version refusals; staleness; atomic finalize; cryptoperiods and destruction), `tests/rekey/identity-reshare.test.ts` (leaving, vault reset, compromise flag, AZ-14 ceilings, locks and profile rules, grant history), `tests/database/rekey-guards.test.ts`, the BOLA suite (rekey and reshare targets in `tests/helpers/bola-cases.ts`) and the route inventory. Negative controls NC-11-01 to NC-11-13.

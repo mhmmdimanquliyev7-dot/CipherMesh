@@ -121,6 +121,23 @@ export function describeRoomError(error: unknown): string {
         return 'You have sent the most active secrets allowed (100). Revoke secrets that are no longer needed, or wait until they are revealed or expire.';
       case 'SECRET_ID_UNAVAILABLE':
         return 'That secret identifier cannot be used. Please try again.';
+      // Key rotation (Phase 11).
+      case 'REKEY_IN_PROGRESS':
+        return 'Another owner or admin is rotating the room key right now. Wait until it finishes, or ask the owner to cancel it.';
+      case 'REKEY_OPERATION_CLOSED':
+        return 'The rotation was closed before it finished (the members or their keys changed, it took too long, or it was cancelled). Nothing was changed; start it again.';
+      case 'REKEY_PAYLOAD_MISMATCH':
+        return 'This rotation was already completed with other keys. Nothing was changed.';
+      case 'REKEY_RECIPIENTS_MISMATCH':
+        return 'The new key was not prepared for exactly the members of this room. Nothing was changed; start the rotation again.';
+      case 'REKEY_NOT_STARTER':
+        return 'Only the person who started this rotation can complete it; they or the room owner can cancel it.';
+      case 'ROOM_KEY_UNAVAILABLE':
+        return 'This room has no room key that could be rotated.';
+      case 'RESHARE_NOT_NEEDED':
+        return 'This member already holds the current room key.';
+      case 'RATE_LIMITED':
+        return 'Too many attempts in a short time. Wait a while and try again.';
     }
   }
   return describeError(error);
@@ -199,7 +216,7 @@ export const ROOM_NAME_WARNING =
 
 /** Shown for a room in REKEY_REQUIRED or REKEYING (ADR-013); the rekey itself arrives in a later phase. */
 export const REKEY_NOTICE =
-  'A member left this room. Until an owner or admin completes a key rotation, new content cannot be added and no one can be invited. Key rotation arrives in a later phase.';
+  'The room key must be rotated. Until an owner or admin completes the key rotation, new content cannot be added and no one can be invited; reading continues.';
 
 /** security-ui.md 2.6: a refused key is never used, and the refusal is reported. */
 export const KEY_REFUSED =

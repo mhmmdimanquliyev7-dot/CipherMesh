@@ -153,6 +153,7 @@ zod 4 compiles object parsers with `new Function`, and when the first object sch
 | `pnpm test:authz` | Room authorization, lifecycle and membership suites against the real API and a throwaway database: the membership lookup, the central authorizer, room routes, role changes, removal, ownership transfer, forced races and account suspension (Phase 5) |
 | `pnpm test:coverage:crypto` | Coverage of `packages/crypto`; fails below 90% statements, branches, functions or lines (Phase 4, run in CI) |
 | `pnpm test:coverage:authz` | Coverage of the room authorization decision (`packages/shared/src/authorization.ts`) and, since Phase 10, of the policy engine (`packages/shared/src/policy.ts`) with the same thresholds (Phase 5, run in CI) |
+| `pnpm test:rekey` | Rekey state machine, leaving, re-sharing and the identity procedure against the real API and a throwaway database (Phase 11, CM-T050 to CM-T053) |
 | `pnpm test:policy` | Policy enforcement matrix and profile changes against the real API, PostgreSQL and the local storage (Phase 10, CM-T049) |
 | `pnpm security:negative-controls` | 44 deliberate defects (ten from Phase 3, seventeen from Phase 4, seventeen from Phase 5), each of which must make the security suites fail; the five browser controls rebuild the web client and run Playwright. `--vitest-only` skips those, `--only=<prefix>` (for example `--only=NC-05`) runs a subset. Every touched file is compared with its original by SHA-256 afterwards |
 | `pnpm bench:argon2` | Argon2id benchmark and RFC 9106 check (CP-05) |

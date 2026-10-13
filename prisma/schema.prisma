@@ -425,16 +425,18 @@ model UserKeyPair {
   /// class: META
   revokedAt                  DateTime?     @map("revoked_at") @db.Timestamptz(3)
 
-  user                User             @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user                User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   envelopes           KeyEnvelope[]
   secretsReceived     Secret[]
-  invitationsReceived Invitation[]     @relation("InvitationInviteeKey")
+  invitationsReceived Invitation[]      @relation("InvitationInviteeKey")
   // Signed room statements (Phase 6, ADR-015): the identity that signed or is named by each.
-  roomsCreated        Room[]           @relation("RoomCreatorKey")
-  grantsReceived      RoomMember[]     @relation("MemberSubjectKey")
-  grantsGiven         RoomMember[]     @relation("MemberGrantorKey")
-  invitationsGranted  Invitation[]     @relation("InvitationGrantorKey")
-  keyVersionsCreated  RoomKeyVersion[] @relation("KeyVersionCreatorKey")
+  roomsCreated        Room[]            @relation("RoomCreatorKey")
+  grantsReceived      RoomMember[]      @relation("MemberSubjectKey")
+  grantsGiven         RoomMember[]      @relation("MemberGrantorKey")
+  invitationsGranted  Invitation[]      @relation("InvitationGrantorKey")
+  keyVersionsCreated  RoomKeyVersion[]  @relation("KeyVersionCreatorKey")
+  grantHistorySubject RoomMemberGrant[] @relation("GrantHistorySubjectKey")
+  grantHistoryGrantor RoomMemberGrant[] @relation("GrantHistoryGrantorKey")
 
   // Composite key target: envelopes, secrets and invitations prove the key belongs to the user.
   @@unique([id, userId])
@@ -481,10 +483,11 @@ model Room {
   /// class: META
   deletedAt          DateTime?       @map("deleted_at") @db.Timestamptz(3)
 
-  createdBy       User             @relation("RoomCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy       User              @relation("RoomCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
   // The genesis signer must be an identity of the creator.
-  creatorKey      UserKeyPair?     @relation("RoomCreatorKey", fields: [creatorKeyId, createdById], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  creatorKey      UserKeyPair?      @relation("RoomCreatorKey", fields: [creatorKeyId, createdById], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
   members         RoomMember[]
+  grantHistory    RoomMemberGrant[]
   invitations     Invitation[]
   keyVersions     RoomKeyVersion[]
   rekeyOperations RekeyOperation[]
@@ -534,12 +537,12 @@ model RoomMember {
   /// class: INT (ECDSA P-256 signature over cm.room.membership-grant, 64 bytes; ADR-015)
   grantSignature  Bytes?           @map("grant_signature")
 
-  room       Room        @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  user       User        @relation("MemberUser", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  addedBy    User?       @relation("MemberAddedBy", fields: [addedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  removedBy  User?       @relation("MemberRemovedBy", fields: [removedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  room       Room         @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user       User         @relation("MemberUser", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  addedBy    User?        @relation("MemberAddedBy", fields: [addedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  removedBy  User?        @relation("MemberRemovedBy", fields: [removedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
   // The invitation must belong to the same room.
-  invitation Invitation? @relation(fields: [invitationId, roomId], references: [id, roomId], onDelete: Restrict, onUpdate: Restrict)
+  invitation Invitation?  @relation(fields: [invitationId, roomId], references: [id, roomId], onDelete: Restrict, onUpdate: Restrict)
   // The granted key belongs to the member; the grantor key belongs to the grantor.
   subjectKey UserKeyPair? @relation("MemberSubjectKey", fields: [subjectKeyId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
   grantorKey UserKeyPair? @relation("MemberGrantorKey", fields: [grantorKeyId, grantorUserId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
@@ -550,6 +553,39 @@ model RoomMember {
   @@index([userId, status])
   @@index([roomId, status])
   @@map("room_members")
+}
+
+/// data-model 4.7.1 (Phase 11). Every signed membership grant ever stored on a membership,
+/// append-only (trigger). A membership keeps only its latest grant; the authority chain of the
+/// statements an earlier identity signed needs the earlier grants too (ADR-015 section 4.1).
+model RoomMemberGrant {
+  /// class: ID
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// class: ID
+  roomId         String   @map("room_id") @db.Uuid
+  /// class: ID
+  subjectUserId  String   @map("subject_user_id") @db.Uuid
+  /// class: ID (the identity key the grant names)
+  subjectKeyId   String   @map("subject_key_id") @db.Uuid
+  /// class: META
+  role           RoomRole
+  /// class: ID
+  grantorUserId  String   @map("grantor_user_id") @db.Uuid
+  /// class: ID
+  grantorKeyId   String   @map("grantor_key_id") @db.Uuid
+  /// class: INT (ECDSA P-256 signature over cm.room.membership-grant, 64 bytes; ADR-015)
+  grantSignature Bytes    @map("grant_signature")
+  /// class: META
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  room       Room        @relation(fields: [roomId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  // The named key belongs to the subject; the signing key belongs to the grantor.
+  subjectKey UserKeyPair @relation("GrantHistorySubjectKey", fields: [subjectKeyId, subjectUserId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+  grantorKey UserKeyPair @relation("GrantHistoryGrantorKey", fields: [grantorKeyId, grantorUserId], references: [id, userId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([roomId, subjectUserId, subjectKeyId, role, grantorUserId, grantorKeyId], map: "room_member_grants_one_per_statement")
+  @@index([roomId, subjectUserId, subjectKeyId], map: "room_member_grants_subject_idx")
+  @@map("room_member_grants")
 }
 
 /// data-model 4.8. In-app invitations only: there is no bearer token or link secret.

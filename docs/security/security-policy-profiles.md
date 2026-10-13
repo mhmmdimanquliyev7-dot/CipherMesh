@@ -97,7 +97,7 @@ Each gate fails closed with a stable error code. Gates never read role or profil
 - PC-03 for every sensitive operation the profile table lists that exists today: reveal secret, file download URL, invite, approve, remove member, change profile, delete room (START_REKEY arrives with Phase 11);
 - PC-13: the audit emitter reads the room's audit level; FULL adds `ENVELOPES_FETCHED` and `MEMBER_LIST_VIEWED` (EXTENDED already recorded download URLs and note reads); every denied request in a room is recorded as `ROOM_ACCESS_DENIED` at every level, which covers FULL's "every denied request". Events still go to the redacted log until the Phase 12 ledger (L-33);
 - section 4, profile changes, with the rules above.
-Not enforced in Phase 10, by plan: PC-11 (no external-link route, CM-T045) and PC-14 (the cryptoperiod sets REKEY_REQUIRED through the worker of CM-T052, Phase 11; the room page lists it as not yet enforced).
+Not enforced: PC-11 (no external-link route, CM-T045). PC-14 was a catalogue value only in Phase 10; since Phase 11 (CM-T052) the worker sets REKEY_REQUIRED with reason `CRYPTOPERIOD_EXPIRED` when the current version of a CONFIDENTIAL or RESTRICTED room is older than its cryptoperiod, and members see a reminder 14 days before (limitation L-66).
 
 ## 7. Testing
 

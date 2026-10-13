@@ -10,6 +10,9 @@ export { verifyPublicIdentity, type PublicIdentity, type VerifiedIdentity } from
 export { computeFingerprint, isFingerprint } from './fingerprint';
 export { verifyStatement } from './signing';
 export { fromBase64Url, toBase64Url } from './encoding';
+// RFC 8785 for server-side digests of canonical values (Phase 11: the rekey recipient set and
+// finalize payload digests, data-model 4.9.1). A digest, not a cryptographic context.
+export { canonicalBytes } from './canonical';
 export { isAcceptableKdf, SUITE, VAULT_KDF, VAULT_VERSION, type Argon2idParameters } from './params';
 // Signed room statements (Phase 6, ADR-015 section 4): the API rebuilds and verifies exactly the
 // bytes browsers sign. Builders and public-key verification only; no room key material.

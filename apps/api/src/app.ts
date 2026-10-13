@@ -38,8 +38,10 @@ import { noteRoutes } from './routes/notes';
 import { secretRoutes } from './routes/secrets';
 import { invitationRoutes } from './routes/invitations';
 import { roomRoutes } from './routes/rooms';
+import { rekeyRoutes } from './routes/rekey';
 import { vaultRoutes } from './routes/vault';
 import { createInvitationService } from './rooms/invitations';
+import { createRekeyService } from './rooms/rekey';
 import { createRoomKeyService } from './rooms/keys';
 import { createRoomService } from './rooms/service';
 import { createObjectStore, type ObjectStore } from './storage/object-store';
@@ -141,6 +143,8 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
   const notes = createNoteService({ store: roomData.store, transaction: roomData.transaction, events, clock });
   // Recipient-bound secrets (Phase 9): payload ciphertext and RSA-OAEP-wrapped SEKs, released once.
   const secrets = createSecretService({ store: roomData.store, transaction: roomData.transaction, events, clock });
+  // Key rotation (Phase 11): rekey operations, leaving and re-sharing; key material only from browsers.
+  const rekey = createRekeyService({ store: roomData.store, transaction: roomData.transaction, events, clock });
 
   const app = express();
   app.disable('x-powered-by');
@@ -169,6 +173,7 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
       ...fileRoutes(files, roomData.store),
       ...noteRoutes(notes, roomData.store),
       ...secretRoutes(secrets, roomData.store),
+      ...rekeyRoutes(rekey),
       ...(testing?.routes ?? []),
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],

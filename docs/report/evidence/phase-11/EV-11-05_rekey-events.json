@@ -1,0 +1,99 @@
+[
+  {
+    "name": "STEP_UP_COMPLETED",
+    "outcome": "SUCCESS"
+  },
+  {
+    "name": "MEMBER_REMOVED",
+    "outcome": "SUCCESS",
+    "details": {
+      "roomId": "423cc2f3-bfa6-45ba-90a2-3b6f0ede1f5c"
+    }
+  },
+  {
+    "name": "REKEY_REQUIRED",
+    "outcome": "SUCCESS",
+    "details": {
+      "roomId": "423cc2f3-bfa6-45ba-90a2-3b6f0ede1f5c",
+      "reason": "MEMBER_REMOVED"
+    }
+  },
+  {
+    "name": "ROOM_ACCESS_DENIED",
+    "outcome": "DENIED",
+    "details": {
+      "action": "AZ-01",
+      "reason": "NOT_A_MEMBER"
+    }
+  },
+  {
+    "name": "ROOM_ACCESS_DENIED",
+    "outcome": "DENIED",
+    "details": {
+      "action": "AZ-15",
+      "reason": "NOT_A_MEMBER"
+    }
+  },
+  {
+    "name": "ROOM_ACCESS_DENIED",
+    "outcome": "DENIED",
+    "details": {
+      "action": "AZ-12",
+      "reason": "NOT_A_MEMBER"
+    }
+  },
+  {
+    "name": "ROOM_ACCESS_DENIED",
+    "outcome": "DENIED",
+    "details": {
+      "action": "AZ-15",
+      "reason": "NOT_A_MEMBER"
+    }
+  },
+  {
+    "name": "ROOM_ACCESS_DENIED",
+    "outcome": "DENIED",
+    "details": {
+      "action": "AZ-20",
+      "reason": "NOT_A_MEMBER"
+    }
+  },
+  {
+    "name": "ROOM_ACCESS_DENIED",
+    "outcome": "DENIED",
+    "details": {
+      "action": "AZ-13",
+      "reason": "NOT_A_MEMBER"
+    }
+  },
+  {
+    "name": "REKEY_STARTED",
+    "outcome": "SUCCESS",
+    "details": {
+      "roomId": "423cc2f3-bfa6-45ba-90a2-3b6f0ede1f5c",
+      "operationId": "558d2dcf-607f-47ac-8125-a86bdda47b1a",
+      "mode": "MANDATORY",
+      "baseVersion": 1,
+      "recipients": 3
+    }
+  },
+  {
+    "name": "REKEY_COMPLETED",
+    "outcome": "SUCCESS",
+    "details": {
+      "roomId": "423cc2f3-bfa6-45ba-90a2-3b6f0ede1f5c",
+      "operationId": "558d2dcf-607f-47ac-8125-a86bdda47b1a",
+      "mode": "MANDATORY",
+      "keyVersion": 2,
+      "recipients": 3
+    }
+  },
+  {
+    "name": "KEY_VERSION_RETIRED",
+    "outcome": "SUCCESS",
+    "details": {
+      "roomId": "423cc2f3-bfa6-45ba-90a2-3b6f0ede1f5c",
+      "keyVersion": 1
+    }
+  }
+]

@@ -69,6 +69,12 @@ let noteB: string;
  */
 let secretA: string;
 let secretB: string;
+/**
+ * PENDING MANUAL rekey operations of rooms A and B (Phase 11), started by their OWNERs: targets of
+ * the finalize and cancel routes (OL-13). A refused request must leave them PENDING.
+ */
+let operationA: string;
+let operationB: string;
 
 const NAME_A = 'BOLA room A confidential codename';
 const NAME_B = 'BOLA room B confidential codename';
@@ -159,6 +165,24 @@ beforeAll(async () => {
   };
   secretA = await activeSecret(roomA, memberA, ownerA);
   secretB = await activeSecret(roomB, memberB, ownerB);
+  // Operation rows with a DUMMY snapshot digest (no key): refused before any snapshot check.
+  const pendingOperation = async (roomId: string, starter: Person): Promise<string> => {
+    const id = randomUUID();
+    await insert(db, 'rekey_operations', {
+      id,
+      room_id: roomId,
+      started_by_id: starter.userId,
+      mode: 'MANUAL',
+      base_version: 1,
+      target_version: 2,
+      membership_epoch: 0,
+      recipient_set_digest: Buffer.alloc(32, 0xa5),
+      lease_expires_at: new Date(Date.now() + 3_600_000),
+    });
+    return id;
+  };
+  operationA = await pendingOperation(roomA, ownerA);
+  operationB = await pendingOperation(roomB, ownerB);
 
   // Everyone confirms their account first, so a step-up never explains a refusal: it is the
   // authorization that denies (the registry decides membership before it asks for a step-up).
@@ -194,6 +218,8 @@ async function snapshot(rooms: readonly string[]): Promise<string> {
     'encrypted_files',
     'encrypted_notes',
     'secrets',
+    'rekey_operations',
+    'room_member_grants',
   ]) {
     const column = table === 'rooms' ? 'id' : 'room_id';
     rows.push((await db.query(`SELECT * FROM ${table} WHERE ${column} = ANY($1) ORDER BY id`, [rooms])).rows);
@@ -235,6 +261,7 @@ type Cast = {
   readonly FILE: string;
   readonly NOTE: string;
   readonly SECRET: string;
+  readonly OPERATION: string;
 };
 const castA = (): Cast => ({
   MEMBER: memberA,
@@ -243,6 +270,7 @@ const castA = (): Cast => ({
   FILE: fileA,
   NOTE: noteA,
   SECRET: secretA,
+  OPERATION: operationA,
 });
 const castB = (): Cast => ({
   MEMBER: memberB,
@@ -251,13 +279,15 @@ const castB = (): Cast => ({
   FILE: fileB,
   NOTE: noteB,
   SECRET: secretB,
+  OPERATION: operationB,
 });
-type Target = Pick<RoomRef, 'userId' | 'invitationId' | 'fileId' | 'noteId' | 'secretId'>;
+type Target = Pick<RoomRef, 'userId' | 'invitationId' | 'fileId' | 'noteId' | 'secretId' | 'operationId'>;
 const targetIn = (c: BolaCase, cast: Cast): Target => {
   if (c.target === 'INVITATION') return { invitationId: cast.INVITATION };
   if (c.target === 'FILE') return { fileId: cast.FILE };
   if (c.target === 'NOTE') return { noteId: cast.NOTE };
   if (c.target === 'SECRET') return { secretId: cast.SECRET };
+  if (c.target === 'OPERATION') return { operationId: cast.OPERATION };
   if (c.target !== undefined && c.targetsMember) return { userId: cast[c.target].userId };
   return {};
 };
@@ -270,9 +300,11 @@ const inventedTarget = (c: BolaCase): Target =>
         ? { noteId: randomUUID() }
         : c.targetsSecret === true
           ? { secretId: randomUUID() }
-          : c.targetsMember
-            ? { userId: randomUUID() }
-            : {};
+          : c.targetsOperation === true
+            ? { operationId: randomUUID() }
+            : c.targetsMember
+              ? { userId: randomUUID() }
+              : {};
 const ref = (roomId: string, target: Target): RoomRef => ({ roomId, ...target });
 /** What a member with `role` gets for a target outside the room: the matrix's first step decides. */
 const crossRoomAnswer = (c: BolaCase, role: RoomRole) =>
@@ -329,7 +361,8 @@ describe('C: addressed room A with a target object (member, invitation, file, no
       c.targetsInvitation ||
       c.targetsFile === true ||
       c.targetsNote === true ||
-      c.targetsSecret === true,
+      c.targetsSecret === true ||
+      c.targetsOperation === true,
   );
   const callers = (): [string, Person, 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'][] => [
     ['OWNER of A', ownerA, 'OWNER'],

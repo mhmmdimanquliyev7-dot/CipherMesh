@@ -1,0 +1,39 @@
+{
+  "room": {
+    "key_state": "REKEY_REQUIRED",
+    "current_key_version": 1,
+    "rekey_reasons": "{MEMBER_REMOVED}"
+  },
+  "noteWrite": {
+    "status": 409,
+    "body": {
+      "error": {
+        "code": "REKEY_REQUIRED",
+        "message": "The room key must be rotated before new content can be added",
+        "requestId": "e25a27da-eb64-48eb-bdd6-a8ec1241c1b6"
+      }
+    }
+  },
+  "invitation": {
+    "status": 409,
+    "body": {
+      "error": {
+        "code": "REKEY_REQUIRED",
+        "message": "The room key must be rotated before membership can change this way",
+        "requestId": "14d13f11-d38c-487d-a655-c61ad1dbf7e3"
+      }
+    }
+  },
+  "keyStateSeenByMember": {
+    "keyState": "REKEY_REQUIRED",
+    "rekeyReasons": [
+      "MEMBER_REMOVED"
+    ],
+    "rekeyRequiredSince": "2026-10-13T11:09:54.426Z",
+    "currentKeyVersion": 1,
+    "cryptoperiodEndsAt": null,
+    "cryptoperiodReminder": false,
+    "operation": null,
+    "membersNeedingKeys": []
+  }
+}

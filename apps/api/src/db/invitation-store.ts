@@ -148,7 +148,11 @@ const roomInvitationOf = (row: {
   createdAt: row.createdAt,
 });
 
-export function invitationStoreFunctions(db: Db) {
+/**
+ * `advanceEpoch` (Phase 11) is the room store's single epoch writer, which also closes a PENDING
+ * rekey operation as STALE; stores built without the room store (the vault's) never accept.
+ */
+export function invitationStoreFunctions(db: Db, advanceEpoch?: (roomId: string, now: Date) => Promise<void>) {
   /** Deletes the PENDING envelopes of the given invitations (decline, revoke, expiry, invalidation). */
   async function deletePendingEnvelopes(invitationIds: readonly string[]): Promise<number> {
     if (invitationIds.length === 0) return 0;
@@ -311,11 +315,9 @@ export function invitationStoreFunctions(db: Db) {
         },
         data: { status: 'ACTIVE', invitationId: null },
       });
-      await db.room.update({
-        where: { id: invitation.roomId },
-        data: { membershipEpoch: { increment: 1 }, updatedAt: now },
-        select: { id: true },
-      });
+      // A new member changes the recipient set (ADR-013 step 5).
+      if (advanceEpoch === undefined) throw new Error('acceptance needs the room store');
+      await advanceEpoch(invitation.roomId, now);
       return true;
     },
 

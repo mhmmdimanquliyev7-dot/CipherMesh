@@ -105,6 +105,14 @@ describe('route inventory', () => {
       'POST /rooms/:roomId/secrets AZ-23-SECRET-CREATE',
       'POST /rooms/:roomId/secrets/:secretId/reveal AZ-24-SECRET-REVEAL',
       'POST /rooms/:roomId/secrets/:secretId/revoke AZ-25-SECRET-REVOKE',
+      // Phase 11 (CM-T050 to CM-T053): the rekey state machine (operations addressed by room AND
+      // operation ID, OL-13), leaving (AZ-11) and re-sharing to a member's current identity (AZ-14).
+      'GET /rooms/:roomId/rekey-operations/current AZ-15-KEY-STATE',
+      'POST /rooms/:roomId/rekey-operations AZ-13-REKEY-START',
+      'POST /rooms/:roomId/rekey-operations/:operationId/finalize AZ-13-REKEY-FINALIZE',
+      'POST /rooms/:roomId/rekey-operations/:operationId/cancel AZ-13-REKEY-CANCEL',
+      'POST /rooms/:roomId/leave AZ-11-LEAVE',
+      'POST /rooms/:roomId/members/:userId/reshare AZ-14-RESHARE',
     ]);
   });
 
@@ -114,9 +122,12 @@ describe('route inventory', () => {
       .filter((r) => r.sensitive !== undefined)
       .map((r) => `${r.method} ${r.path} ${String(r.sensitive)}`);
     // security-policy-profiles.md PC-03: reveal secret, file download URL, invite, approve,
-    // remove member, start a rekey (no route before Phase 11), change profile, delete room.
+    // remove member, start a rekey (Phase 11), change profile, delete room. Re-sharing keys (AZ-14)
+    // takes the invitation's step-up: the matrix gives it "the same checks as invitations".
     expect(sensitive.sort()).toEqual(
       [
+        'POST /rooms/:roomId/rekey-operations START_REKEY',
+        'POST /rooms/:roomId/members/:userId/reshare INVITE',
         'POST /rooms/:roomId/secrets/:secretId/reveal SECRET_REVEAL',
         'POST /rooms/:roomId/files/:fileId/download-url FILE_DOWNLOAD_URL',
         'POST /rooms/:roomId/invitations INVITE',
@@ -178,6 +189,9 @@ describe('route inventory', () => {
       // Phase 9: only the metadata list is a read. There is no GET for one secret, and the reveal
       // that releases (and burns) the ciphertext is a POST, so no preview or prefetch consumes it.
       '/rooms/:roomId/secrets',
+      // Phase 11: the key state is a read; an expired lease is closed by the next start or the
+      // worker, never by this GET. Start, finalize, cancel, leave and re-share are POSTs.
+      '/rooms/:roomId/rekey-operations/current',
     ]);
   });
 

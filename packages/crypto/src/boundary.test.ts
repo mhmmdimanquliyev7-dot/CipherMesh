@@ -31,6 +31,8 @@ describe('@ciphermesh/crypto export surface', () => {
         'computeSafetyCode',
         'createInitialRoomKey',
         'createInvitationKeys',
+        // Phase 11 (CM-T050): rekeyed versions are made and reviewed in the browser.
+        'createRekeyKeys',
         'createVault',
         'createWorkerRunner',
         'encryptFile',
@@ -40,6 +42,7 @@ describe('@ciphermesh/crypto export surface', () => {
         'encryptedSecretToWire',
         'formatFingerprint',
         'grantProofToWire',
+        'grantsFromWire',
         'invitationKeysToWire',
         'isBelowKdfTarget',
         'isCryptoError',
@@ -56,6 +59,8 @@ describe('@ciphermesh/crypto export surface', () => {
         'openRoomKeys',
         'openSecret',
         'publicIdentityFromWire',
+        'rekeyKeysToWire',
+        'reviewRekeyRecipients',
         'rewrapToWire',
         'roomCreationKeysToWire',
         'roomKeyBundlesFromWire',
@@ -98,6 +103,9 @@ describe('@ciphermesh/crypto export surface', () => {
       'openRoomKey',
       'computeSafetyCode',
       'signMembershipGrant',
+      // Phase 11: the API verifies a rekeyed version's statement but never makes or reviews one.
+      'createRekeyKeys',
+      'reviewRekeyRecipients',
     ]) {
       expect(names).not.toContain(forbidden);
     }

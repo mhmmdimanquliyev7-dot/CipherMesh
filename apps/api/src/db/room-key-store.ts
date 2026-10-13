@@ -164,11 +164,21 @@ export function roomKeyStoreFunctions(db: Db) {
       return rows.length === 1;
     },
 
-    /** The current public identity of an ACTIVE member of the room, as seen by an ACTIVE member. */
+    /**
+     * The current public identity of an ACTIVE member of the room, as seen by an ACTIVE member. Since
+     * Phase 11 also of a SUSPENDED member (the member list shows them), so an OWNER or ADMIN can
+     * verify the identity of a re-enabled account before reinstating it with re-shared keys (AZ-14).
+     * Public keys only; a disabled account or a retired identity has none to show.
+     */
     async findMemberIdentity(roomId: string, viewerId: string, memberId: string): Promise<IdentityRecord | null> {
       if (!isUuidV4(roomId) || !isUuidV4(viewerId) || !isUuidV4(memberId)) return null;
       const member = await db.roomMember.findFirst({
-        where: { roomId, userId: memberId, status: 'ACTIVE', room: callerIsMember(roomId, viewerId) },
+        where: {
+          roomId,
+          userId: memberId,
+          status: { in: ['ACTIVE', 'SUSPENDED'] },
+          room: callerIsMember(roomId, viewerId),
+        },
         select: { userId: true },
       });
       if (member === null) return null;
@@ -262,7 +272,8 @@ export function roomKeyStoreFunctions(db: Db) {
      * The signed grants a member needs to verify the room's statements (ADR-015 section 4): the
      * caller's own current grant, and the OWNER and ADMIN grants of every identity in the authority
      * chain of the key-version creators and of the caller's grantor, back to the genesis creator.
-     * Grants of former members are included when the chain runs through them.
+     * Grants of former members, and grants a later one replaced, are included when the chain runs
+     * through them.
      */
     async grantChain(roomId: string, viewerId: string, start: readonly IdentityRef[]): Promise<GrantRecord[]> {
       if (!isUuidV4(roomId) || !isUuidV4(viewerId)) return [];
@@ -314,19 +325,39 @@ export function roomKeyStoreFunctions(db: Db) {
       const seen = new Set<string>();
       let frontier = uniqueRefs([...start, ...(own === null ? [] : [add(own)].filter((r) => r !== undefined))]);
       for (const r of frontier) seen.add(refKey(r));
+      // Phase 11: the chain reads every grant ever stored (room_member_grants), not only each
+      // membership's latest one, so statements an earlier identity signed keep their authority
+      // after a re-share replaced that membership's grant (AZ-14, CM-T053).
       for (let round = 0; round < MAX_CHAIN_ROUNDS && frontier.length > 0 && found.size < MAX_GRANTS; round++) {
-        const rows = await db.roomMember.findMany({
+        const rows = await db.roomMemberGrant.findMany({
           where: {
             roomId,
-            grantRole: { in: ['OWNER', 'ADMIN'] },
-            OR: frontier.map((r) => ({ userId: r.userId, subjectKeyId: r.keyId })),
+            role: { in: ['OWNER', 'ADMIN'] },
+            OR: frontier.map((r) => ({ subjectUserId: r.userId, subjectKeyId: r.keyId })),
           },
-          select,
+          select: {
+            id: true,
+            subjectUserId: true,
+            subjectKeyId: true,
+            role: true,
+            grantorUserId: true,
+            grantorKeyId: true,
+            grantSignature: true,
+          },
+          orderBy: { createdAt: 'asc' },
           take: MAX_GRANTS,
         });
         const next: IdentityRef[] = [];
-        for (const row of rows) {
-          const grantor = add(row);
+        for (const history of rows) {
+          const grantor = add({
+            id: history.id,
+            userId: history.subjectUserId,
+            subjectKeyId: history.subjectKeyId,
+            grantRole: history.role,
+            grantorUserId: history.grantorUserId,
+            grantorKeyId: history.grantorKeyId,
+            grantSignature: history.grantSignature,
+          });
           if (grantor !== undefined && !seen.has(refKey(grantor))) {
             seen.add(refKey(grantor));
             next.push(grantor);
