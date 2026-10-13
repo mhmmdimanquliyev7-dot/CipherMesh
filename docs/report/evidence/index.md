@@ -127,4 +127,4 @@ Captured on branch `feature/CM-T050-key-rotation` against the local PostgreSQL c
 | EV-11-06, EV-11-07 | [phase-11/EV-11-06-07_recovery-and-idempotency.txt](phase-11/EV-11-06-07_recovery-and-idempotency.txt) | 2026-10-13 | CM-T050 | Integration report: lease expiry and worker recovery, idempotent and concurrent finalize, stale and foreign operations |
 | EV-11-08 | [phase-11/EV-11-08_negative-controls.txt](phase-11/EV-11-08_negative-controls.txt) | 2026-10-13 | CM-T050 to CM-T053 | 13 of 13 new negative controls caught; baseline passes; sources restored byte for byte |
 | EV-11-09 | [phase-11/EV-11-09_gates.txt](phase-11/EV-11-09_gates.txt) | 2026-10-13 | CM-T050 to CM-T053 | Gate results of the final Phase 11 code |
-
+| EV-11-10 | [phase-11/EV-11-10_ci-run.txt](phase-11/EV-11-10_ci-run.txt) | 2026-10-13 | CM-T050 to CM-T053 | CI run 38392960689 of pull request #32: every job passed on the first attempt |
