@@ -88,7 +88,7 @@ export interface ProfilePolicy {
   readonly viewerMayObtainFileKeys: boolean;
   /** PC-13. */
   readonly auditLevel: AuditLevel;
-  /** PC-14: the room-key cryptoperiod; null means event-driven only. Enforced by CM-T052. */
+  /** PC-14: the room-key cryptoperiod; null means event-driven only. Enforced by the worker (Phase 11, CM-T052). */
   readonly cryptoperiodMs: number | null;
   /** PC-15: losing a member requires a rekey, in every profile. */
   readonly rekeyAfterMemberLoss: true;

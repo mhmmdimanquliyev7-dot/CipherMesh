@@ -22,8 +22,8 @@ import { mayAttempt } from './permissions';
  *
  * Everything here is UX. The API decides every request against the stored profile; hiding a
  * control or a confirmation box changes nothing about that (INV-08). Only rules the API enforces
- * today are listed as active; the room-key cryptoperiod (PC-14) arrives with key rotation and is
- * shown as not yet enforced. External links (PC-11) are not built, so they are not mentioned.
+ * today are listed as active, including the room-key cryptoperiod (PC-14, enforced by the worker
+ * since Phase 11). External links (PC-11) are not built, so they are not mentioned.
  */
 
 const HOUR = 60 * 60_000;
@@ -182,7 +182,8 @@ export function ProfilePanel({
       </ul>
       {policy.cryptoperiodMs === null ? null : (
         <p className="text-xs text-slate-500">
-          Not enforced yet: rotating the room key every {duration(policy.cryptoperiodMs)} (arrives with key rotation).
+          Room key cryptoperiod: the worker locks the room for a rekey when the current key version is older than{' '}
+          {duration(policy.cryptoperiodMs)}; members are reminded 14 days before.
         </p>
       )}
       {canChange ? (

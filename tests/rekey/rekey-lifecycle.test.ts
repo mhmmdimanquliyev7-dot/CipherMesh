@@ -8,6 +8,7 @@ import { runRekeyMaintenance } from '../../apps/api/src/db/rekey-cleanup';
 import { createLogger } from '../../apps/api/src/logging/logger';
 import { errorCode, startAuthApi, type AuthTestApi } from '../helpers/auth';
 import { loadDatabaseTestEnv, testDatabase } from '../helpers/database';
+import { encryptForRoom, startUpload } from '../helpers/files';
 import { createNote, createdNote, readNote } from '../helpers/notes';
 import { inRoomLockOrder, steppedUpAgo, STALE_STEP_UP_MS } from '../helpers/policy';
 import {
@@ -613,6 +614,41 @@ describe('key state, cryptoperiods (PC-14) and destruction of retired versions (
       key_state: 'REKEY_REQUIRED',
       rekey_reasons: '{CRYPTOPERIOD_EXPIRED}',
     });
+  });
+
+  it('a room locked by the wrap bound (R7) or an expired cryptoperiod (R6) is unlocked only by a rekey', async () => {
+    const owner = await mfaPersonWithVault(api, db);
+    const wrapRoom = await createRoom(owner, 'STANDARD');
+    await db.query('UPDATE room_key_versions SET wrap_count = 1048576 WHERE room_id = $1', [wrapRoom]);
+    const file = await encryptForRoom(owner, wrapRoom, randomBytes(8));
+    expect(errorCode(await startUpload(owner, wrapRoom, file))).toBe('REKEY_REQUIRED');
+    expect(await roomRow(db, wrapRoom)).toMatchObject({
+      key_state: 'REKEY_REQUIRED',
+      rekey_reasons: '{WRAP_LIMIT_REACHED}',
+    });
+    expect(await rekey(owner, wrapRoom)).toBe(2);
+    // The new version starts with a fresh wrap count and the reason is gone.
+    expect(await roomRow(db, wrapRoom)).toMatchObject({ key_state: 'ACTIVE', rekey_reasons: '{}' });
+    expect((await versions(wrapRoom)).map((v) => [v.version, v.status, v.reasons])).toEqual([
+      [1, 'RETIRED', '{INITIAL}'],
+      [2, 'ACTIVE', '{WRAP_LIMIT_REACHED}'],
+    ]);
+
+    const periodRoom = await createRoom(owner, 'CONFIDENTIAL');
+    const DAY = 24 * 60 * 60_000;
+    await db.query('UPDATE room_key_versions SET created_at = $2 WHERE room_id = $1 AND version = 1', [
+      periodRoom,
+      new Date(api.clock.now().getTime() - 181 * DAY),
+    ]);
+    const worker = workerDatabase();
+    try {
+      await runRekeyMaintenance(worker.prisma, api.clock.now());
+    } finally {
+      await worker.close();
+    }
+    expect(await roomRow(db, periodRoom)).toMatchObject({ rekey_reasons: '{CRYPTOPERIOD_EXPIRED}' });
+    expect(await rekey(owner, periodRoom)).toBe(2);
+    expect(await roomRow(db, periodRoom)).toMatchObject({ key_state: 'ACTIVE', rekey_reasons: '{}' });
   });
 
   it('the worker destroys a retired version no live item names; it keeps one a note still names', async () => {

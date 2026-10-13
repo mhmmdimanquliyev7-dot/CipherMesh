@@ -100,7 +100,7 @@ test('an invited member is promoted, receives ownership, and the new owner remov
   await expect(former).toContainText('Admin');
   await former.getByRole('button', { name: 'Remove' }).click();
   await expect(other.getByText('was removed.', { exact: false })).toBeVisible();
-  await expect(other.getByText('Until an owner or admin completes a key rotation').first()).toBeVisible();
+  await expect(other.getByText('Until an owner or admin completes the key rotation').first()).toBeVisible();
   await otherContext.close();
 
   // The removed former owner no longer reaches the room.

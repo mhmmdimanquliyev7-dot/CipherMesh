@@ -1,8 +1,8 @@
 // `pnpm security:negative-controls`: proves that the security tests are real (Phase 3, extended
 // with the vault and cryptography controls of Phase 4, the room authorization controls of Phase 5,
 // the cryptographic membership controls of Phase 6, the encrypted file controls of Phase 7, the
-// encrypted note controls of Phase 8, the recipient-bound secret controls of Phase 9 and the
-// security policy controls of Phase 10).
+// encrypted note controls of Phase 8, the recipient-bound secret controls of Phase 9, the
+// security policy controls of Phase 10 and the key rotation controls of Phase 11).
 // `--only=<prefix>` runs a subset, for example `--only=NC-05`.
 //
 // For each control, one deliberate defect is written into a source file in the working tree, the
@@ -1353,6 +1353,176 @@ const CONTROLS = [
       ],
     ],
     tests: ['tests/security/route-inventory.test.ts', 'tests/policy/policy-matrix.test.ts'],
+  },
+  // Phase 11 (CM-T050 to CM-T053): the rekey state machine, re-sharing, the identity procedure and
+  // the engine fix SF-11-01. Defects that the API repeats in the database (staleness, the grant
+  // history) are written into both layers, because each layer alone is caught by the other.
+  {
+    id: 'NC-11-01',
+    defect: 'Any OWNER or ADMIN may finalize another member’s rekey operation (OL-13)',
+    file: 'apps/api/src/rooms/rekey.ts',
+    edits: [
+      [
+        '          if (operation.startedById !== actor.userId) {\n            throw notStarter(',
+        "          if (operation.startedById !== actor.userId && actor.userId === '') {\n            throw notStarter(",
+      ],
+    ],
+    tests: ['tests/rekey/rekey-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-11-02',
+    defect: 'Any ADMIN may cancel the OWNER’s rekey operation (OL-13)',
+    file: 'apps/api/src/rooms/rekey.ts',
+    edits: [
+      [
+        "        if (operation.startedById !== actor.userId && member.role !== 'OWNER') {",
+        "        if (operation.startedById !== actor.userId && member.role !== 'OWNER' && member.role !== 'ADMIN') {",
+      ],
+    ],
+    tests: ['tests/rekey/rekey-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-11-03',
+    defect: 'The key-version statement signature is not checked at finalize (T-36)',
+    file: 'apps/api/src/rooms/rekey.ts',
+    edits: [['          if (!statementOk) {', '          if (!statementOk && statementOk) {']],
+    tests: ['tests/rekey/rekey-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-11-04',
+    defect: 'The recipient snapshot includes removed and departed members (T-21)',
+    file: 'apps/api/src/db/rekey-store.ts',
+    edits: [
+      [
+        "        where: { roomId, status: 'ACTIVE', user: { status: 'ACTIVE' } },",
+        "        where: { roomId, status: { in: ['ACTIVE', 'REMOVED', 'LEFT'] }, user: { status: 'ACTIVE' } },",
+      ],
+    ],
+    tests: ['tests/rekey/rekey-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-11-05',
+    defect: 'A membership change no longer makes a pending rekey STALE (API and database trigger)',
+    file: 'apps/api/src/db/room-store.ts',
+    edits: [
+      [
+        "       WHERE room_id = ${roomId}::uuid AND status = 'PENDING'\n      RETURNING id::text AS id, mode::text AS mode`;",
+        "       WHERE room_id = ${roomId}::uuid AND status = 'PENDING' AND false\n      RETURNING id::text AS id, mode::text AS mode`;",
+      ],
+    ],
+    also: [
+      {
+        file: 'prisma/migrations/20261011000000_key_rotation/migration.sql',
+        edits: [
+          [
+            "     WHERE room_id = NEW.id AND status = 'PENDING';\n    IF NEW.key_state = 'REKEYING' THEN",
+            "     WHERE room_id = NEW.id AND status = 'PENDING' AND false;\n    IF NEW.key_state = 'REKEYING' THEN",
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/rekey/rekey-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-11-06',
+    defect: 'An expired lease is still accepted at finalize (ADR-013 step 6)',
+    file: 'apps/api/src/rooms/rekey.ts',
+    edits: [
+      [
+        "          if (operation.leaseExpiresAt <= now) {\n            return { kind: 'closed', closed: await close(tx, room, operation, 'ABANDONED', 'LEASE_EXPIRED', now) };",
+        "          if (operation.leaseExpiresAt <= now && false) {\n            return { kind: 'closed', closed: await close(tx, room, operation, 'ABANDONED', 'LEASE_EXPIRED', now) };",
+      ],
+    ],
+    tests: ['tests/rekey/rekey-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-11-07',
+    defect: 'A different payload is answered as a retry of a completed rekey (idempotency)',
+    file: 'apps/api/src/rooms/rekey.ts',
+    edits: [
+      [
+        '            if (operation.payloadDigest !== null && sameBytes(operation.payloadDigest, payloadDigest)) {',
+        '            if (operation.payloadDigest !== null) {',
+      ],
+    ],
+    tests: ['tests/rekey/rekey-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-11-08',
+    defect: 'Starting a rekey in a RESTRICTED room needs no step-up (PC-03, route and locked row)',
+    file: 'apps/api/src/routes/rekey.ts',
+    edits: [
+      ["      access: { kind: 'room', requires: { sensitive: 'START_REKEY' } },", "      access: { kind: 'room' },"],
+    ],
+    also: [
+      {
+        file: 'apps/api/src/rooms/rekey.ts',
+        edits: [
+          [
+            "        const { room } = await lockAndReauthorize(tx, actor, access.roomId, meta, 'AZ-13', now, true);",
+            "        const { room } = await lockAndReauthorize(tx, actor, access.roomId, meta, 'AZ-13', now, false);",
+          ],
+        ],
+      },
+    ],
+    tests: ['tests/rekey/rekey-lifecycle.test.ts'],
+  },
+  {
+    id: 'NC-11-09',
+    defect: 'An ADMIN may re-share keys to another ADMIN (AZ-14 without the invitation role ceilings)',
+    file: 'apps/api/src/rooms/rekey.ts',
+    edits: [
+      [
+        '        if (!ceiling.allowed) throw roomDenial(events, request, ceiling.reason);',
+        '        if (!ceiling.allowed && ceiling.allowed) throw roomDenial(events, request, ceiling.reason);',
+      ],
+    ],
+    tests: ['tests/rekey/identity-reshare.test.ts'],
+  },
+  {
+    id: 'NC-11-10',
+    defect: 'A vault reset leaves the old identity’s envelopes in its rooms (CM-T053)',
+    file: 'apps/api/src/db/room-store.ts',
+    edits: [
+      [
+        '      await db.keyEnvelope.deleteMany({ where: { recipientUserId: userId, recipientKeyId: oldKeyId } });\n',
+        '',
+      ],
+    ],
+    tests: ['tests/rekey/identity-reshare.test.ts'],
+  },
+  {
+    id: 'NC-11-11',
+    defect: 'The grant history is not recorded, so a re-shared ADMIN’s earlier statements lose their authority',
+    file: 'prisma/migrations/20261011000000_key_rotation/migration.sql',
+    edits: [
+      [
+        '  IF NEW.grant_signature IS NOT NULL\n     AND (TG_OP',
+        '  IF NEW.grant_signature IS NOT NULL AND false\n     AND (TG_OP',
+      ],
+    ],
+    tests: ['tests/rekey/identity-reshare.test.ts'],
+  },
+  {
+    id: 'NC-11-12',
+    defect: 'The browser accepts a rekey snapshot that lists one user twice (recipient review)',
+    file: 'packages/crypto/src/room-keys.ts',
+    edits: [
+      [
+        '  if (users.size !== candidates.length || keys.size !== candidates.length) throw authenticationFailed();',
+        '  if (users.size === -1 || keys.size === -1) throw authenticationFailed();',
+      ],
+    ],
+    tests: ['packages/crypto/src/rekey.test.ts'],
+  },
+  {
+    id: 'NC-11-13',
+    defect: 'SF-11-01 regression: a 32-byte value with dropped leading zeros is refused again',
+    file: 'packages/crypto/src/rsa-oaep.ts',
+    edits: [
+      ['  if (value.length > RSA_OAEP.wrappedValueBytes) {', '  if (value.length !== RSA_OAEP.wrappedValueBytes) {'],
+    ],
+    tests: ['packages/crypto/src/rsa-oaep.test.ts'],
   },
 ];
 
