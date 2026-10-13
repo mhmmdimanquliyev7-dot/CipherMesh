@@ -1,0 +1,39 @@
+EV-11-08b Re-run of the 31 older negative controls whose target files Phase 11 changed (NC-03-06, NC-04-xx, NC-05-xx, NC-06-xx, NC-09-04, NC-10-02, NC-10-08, NC-10-11), 2026-10-13, branch feature/CM-T050-key-rotation, local PostgreSQL 17 and storage. All 115 control anchors were checked to match exactly once.
+
+| ID | Deliberate defect | Detected by | Result |
+|---|---|---|---|
+| NC-03-06 | Route mounted outside the route registry | tests/security/route-inventory.test.ts | CAUGHT (tests failed) |
+| NC-04-03 | Directory response exposes wrapped private-key data | tests/vault/reset-and-directory.test.ts | CAUGHT (tests failed) |
+| NC-04-04 | Vault ownership bypassed (any ACTIVE vault returned) | tests/vault/reset-and-directory.test.ts, tests/vault/setup.test.ts | CAUGHT (tests failed) |
+| NC-04-07 | Server accepts a vault re-wrap without verifying its signature | tests/vault/rewrap.test.ts | CAUGHT (tests failed) |
+| NC-04-11 | RSA-OAEP wrapper accepts values of any size (INV-17) | packages/crypto/src/rsa-oaep.test.ts | CAUGHT (tests failed) |
+| NC-04-12 | Vault Passphrase persisted in localStorage at unlock | tests/e2e/vault.spec.ts "setup, lock, unlock and passphrase change" (Chromium) | CAUGHT (tests failed) |
+| NC-04-13 | Vault Passphrase sent to the API at setup | tests/e2e/vault.spec.ts "setup, lock, unlock and passphrase change" (Chromium) | CAUGHT (tests failed) |
+| NC-04-14 | Inactivity auto-lock disabled | tests/e2e/vault.spec.ts "the vault locks after 15 minutes" (Chromium) | CAUGHT (tests failed) |
+| NC-04-17 | A failed background refresh replaces the unlocked vault by an error view (R-04-01) | tests/e2e/vault.spec.ts "a failed background refresh keeps the vault under the auto-lock" (Chromium) | CAUGHT (tests failed) |
+| NC-05-12 | The membership locked inside a transaction is not limited to the addressed room | tests/authz/membership-lookup.test.ts | CAUGHT (tests failed) |
+| NC-05-13 | Membership changes skip the re-authorization on locked state (stale gate decision) | tests/authz/membership-concurrency.test.ts | CAUGHT (tests failed) |
+| NC-05-15 | One-OWNER invariant broken: a transfer demotes the OWNER without promoting the target | tests/authz/membership-admin.test.ts | CAUGHT (tests failed) |
+| NC-05-16 | Disabling an account no longer suspends its room memberships (PA-03) | tests/authz/account-disable.test.ts | CAUGHT (tests failed) |
+| NC-05-17 | The room list is not limited to the caller memberships (OL-08) | tests/authz/rooms-lifecycle.test.ts | CAUGHT (tests failed) |
+| NC-05-19 | A target member of another room is accepted and changed (target lookup, lock and room check all unscoped) | tests/authz/bola.test.ts | CAUGHT (tests failed) |
+| NC-05-20 | A membership in room A authorizes room B (membership lookup, lock, mismatch check and room read all unscoped) | tests/authz/bola.test.ts | CAUGHT (tests failed) |
+| NC-05-21 | PLATFORM_ADMIN is treated as an ADMIN member of every room (gate and locked re-check) | tests/authz/bola.test.ts | CAUGHT (tests failed) |
+| NC-06-01 | The browser skips the key-version signature check (a server-made key version is used, T-36) | packages/crypto/src/room-keys.test.ts | CAUGHT (tests failed) |
+| NC-06-02 | The browser skips the commitment check (a key that does not match the signed commitment is used, T-29) | packages/crypto/src/room-keys.test.ts, tests/authz/room-keys.test.ts | CAUGHT (tests failed) |
+| NC-06-03 | The envelope label no longer names the recipient user and key (envelopes become transferable, T-25) | packages/crypto/src/room-keys.test.ts | CAUGHT (tests failed) |
+| NC-06-04 | An invitation without an envelope for the current key version is accepted (PC-07 version check removed) | tests/authz/invitations.test.ts | CAUGHT (tests failed) |
+| NC-06-05 | An ADMIN grant signed by someone who is not an OWNER confers ADMIN authority (authority chain) | packages/crypto/src/room-keys.test.ts | CAUGHT (tests failed) |
+| NC-06-06 | Another user can accept someone else's invitation (invitee filter removed from lookup and re-check) | tests/authz/invitations.test.ts | CAUGHT (tests failed) |
+| NC-06-07 | Invitation acceptance no longer locks and re-checks the invitee's user row (an account disable can miss it) | tests/authz/invitation-concurrency.test.ts | CAUGHT (tests failed) |
+| NC-06-08 | The API stores a new room without verifying the signed genesis and key-version statements | tests/authz/room-keys.test.ts | CAUGHT (tests failed) |
+| NC-06-09 | The Safety Code is derived from the public, server-supplied commitment instead of the key material | packages/crypto/src/room-keys.test.ts | CAUGHT (tests failed) |
+| NC-06-10 | The browser keeps the Room Safety Code in localStorage (INV-18) | tests/e2e/room-keys.spec.ts "kept in the browser" (Chromium) | CAUGHT (tests failed) |
+| NC-09-04 | Recipient authentication accepts any self-consistent identity the server names (key substitution, T-25) | packages/crypto/src/secrets.test.ts | CAUGHT (tests failed) |
+| NC-10-02 | The profile change trusts the client's claim of the current profile (stale check removed, direction from the request) | tests/policy/profile-change.test.ts | CAUGHT (tests failed) |
+| NC-10-08 | The locked re-check ignores the profile, so a change that commits first does not govern a waiting write (TOCTOU) | tests/policy/profile-change.test.ts | CAUGHT (tests failed) |
+| NC-10-11 | The FULL audit level records no envelope fetches or member-list views (PC-13) | tests/policy/policy-matrix.test.ts | CAUGHT (tests failed) |
+
+Baseline on unmodified code (Vitest): PASS
+Baseline on unmodified code (rebuilt export, Playwright): PASS
+Sources restored byte for byte (SHA-256, 16 files): YES

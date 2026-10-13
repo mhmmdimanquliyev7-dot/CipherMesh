@@ -265,3 +265,15 @@ The `policy-matrix` suite of the roadmap. Real API, real sessions with real MFA 
 | Browser | `tests/e2e/policies.spec.ts` | Chromium: the rules shown for each profile, an upgrade, a member without MFA refused, a downgrade with a fresh identity confirmation |
 
 The Phase 10 negative controls (NC-10-01 to NC-10-12) are listed in `scripts/security/negative-controls.mjs`. `pnpm test:policy` runs the `policy` project (needs the local PostgreSQL and storage).
+
+The Phase 11 negative controls (NC-11-01 to NC-11-13) are listed in `scripts/security/negative-controls.mjs`. `pnpm test:rekey` runs the `rekey` project (needs the local PostgreSQL). Coverage of the phase:
+
+| Area | Suite | What it proves |
+|---|---|---|
+| Browser cryptography | `packages/crypto/src/rekey.test.ts`, `rsa-oaep.test.ts` | A new version is fresh, committed, signed, chained and wrapped once per recipient; a departed member's old key cannot unwrap a new DEK (L-04); every tampered statement field, fork, substituted envelope and unattributed signer is refused; the recipient snapshot is reviewed before any key is made; SF-11-01 (RSA-OAEP results with dropped leading zero bytes) |
+| State machine | `tests/rekey/rekey-lifecycle.test.ts` | Removal locks, rekey unlocks; who may start, finalize and cancel (OL-13); one live operation, the lease, idempotency and concurrency; wrong recipient set, signature, version or commitment; STALE on membership change; atomic finalize; cryptoperiods and destruction; forged versions refused by members |
+| Identity | `tests/rekey/identity-reshare.test.ts` | Leaving; vault reset with and without the compromise flag; AZ-14 role ceilings, locks, profile rules and reinstatement; the grant history |
+| Database | `tests/database/rekey-guards.test.ts`, `privileges.test.ts` | The guards of database-security section 14 |
+| Drift | `tests/security/route-inventory.test.ts`, `bola-inventory.test.ts`, `authz-matrix.test.ts` | The six new routes in the reviewed lists and the BOLA table (rekey operation and member targets) |
+| Browser | `tests/e2e/rekey.spec.ts` (Chromium, Firefox and WebKit, three scenarios each) | A: removal locks the room and a rotation in the browser gives the remaining members a verified new key; B: a cancelled rotation leaves the room locked and a new one recovers it; C: after a vault reset the admin re-shares and the member verifies with the new identity. `room-keys.spec.ts` holds the known-answer round trip of SF-11-01 in each engine. Leaving a room is covered by the integration suite, not by a browser scenario |
+

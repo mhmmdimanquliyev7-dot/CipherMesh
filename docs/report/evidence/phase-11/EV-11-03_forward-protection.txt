@@ -1,0 +1,23 @@
+EV-11-03 Forward protection and its limit (L-04): a departed member's old key material cannot unwrap a DEK created after the rekey; the new version chains to the old one; a forged, forked or cross-substituted version is refused. Browser cryptography (packages/crypto) report, 2026-10-13, branch feature/CM-T050-key-rotation, local PostgreSQL 17 and storage, synthetic data only.
+
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP known answers (Wycheproof rsa_oaep_3072_sha256_mgf1sha256) > decrypts every valid vector to its message and rejects every invalid one 89ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP known answers (Wycheproof rsa_oaep_3072_sha256_mgf1sha256) > unwrap32 recovers the OpenSSL-encrypted 32-byte value with the canonical pair-check label 4ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP wrapper (INV-17: 32-byte values only, label always a canonical context) > interoperates with OpenSSL in both directions 7ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP wrapper (INV-17: 32-byte values only, label always a canonical context) > refuses anything but exactly 32 bytes (no RSA encryption of content) 164ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > RSA-OAEP wrapper (INV-17: 32-byte values only, label always a canonical context) > rejects a wrong label, a modified ciphertext, a wrong size and a valid OAEP value of 33 bytes 216ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > unwrap32 on an engine that drops leading zero bytes (finding SF-11-01, CD-33) > restores 32-byte values that start with one or more zero bytes 114ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > createRekeyKeys: a new key version made in the browser (CM-T050, DF-10) > draws fresh material, commits to it, signs the statement and wraps it once per recipient 638ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > unwrap32 on an engine that drops leading zero bytes (finding SF-11-01, CD-33) > still fails closed for a wrong label or a modified ciphertext 765ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > createRekeyKeys: a new key version made in the browser (CM-T050, DF-10) > every recipient verifies version 2, chained to version 1, with one Safety Code that differs from v1 827ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > importEncryptionPublicKey: only RSA-3072 with e = 65537 in canonical DER > accepts the vector key and generated keys 300ms
+ ✓ |unit| packages/crypto/src/rsa-oaep.test.ts > importEncryptionPublicKey: only RSA-3072 with e = 65537 in canonical DER > rejects RSA-2048, a 3072-bit key with another exponent, garbage and an EC key 342ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > createRekeyKeys: a new key version made in the browser (CM-T050, DF-10) > a departed member holding RKM_1 cannot unwrap a DEK created after the rekey (CM-T051, L-04) 614ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > createRekeyKeys: a new key version made in the browser (CM-T050, DF-10) > refuses inputs that would make an unusable or unattributed version 496ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > opening a rekeyed version refuses every tampered field (ADR-015 section 4, T-36) > accepts the untouched version and refuses each modified statement field 484ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > opening a rekeyed version refuses every tampered field (ADR-015 section 4, T-36) > refuses a fork: a v2 whose previous commitment is not the v1 this client verified 736ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > opening a rekeyed version refuses every tampered field (ADR-015 section 4, T-36) > refuses an envelope of another recipient, another version or another room (cross-recipient substitution) 330ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > opening a rekeyed version refuses every tampered field (ADR-015 section 4, T-36) > refuses a version signed by an ADMIN's new key (after a vault reset) that no grant names 727ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > reviewRekeyRecipients: the snapshot is checked before any key is made (ADR-013 step 2.1) > verifies every identity and flags a key the room has never signed (after a vault reset) 790ms
+ ✓ |unit| packages/crypto/src/rekey.test.ts > reviewRekeyRecipients: the snapshot is checked before any key is made (ADR-013 step 2.1) > refuses duplicates, a snapshot without this client, an empty one and a forged identity 1673ms
+ Test Files  2 passed (2)
+      Tests  19 passed (19)

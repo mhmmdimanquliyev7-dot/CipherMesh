@@ -103,4 +103,14 @@ stateDiagram-v2
 
 ## Status
 
-Accepted. Implementation in Phase 11 (CM-T050, CM-T051).
+Accepted. Implemented in Phase 11 (CM-T050 to CM-T053); see [phase-11-traceability.md](../../management/phase-11-traceability.md).
+
+### Implementation notes (Phase 11)
+
+The state machine is implemented as decided. Additions that the decision left open, none of which changes a property it states:
+
+- **Database guards.** The staleness rule (step 5), the sequence and status order of key versions, write-once operation columns and the rule that a room is REKEYING exactly when it has a PENDING MANDATORY operation are also enforced by triggers (`20261011000000_key_rotation`), so a faulty runtime writer cannot break them silently. Controls NC-11-05 and NC-11-11 write the defect into both layers.
+- **Recipient digest recomputed at finalize.** Besides the epoch, finalize recomputes the recipient set from the database and compares its digest with the snapshot's, which catches an invitation created or revoked during the operation.
+- **Grant history.** Re-sharing to a reset ADMIN replaces the grant stored on the membership, so every grant is also recorded in an append-only table (`room_member_grants`) from which the authority chain is built; statements signed by the earlier identity stay verifiable.
+- **Limits.** At most 10 starts per room per hour and 100 recipients (CP-25); the worker abandons expired operations, applies the cryptoperiod and destroys unreferenced RETIRED versions.
+- **Not built.** Account deletion as a rekey trigger (R4): the product has no account deletion (L-67).

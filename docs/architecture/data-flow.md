@@ -423,7 +423,7 @@ sequenceDiagram
 
 Rules:
 - Between the removal and the finalize, the room is write-locked. New files, notes, note edits, secrets and invitations fail with 409 `REKEY_REQUIRED`. Reads continue.
-- Leaving, a disabled or deleted account, a reported identity-key compromise, cryptoperiod expiry and the wrap bound enter the same REKEY_REQUIRED state without an admin present. Any OWNER or ADMIN completes the rekey later (L-24).
+- Leaving, a disabled account, a reported identity-key compromise (account deletion is not built, L-67), cryptoperiod expiry and the wrap bound enter the same REKEY_REQUIRED state without an admin present. Any OWNER or ADMIN completes the rekey later (L-24).
 - Pending invitees are part of the recipient snapshot, so their invitations stay valid across a rekey.
 - After activation, writes that name version v fail with 409 `KEY_VERSION_STALE`. RETIRED versions stay available for decrypting existing content.
 
@@ -432,6 +432,8 @@ Failure handling:
 - **Retry after a timeout:** repeating the identical finalize returns the original result. A different payload returns 409 `REKEY_PAYLOAD_MISMATCH`.
 - **Stale finalize:** a finalize after a membership change, a key change or lease expiry fails with 409 `REKEY_OPERATION_CLOSED`, and the admin starts again.
 - **Mismatched envelopes:** envelopes for the wrong recipients, including a removed member, fail with 422 `REKEY_RECIPIENTS_MISMATCH`.
+
+Implementation (Phase 11, CM-T050 to CM-T053): `POST /rooms/{roomId}/rekey-operations` records the operation and the recipient snapshot; the starter's browser reviews the snapshot, makes the version (`createRekeyKeys`) and posts it to `.../finalize`; `.../cancel`, `POST /rooms/{roomId}/leave` and `.../members/{userId}/reshare` complete the flow. Authorization: [authorization-model.md](../security/authorization-model.md) section 9.12. The server stores the envelopes and checks the set, the signature and the order of versions; it never sees key material (INV-01, INV-04). Runbook: [runbook-compromised-identity-key.md](../security/runbook-compromised-identity-key.md).
 
 ## DF-11 Audit append, checkpoint and verification
 

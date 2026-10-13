@@ -1,6 +1,6 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-12, end of Prompt 12 (Phase 10 implemented, verified and merged into `main`: CM-T046 to CM-T049). Phases 1 to 10 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-13, end of Prompt 13 (Phase 11 implemented and verified on branch `feature/CM-T050-key-rotation`: CM-T050 to CM-T053; its pull request is open until merged). Phases 1 to 10 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
@@ -11,8 +11,9 @@ Snapshot: 2026-10-12, end of Prompt 12 (Phase 10 implemented, verified and merge
 | Phase 8 | Secure Notes (CM-T042): title and body as one AES-256-GCM message under a fresh NEK per revision, the revision bound in both contexts, optimistic concurrency with 409 on stale saves, AZ-19 to AZ-22, text-only rendering (section 6c). Traceability: [phase-08-traceability.md](phase-08-traceability.md) |
 | Phase 9 | Burn Secrets (CM-T043, CM-T044): one AES-256-GCM message under a fresh SEK, only the 32-byte SEK RSA-OAEP-wrapped to a recipient key the sender's browser authenticated against the room's signed statements; POST-only reveal in a locking transaction that returns and, with burn-after-reading, destroys the ciphertext in one statement; AZ-23 to AZ-25 and the new AZ-32 (section 6d). CM-T045 (external links, stretch) not built. Traceability: [phase-09-traceability.md](phase-09-traceability.md) |
 | Phase 10 | Security Policies (CM-T046 to CM-T049): the versioned, frozen policy catalogue `packages/shared/src/policy.ts` (version 1), PC-01 and PC-02 on every room request and again on the locked room row, PC-03 for every sensitive operation that exists, PC-13 FULL events, profile changes with expiry clamping and revocation (AZ-03), the `policy` test matrix (section 6e). Traceability: [phase-10-traceability.md](phase-10-traceability.md) |
-| Branch | `feature/CM-T046-security-policies` (head `02c48e5`) is merged and takes no further commits |
-| Next | **Prompt 13: Phase 11, Key Rotation** (CM-T050 to CM-T053), after this Phase 10 handoff is merged. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Security profile panel only follows the current style |
+| Phase 11 | Key Rotation (CM-T050 to CM-T053): the rekey state machine and operation API (ADR-013), rekeyed versions made and reviewed in the browser, leaving a room, retirement, destruction, the wrap bound and the PC-14 cryptoperiod through the worker, the vault-reset procedure with the `identityCompromised` flag, re-sharing and reinstatement (AZ-14) and the append-only grant history (section 6f). Engine finding SF-11-01 fixed in `unwrap32` (CD-33). Account deletion does not exist, so R4 has no trigger (L-67). Traceability: [phase-11-traceability.md](phase-11-traceability.md); runbook: [../security/runbook-compromised-identity-key.md](../security/runbook-compromised-identity-key.md) |
+| Branch | `feature/CM-T050-key-rotation` carries Phase 11 (commits `79ee7a8` to `b8b5fa8` plus the verification and documentation commit); `feature/CM-T046-security-policies` is merged and takes no further commits |
+| Next | **Prompt 14: Phase 12, Tamper-Evident Audit** (CM-T054 to CM-T058), after the Phase 11 pull request and its handoff are merged. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Security profile panel only follows the current style |
 | Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 9. After this handoff is merged it is the baseline for Prompt 12 |
 
 ## 2. Architecture implemented so far
@@ -87,7 +88,7 @@ Behaviour to know:
 - **Commitment and envelope.** RKC_v = HKDF(RKM_v, `cm.room.commitment {roomId, keyVersion}`); envelope = RSA-OAEP(recipient key, RKM_v, label `cm.room.envelope {roomId, keyVersion, recipientUserId, recipientKeyId, suite}`).
 - **Statements** (`cm.room.genesis`, `cm.room.membership-grant`, `cm.room.key-version`), the verification rule and the owner-approved clarification for invited members: ADR-015 section 4.1, CD-28. The API verifies the statements it stores, and browsers verify everything again.
 - **Invitations.** AZ-06 role ceilings; PC-03 (RESTRICTED step-up), PC-04 (OWNER approval of ADMIN invitations in CONFIDENTIAL and RESTRICTED), PC-05, PC-06 and PC-07 from `INVITATION_RULES`; PC-16 everywhere. PENDING envelopes are never served and become ACTIVE at acceptance. Acceptance locks the user row, the identity row, the room, the invitation and the memberships in that order and re-checks everything, so an account disable cannot miss it.
-- **Identity reset.** A vault reset revokes the open invitations addressed to the old identity and deletes their PENDING envelopes. Deleting the old identity's ACTIVE envelopes and re-sharing (AZ-14, reinstatement) are CM-T053 (Phase 11, L-44); Phase 6 does not implement them.
+- **Identity reset.** A vault reset revokes the open invitations addressed to the old identity and deletes their PENDING envelopes. Since Phase 11 the reset also deletes every envelope wrapped to the old identity, advances each room's epoch and, with the compromise flag, locks every room of the user; re-sharing and reinstatement (AZ-14) are in section 6f (L-44 resolved).
 - **Grants** replace each other only when the OWNER grants ADMIN or transfers ownership (`POST .../role`, `.../transfer-ownership` carry a signed grant). They are statements, not revocable credentials (L-46).
 - **Routes** (new in Phase 6; reviewed lists in `tests/security/route-inventory.test.ts`, BOLA table `tests/helpers/bola-cases.ts`): `GET /rooms/{roomId}/key-versions` (AZ-15), `/envelopes` (AZ-12), `/members/{userId}/identity` (AZ-01), `/invitations` (AZ-31); `POST /rooms/{roomId}/invitations` (AZ-06), `/invitations/{id}/approve` (AZ-07), `/invitations/{id}/revoke` (AZ-08), `/key-reports` (AZ-29), `/safety-code` (AZ-30); `GET /invitations`, `POST /invitations/{id}/accept`, `/decline` (SS-03). `POST /rooms` requires `keys`.
 - **Legacy rooms.** Rooms created before Phase 6 stay keyless and cannot be invited to (L-43); nothing initializes them on the server.
@@ -179,7 +180,26 @@ Behaviour to know:
 - **Events.** FULL adds `ENVELOPES_FETCHED` and `MEMBER_LIST_VIEWED` (room and count). All to the redacted log until Phase 12.
 - **Tests that move session ages** update `sessions.authenticated_at` or `step_up_at` as cm_api; a test that needs a CONFIDENTIAL or RESTRICTED actor must use `mfaPersonWithVault` (and step up in RESTRICTED for the PC-03 operations).
 - **Decisions** D-10-01 to D-10-09 are in the traceability file; no new dependency.
-- **Not enforced yet, by plan:** PC-11 (CM-T045) and PC-14 (CM-T052, Phase 11: the worker must set REKEY_REQUIRED with CRYPTOPERIOD_EXPIRED from `policy.cryptoperiodMs`).
+- **Not enforced, by plan:** PC-11 (CM-T045). PC-14 has been enforced by the worker since Phase 11 (REKEY_REQUIRED with CRYPTOPERIOD_EXPIRED from `policy.cryptoperiodMs`, section 6f).
+
+## 6f. Key rotation (Phase 11, CM-T050 to CM-T053)
+
+| Part | Location |
+|---|---|
+| Browser: make, review and open rekeyed versions | `packages/crypto/src/room-keys.ts` (`createRekeyKeys`, `reviewRekeyRecipients`, `openRoomKeys` with the grant history), `room-format.ts` (`rekeyKeysToWire`, `grantsFromWire`) |
+| RSA-OAEP fix SF-11-01 | `packages/crypto/src/rsa-oaep.ts` (`unwrap32` left-pads a short result; CD-33) |
+| API | `apps/api/src/rooms/rekey.ts` (state machine, leaving, re-sharing), `routes/rekey.ts`, `db/rekey-store.ts`, `db/rekey-cleanup.ts` (worker maintenance, called from `worker/retention.ts`), `vault/service.ts` (`resetVault` with the compromise flag) |
+| Schemas and constants | `packages/validation/src/rekey.ts`; `REKEY_RULES`, `REKEY_REASONS` in `packages/shared/src/rooms.ts`; error codes `REKEY_*`, `ROOM_KEY_UNAVAILABLE`, `RESHARE_NOT_NEEDED` |
+| Database | migration `20261011000000_key_rotation`: `room_member_grants` (append-only), guards on `rekey_operations`, `room_key_versions` and `rooms`, a deferred consistency check (database-security section 14) |
+| Web | `apps/web/src/rooms/rekey-panel.tsx` (state, review, rotate, leave, re-share), `keys.ts`, a compromise checkbox on the vault page |
+| Tests | `tests/rekey` (Vitest project `rekey`), `tests/database/rekey-guards.test.ts`, `packages/crypto/src/rekey.test.ts`, `tests/e2e/rekey.spec.ts`, helpers `tests/helpers/rekey.ts` |
+
+Behaviour to know:
+- **Who.** OWNER and ADMIN start; only the starter finalizes; the starter or the OWNER cancels. RESTRICTED starts need a step-up. One live operation per room (10-minute lease); 10 starts per room per hour.
+- **Lock.** Removal, leaving, suspension, the compromise flag, an expired cryptoperiod and the wrap bound set REKEY_REQUIRED. A mandatory rekey cannot be cancelled into an unlocked room. Any membership change makes a pending operation STALE (API and database).
+- **Re-share.** After a vault reset the new identity holds no key until a rekey includes it or an OWNER or ADMIN re-shares (AZ-14, same role ceilings as invitations; nobody re-shares to the OWNER). A locked room refuses a re-share, so the rekey comes first.
+- **Trust.** The server checks the set, the signature and the order of versions; members verify the version in the browser. The starter chooses the key (L-63).
+- **Line endings.** Scripted edits must keep LF (open files with `newline=''`).
 
 ## 7. Invariants every session must preserve
 
@@ -192,27 +212,27 @@ All of CLAUDE.md section 6 (INV-01 to INV-19). For Phases 5 and 6 especially:
 - **INV-09:** no unchained rows in `audit_events`.
 - Never weaken tests, grants, cookies or authorization to make something pass.
 
-## 8. Documents Prompt 13 must read
+## 8. Documents Prompt 14 must read
 
-- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 11, CM-T050 to CM-T053); `docs/management/jira-backlog.md` (CM-EPIC-10); [phase-10-traceability.md](phase-10-traceability.md).
-- ADR-013 (rekey), ADR-015 section 4 (rekey part), `docs/crypto/key-lifecycle.md`, DF-10, PC-14 and PC-15 in `security-policy-profiles.md`, authorization model 9.11 (a rekey start is a PC-03 operation; route declarations), L-44 and L-46 in `limitations.md`.
+- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 12, CM-T054 to CM-T058); `docs/management/jira-backlog.md` (CM-EPIC-11); [phase-11-traceability.md](phase-11-traceability.md).
+- ADR-009 (audit trust model), `docs/security/limitations.md` L-26 and L-33 (events are in the redacted log, not the ledger), INV-09, the event catalogue in `apps/api/src/auth/security-events.ts` (the Phase 11 rekey events are in it), `docs/architecture/data-flow.md` DF-11.
 - The PC-16 scope question for AZ-26 stays open with CM-T045 (not built).
 
 ## 9. Test counts
 
-Gates of Prompt 12 on the final Phase 10 code (2026-10-12, local PostgreSQL and storage), recorded in EV-10-05 and phase-10-traceability.md section 5:
+Gates of Prompt 13 on the final Phase 11 code (2026-10-13, local PostgreSQL and storage), recorded in EV-11-09 and phase-11-traceability.md section 5:
 
 | Gate | Result |
 |---|---|
-| `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | Pass |
-| `pnpm test` | 2201 tests in 84 files (Phase 9: 2044 in 81). New: `tests/policy` (matrix 110, profile changes 14), `policy-catalogue.test.ts` (replaces `profile-requirements.test.ts`), `policy.test.ts`. One local first-run process stall (see below) |
-| `pnpm test:e2e` (three engines, one worker) | 118 passed, 16 skipped by design, 1 Firefox navigation timeout in a Phase 9 test that passed on rerun |
-| `pnpm security:negative-controls` | 102 of 102 caught (twelve Phase 10), both baselines pass, 54 source files restored byte for byte |
-| `pnpm test:coverage:crypto` | 98.79% statements, 94.16% branches (gate 90%) |
-| `pnpm test:coverage:authz` (with `policy.ts`) | 96.92% statements, 97.24% branches |
-| `pnpm build`, `pnpm smoke:api`, `pnpm sbom:generate`, `db:validate`, `db:check-schema`, `db:drift` | Pass |
+| `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 2302 tests in 88 files (Phase 10: 2201 in 84). New: `tests/rekey` (36), `rekey-guards.test.ts`, `packages/crypto/src/rekey.test.ts`, SF-11-01 tests |
+| `pnpm test:e2e` (three engines) | 128 passed, 0 failed, 16 skipped by design |
+| `pnpm security:negative-controls` | NC-11-01 to NC-11-13: 13 of 13 caught; the 31 older controls on files Phase 11 changed: 31 of 31 caught; baselines pass; all 115 anchors intact. A run of all 115 was not repeated |
+| `pnpm test:coverage:crypto` | 98.36% statements, 93.85% branches (gate 90%) |
+| `pnpm test:coverage:authz` | 96.92% statements, 97.24% branches |
+| `pnpm build`, `pnpm smoke:api`, `db:validate`, `db:check-schema`, `db:drift`, `pnpm sbom:generate` | Pass |
 | `pnpm audit:deps` | Pass (no known vulnerabilities); no dependency added or changed |
-| Secret scan (gitleaks) | Full history and staged changes: no leaks found |
+| Secret scan (gitleaks) | 73 commits and staged changes: no leaks found |
 
 Local notes: `.gitignore` anchors `/secrets/`; if Docker Desktop restarts and the Postgres container cannot bind `127.0.0.1:55432` (Windows reserves port ranges), set another `POSTGRES_PORT` and the same port in the three database URLs of the git-ignored `.env`; the files and policy suites need the local storage (`pnpm services:up && pnpm storage:bootstrap`); the database suites need the local PostgreSQL container. Run E2E and the negative controls one at a time, E2E with `--workers=1`. The `cm_api` connection limit of 40 is shared by all projects; `authz`, `files`, `notes`, `secrets` and `policy` run their files serially. Twice in Prompt 12 a single test reported "timed out in 60000ms" after 10 to 16 minutes: the test process itself stalled (its timer could not fire); reruns passed and a 10-second tick logger showed no stall. A duration far above the timeout means a stall, not a defect, but check with the tick logger. Known timing-sensitive tests are in the memory notes; on a red CI run rerun the job once, find the mechanism and never loosen assertions.
 
@@ -226,13 +246,15 @@ Local notes: `.gitignore` anchors `/secrets/`; if Docker Desktop restarts and th
 - Phase 8: note metadata (authors, editors, revision counts, sizes, times) is visible to the server (L-51); only the current revision, no history or merge (L-52); authorship is the server's statement (L-53, L-09); removal does not take back notes already read (L-54); an older revision served under its own number is noticed only if this tab saw a newer one (L-10, T-32).
 - Phase 9: secret metadata is visible to the server and to OWNER and ADMIN (L-55); the sender of a secret is the server's statement (L-56); burn-after-reading is at most once and proves release, not reading (L-57); revealed text is dropped, not wiped (L-58); with L-03 and L-12.
 - Phase 10: reads are judged by the profile at the request's start (L-59); profiles are per room, not per device, and the room list still shows a room to a member who fails its profile (L-60); profile changes do not take back what members obtained (L-61); PC-11 and PC-14 wait for later phases (L-62). L-42 is resolved. Rooms from before Phase 6 stay keyless (L-43); a room that loses a member stays REKEY_REQUIRED until the rekey exists, and neither a re-enabled account nor a reset identity gets rooms back until CM-T053 (L-44); a reused room ID is refused with 409, and there is no room quota (L-45).
+- Phase 11: a rekeyed version is trusted to the browser that made it (L-63); the compromise flag is declared, not detected (L-64); re-share and rekey for a reset member rely on a fingerprint check through another channel in STANDARD and CONFIDENTIAL rooms (L-65); cryptoperiods run on the worker's schedule and destruction leaves backups (L-66); account deletion does not exist (L-67). L-44 is resolved; PC-14 is enforced.
 - Full list: `docs/security/limitations.md`.
 
 ## 11. Deferred decisions
 
 | Decision | Status |
 |---|---|
-| Rekey, leaving a room, re-sharing and reinstatement (AZ-14), how a former ADMIN's signature is rejected (L-46) | Phase 11 (CM-T050 to CM-T053) |
+| Rekey, leaving a room, re-sharing and reinstatement (AZ-14) | Done in Phase 11. A former ADMIN's earlier grants still count as authority for statements they signed (L-46, L-65) |
+| Account deletion and its rekey trigger (R4) | No feature exists; implement together (L-67) |
 | PC-16 scope for AZ-26 | With CM-T045 (external links, stretch), which Phase 9 did not build |
 | Initialization of rooms created before Phase 6 | Not needed while nothing is deployed; needs an architecture decision before it is built (L-43) |
 | OCD-06 fingerprint pinning, OCD-10 vault recovery key, OCD-11 WebAuthn | Stretch |
@@ -240,7 +262,7 @@ Local notes: `.gitignore` anchors `/secrets/`; if Docker Desktop restarts and th
 
 ## 12. Outstanding work outside the repository
 
-- **E2E flakiness (found in Prompt 12, not caused by Phase 10).** The browser E2E step of CI fails intermittently on a different Phase 5 to 9 test every run, mostly WebKit and Firefox (see section 1 for the runs); the Vitest jobs are green. Unresolved: find the mechanism (a hang under load is suspected, unproven) before Prompt 13 relies on a green E2E, and never loosen assertions or drop an engine. The same section's required-checks item below matters here: until the CI jobs are required checks, a red E2E does not block a merge.
+- **E2E flakiness (found in Prompt 12, not caused by Phase 10).** The browser E2E step of CI fails intermittently on a different Phase 5 to 9 test every run, mostly WebKit and Firefox (see section 1 for the runs); the Vitest jobs are green. Unresolved: find the mechanism (a hang under load is suspected, unproven) before a later prompt relies on a green E2E. The Phase 11 local runs (three engines, default workers) had no intermittent failure: one deterministic failure was a stale assertion (fixed) and the final full run passed 128 of 128, and never loosen assertions or drop an engine. The same section's required-checks item below matters here: until the CI jobs are required checks, a red E2E does not block a merge.
 - Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including both coverage steps) as required checks, then capture EV-01-01 to EV-01-03.
 - Dependabot pull requests remain open (#2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24; the `next` update is covered by Phase 6, which pins 16.3.8).
 - Jira: import the backlog; move CM-T006 to CM-T044, CM-T085 and CM-T086 through IN PROGRESS, SECURITY REVIEW and TESTING; create SF-04-01, R-05-01 and SF-07-01 as `security-finding` items. Nothing is DONE yet.
@@ -249,7 +271,7 @@ Local notes: `.gitignore` anchors `/secrets/`; if Docker Desktop restarts and th
 ## 13. Not implemented yet
 
 - External one-time secret links (CM-T045, stretch). Files (Phase 7), notes (Phase 8) and recipient-bound secrets (Phase 9, section 6d) are implemented. Note version history, collaborative editing and Markdown are not planned for any phase. Secrets are not signed by their sender (L-56).
-- Rekey, key-version retirement, leaving a room, re-sharing keys, the compromised-identity procedure (Phase 11).
+- Account deletion (key-lifecycle R4, L-67).
 - The audit hash chain (Phase 12), the Crypto Inspector or the Security Dashboard (Phases 13 and 14).
 - Deployment, Nginx or cloud resources (Phase 17 onward).
 - Any server-side handling of the Vault Passphrase, private keys or room key material, ever.

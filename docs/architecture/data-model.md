@@ -1,6 +1,6 @@
 # Data Model Proposal
 
-Status: Phase 0.5 design, implemented in Phase 2 as `prisma/schema.prisma` (schema v1) and extended in Phase 4 (section 4.5, identity signing key, ADR-015) and Phase 6 (sections 4.6 to 4.10 and 8, the signed room statements). Section 7 records how the implementation maps to this design and every justified deviation; section 8 lists the additions that ADR-015 plans for Phases 6 and 11. Database security controls: [../security/database-security.md](../security/database-security.md). Related: [data-flow.md](data-flow.md), [../crypto/key-hierarchy.md](../crypto/key-hierarchy.md), [../security/authorization-model.md](../security/authorization-model.md).
+Status: Phase 0.5 design, implemented in Phase 2 as `prisma/schema.prisma` (schema v1) and extended in Phase 4 (section 4.5, identity signing key, ADR-015) Phase 6 (sections 4.6 to 4.10 and 8, the signed room statements) and Phase 11 (sections 4.9.1 and 4.9.2: the rekey operation and the membership grant history, migration `20261011000000_key_rotation`). Section 7 records how the implementation maps to this design and every justified deviation; section 8 lists the additions that ADR-015 plans for Phases 6 and 11. Database security controls: [../security/database-security.md](../security/database-security.md). Related: [data-flow.md](data-flow.md), [../crypto/key-hierarchy.md](../crypto/key-hierarchy.md), [../security/authorization-model.md](../security/authorization-model.md).
 
 ## 1. Principles
 
@@ -222,6 +222,20 @@ Ownership: the room. Started and finalized by one OWNER or ADMIN ([ADR-013](adr/
 | closedReason | text, nullable | META | For example LEASE_EXPIRED, MEMBERSHIP_CHANGED, CANCELLED_BY_OWNER |
 | createdAt, completedAt, closedAt | timestamptz | META | |
 
+#### 4.9.2 RoomMemberGrant (Phase 11, CM-T053)
+Ownership: the room. An append-only record of every signed membership grant ever stored on a membership (`room_members` keeps only the latest). It holds signatures and key IDs, no key material.
+
+| Field | Type | Class | Notes |
+|---|---|---|---|
+| id, roomId | uuid | ID | |
+| subjectUserId, subjectKeyId | uuid | ID | The member and the identity the grant names |
+| role | enum RoomRole | META | The role the grantor signed |
+| grantorUserId, grantorKeyId | uuid | ID | The signer and the identity that signed |
+| grantSignature | bytea | INT | ECDSA P-256 signature (CP-26) |
+| createdAt | timestamptz | META | |
+
+A trigger on `room_members` records each grant; the table is unique per statement and refuses update, delete and truncate. The API reads it to serve the authority chain, so statements signed by an identity that a member later replaced (key versions it created, invitations it granted) remain verifiable (ADR-015 section 4.1, step 4). Grants: `cm_api` may select and insert; nothing else.
+
 ### 4.10 KeyEnvelope (WrappedKey)
 Ownership: the room. Each envelope is served **only** to its recipient, and only while the recipient is an ACTIVE member.
 
@@ -398,7 +412,7 @@ Schema v1 implements sections 4.1 to 4.13 and 4.15 as 15 tables. Every stored fi
 
 ## 8. Signed room statements (ADR-015), implemented in Phase 6
 
-ADR-015 section 4 makes room authority verifiable by members. Migration `20261006000000_room_statements` (Phase 6, CM-T033 to CM-T036) adds the columns below; the rekey part (`RekeyOperation`) follows in Phase 11 (CM-T050). The list is what is stored so that every statement can be verified later by any member; see ADR-015 section 4.1 for the exact statements and the verification rule.
+ADR-015 section 4 makes room authority verifiable by members. Migration `20261006000000_room_statements` (Phase 6, CM-T033 to CM-T036) adds the columns below; the rekey part (`RekeyOperation`) and the grant history were added in Phase 11 (CM-T050, CM-T053). The list is what is stored so that every statement can be verified later by any member; see ADR-015 section 4.1 for the exact statements and the verification rule.
 
 | Entity | Planned fields | Purpose |
 |---|---|---|

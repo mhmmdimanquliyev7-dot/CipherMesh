@@ -49,6 +49,7 @@ S = SELECT, I = INSERT, U = UPDATE, D = DELETE. Source of truth: `prisma/migrati
 | invitations | S I U | S U | | Rows kept |
 | room_key_versions | S I U | S U | | Rows kept with commitment |
 | rekey_operations | S I U | S U D | | Worker purges 90 days after closing |
+| room_member_grants (Phase 11) | S I | | | Never: append-only (trigger refuses update, delete and truncate) |
 | key_envelopes | S I U D | S D | | Envelopes are deleted, never tombstoned |
 | encrypted_files | S I U | S U | | Tombstones (wrapped FEK and manifest set to NULL) |
 | encrypted_notes | S I U | S U | | Tombstones |
@@ -222,4 +223,18 @@ The migration replaces two trigger functions so that a profile upgrade can short
 | `cm_reject_invitation_grant_change` | `expires_at` write-once with the grant columns | `expires_at` may move strictly earlier while the invitation is PENDING_APPROVAL or PENDING; later, or any change on a closed invitation, is refused; the signed grant columns stay write-once |
 
 `CREATE OR REPLACE` keeps both triggers and the functions' privileges (restated with `REVOKE ALL ... FROM PUBLIC`). Tests: `tests/database/constraints.test.ts` (both directions, closed rows), `tests/policy/profile-change.test.ts` (the upgrade through the API). The migration replays from zero in the migration test and the drift check reports no difference.
+
+## 14. Phase 11: key rotation (migration `20261011000000_key_rotation`)
+
+One new table and database-level guards for the rekey state machine (data-model 4.9.1 and 4.9.2). The API enforces every rule first; the guards make a faulty or compromised writer of the runtime role unable to break the invariants silently (T-36, T-37, INV-07).
+
+| Object | Guard |
+|---|---|
+| `room_member_grants` | New. Every signed membership grant stored on `room_members` is recorded by a trigger (existing grants copied once); unique per statement; update, delete and truncate are refused. `cm_api` has SELECT and INSERT, nobody else a grant (matrix in 2.1, `tests/database/privileges.test.ts`) |
+| `rekey_operations` | Identity columns are write-once; a closed operation never changes again; a PENDING operation is never deleted |
+| `room_key_versions` | Versions are created in sequence with the previous version's commitment; status moves only ACTIVE to RETIRED to DESTROYED; `wrap_count` never decreases (CP-16) |
+| `rooms` | The current version moves only to the next, already ACTIVE version; a locked room is unlocked only together with that move; the membership epoch only increases, and a change closes a PENDING operation as STALE and returns a REKEYING room to REKEY_REQUIRED, whichever code path changed it |
+| Consistency at commit | A deferred constraint trigger: a room is REKEYING exactly when it has a PENDING MANDATORY operation, and a PENDING MANUAL operation exists only while the room is ACTIVE |
+
+Tests: `tests/database/rekey-guards.test.ts` (each guard refused as the runtime role, including a direct statement that bypasses the API) and the privilege matrix. Controls NC-11-05 and NC-11-11 remove a guard together with its API twin, because each layer alone is caught by the other.
 

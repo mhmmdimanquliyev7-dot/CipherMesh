@@ -112,3 +112,19 @@ Captured on `feature/CM-T037-encrypted-files` (from `main` at `c175d22`) against
 | EV-07-09 | [phase-07/EV-07-09_negative-controls.txt](phase-07/EV-07-09_negative-controls.txt) | 2026-10-11 | CM-T037 to CM-T041 | 69 of 69 negative controls caught, ten of them new |
 | EV-07-10 | [phase-07/EV-07-10_supply-chain.txt](phase-07/EV-07-10_supply-chain.txt) | 2026-10-11 | CM-T037 | `aws4fetch` 1.0.20 (LIB-09), audit, SBOM, secret scan |
 | EV-07-11 | [phase-07/EV-07-11_ci-run.txt](phase-07/EV-07-11_ci-run.txt) | 2026-10-11 | CM-T037 to CM-T041 | CI run 38143399418 of pull request #24: every job passed on attempt 2 after one unrelated WebKit timeout on attempt 1 |
+
+## Phase 11
+
+Captured on branch `feature/CM-T050-key-rotation` against the local PostgreSQL container and throwaway test databases, synthetic data only, no key material. The JSON files were produced by a temporary capture test that drove the real API and database through a removal and a rekey; it is not kept in the repository.
+
+| ID | File | Date | Jira | Caption |
+|---|---|---|---|---|
+| EV-11-01 | [phase-11/EV-11-01_key-version-history.json](phase-11/EV-11-01_key-version-history.json) | 2026-10-13 | CM-T050 | Key versions and envelope sets before and after a removal: v1 RETIRED, v2 ACTIVE with reason MEMBER_REMOVED, envelopes for exactly the three remaining members |
+| EV-11-02 | [phase-11/EV-11-02_removed-member-404.json](phase-11/EV-11-02_removed-member-404.json) | 2026-10-13 | CM-T051 | The removed member gets the generic 404 on six room routes including the rekey start; no envelope is left |
+| EV-11-03 | [phase-11/EV-11-03_forward-protection.txt](phase-11/EV-11-03_forward-protection.txt) | 2026-10-13 | CM-T050, CM-T051 | Browser cryptography report: RKM_1 cannot unwrap a DEK created after the rekey (L-04); forged, forked and substituted versions refused; SF-11-01 tests |
+| EV-11-04 | [phase-11/EV-11-04_write-lock.json](phase-11/EV-11-04_write-lock.json) | 2026-10-13 | CM-T051 | 409 `REKEY_REQUIRED` for a note write and an invitation while the room is locked; the key state a member sees |
+| EV-11-05 | [phase-11/EV-11-05_rekey-events.json](phase-11/EV-11-05_rekey-events.json) | 2026-10-13 | CM-T050, CM-T051 | Recorded events of a removal and rekey: MEMBER_REMOVED, REKEY_REQUIRED, REKEY_STARTED, REKEY_COMPLETED, KEY_VERSION_RETIRED, and the refusals of the removed member (redacted log; the ledger is Phase 12) |
+| EV-11-06, EV-11-07 | [phase-11/EV-11-06-07_recovery-and-idempotency.txt](phase-11/EV-11-06-07_recovery-and-idempotency.txt) | 2026-10-13 | CM-T050 | Integration report: lease expiry and worker recovery, idempotent and concurrent finalize, stale and foreign operations |
+| EV-11-08 | [phase-11/EV-11-08_negative-controls.txt](phase-11/EV-11-08_negative-controls.txt) | 2026-10-13 | CM-T050 to CM-T053 | 13 of 13 new negative controls caught; baseline passes; sources restored byte for byte |
+| EV-11-09 | [phase-11/EV-11-09_gates.txt](phase-11/EV-11-09_gates.txt) | 2026-10-13 | CM-T050 to CM-T053 | Gate results of the final Phase 11 code |
+

@@ -1,0 +1,125 @@
+{
+  "note": "Synthetic room. roles map envelope recipients: owner, admin, member and the removed member.",
+  "before": {
+    "versions": [
+      {
+        "version": 1,
+        "status": "ACTIVE",
+        "reasons": "{INITIAL}",
+        "made_by_operation": false
+      }
+    ],
+    "envelopes": [
+      {
+        "role": "admin",
+        "recipient": "009e9d2e-452c-4b44-b824-ad3e74d53433",
+        "version": 1,
+        "status": "ACTIVE"
+      },
+      {
+        "role": "owner",
+        "recipient": "6a73a2c8-8485-4bea-8404-8dab96353090",
+        "version": 1,
+        "status": "ACTIVE"
+      },
+      {
+        "role": "removed",
+        "recipient": "d1073e77-459b-4257-b654-6ead2c344d2e",
+        "version": 1,
+        "status": "ACTIVE"
+      },
+      {
+        "role": "member",
+        "recipient": "ed5acc45-3d08-4455-825c-e677737e8bcd",
+        "version": 1,
+        "status": "ACTIVE"
+      }
+    ],
+    "room": {
+      "key_state": "ACTIVE",
+      "current_key_version": 1,
+      "rekey_reasons": "{}"
+    }
+  },
+  "afterRemoval": {
+    "room": {
+      "key_state": "REKEY_REQUIRED",
+      "current_key_version": 1,
+      "rekey_reasons": "{MEMBER_REMOVED}"
+    }
+  },
+  "snapshotRecipients": [
+    {
+      "role": "admin",
+      "kind": "MEMBER"
+    },
+    {
+      "role": "owner",
+      "kind": "MEMBER"
+    },
+    {
+      "role": "member",
+      "kind": "MEMBER"
+    }
+  ],
+  "after": {
+    "versions": [
+      {
+        "version": 1,
+        "status": "RETIRED",
+        "reasons": "{INITIAL}",
+        "made_by_operation": false
+      },
+      {
+        "version": 2,
+        "status": "ACTIVE",
+        "reasons": "{MEMBER_REMOVED}",
+        "made_by_operation": true
+      }
+    ],
+    "envelopes": [
+      {
+        "role": "admin",
+        "recipient": "009e9d2e-452c-4b44-b824-ad3e74d53433",
+        "version": 1,
+        "status": "ACTIVE"
+      },
+      {
+        "role": "owner",
+        "recipient": "6a73a2c8-8485-4bea-8404-8dab96353090",
+        "version": 1,
+        "status": "ACTIVE"
+      },
+      {
+        "role": "member",
+        "recipient": "ed5acc45-3d08-4455-825c-e677737e8bcd",
+        "version": 1,
+        "status": "ACTIVE"
+      },
+      {
+        "role": "admin",
+        "recipient": "009e9d2e-452c-4b44-b824-ad3e74d53433",
+        "version": 2,
+        "status": "ACTIVE"
+      },
+      {
+        "role": "owner",
+        "recipient": "6a73a2c8-8485-4bea-8404-8dab96353090",
+        "version": 2,
+        "status": "ACTIVE"
+      },
+      {
+        "role": "member",
+        "recipient": "ed5acc45-3d08-4455-825c-e677737e8bcd",
+        "version": 2,
+        "status": "ACTIVE"
+      }
+    ],
+    "room": {
+      "key_state": "ACTIVE",
+      "current_key_version": 2,
+      "rekey_reasons": "{}"
+    }
+  },
+  "removedMemberHasEnvelopes": false
+}
