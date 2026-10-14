@@ -270,7 +270,7 @@ test('signing out locks the vault, and a session ended elsewhere locks it too', 
   await page.getByLabel('Email address').fill(user.email);
   await page.getByLabel('Account password').fill(user.password);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Vault', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Unlock your vault' })).toBeVisible();
 
@@ -281,6 +281,7 @@ test('signing out locks the vault, and a session ended elsewhere locks it too', 
   const other = await otherContext.newPage();
   await useDistinctClientAddress(other);
   await login(other, user);
+  await other.getByRole('link', { name: 'Account', exact: true }).click();
   const revoked = other.waitForResponse((r) => r.url().endsWith('/api/auth/sessions/revoke-others'));
   await other.getByRole('button', { name: 'Sign out all other sessions' }).click();
   expect((await revoked).status()).toBe(200);
@@ -288,6 +289,9 @@ test('signing out locks the vault, and a session ended elsewhere locks it too', 
   // The next API answer for this tab is 401: the vault locks and the tab is signed out.
   await page.getByRole('link', { name: 'Account', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
+  // Still client-side navigation in the same runtime: the sign-in page has the public frame, so go
+  // through the Trust Center, whose workspace frame links to the Vault.
+  await page.getByRole('navigation', { name: 'Public' }).getByRole('link', { name: 'Trust Center' }).click();
   await page.getByRole('link', { name: 'Vault', exact: true }).click();
   await expect(page.getByText('Sign in first.')).toBeVisible();
 });

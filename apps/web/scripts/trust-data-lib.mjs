@@ -1,0 +1,385 @@
+// Trust Center data (Phase 14 + Prompt 16.5, CM-T061). The Trust Center shows the project's own
+// normative documents, never a second copy typed by hand: this module parses the Markdown sources
+// (threat model, limitations, ISMS control mapping, evidence plan and index, parameter register)
+// into plain JSON. `generate-trust-data.mjs` writes the result into the web client and, with
+// --check, fails the build when the committed JSON no longer matches the documents, so a page can
+// never show a risk, control or evidence status that the documents do not state.
+//
+// Pure functions only, so they can be unit tested. Text is reduced to plain text (no Markdown, no
+// HTML): the client renders every value as text.
+import { posix } from 'node:path';
+
+/** Repository on GitHub; evidence and document links point to the reviewed `main` branch. */
+export const REPOSITORY_URL = 'https://github.com/mhmmdimanquliyev7-dot/CipherMesh';
+
+/** Phases the project owner deferred on 2026-10-13 (Phase 14 + Prompt 16.5 approval). */
+export const DEFERRED_PHASES = Object.freeze([12, 13, 15, 16]);
+
+/** Phases that belong to the later workstreams (cloud deployment, hardening, assessment, report). */
+export const LATER_PHASES = Object.freeze([17, 18, 19, 20, 21, 22]);
+
+/**
+ * Markdown inline syntax to plain text: links keep their text, emphasis and code marks go.
+ * @param {string} text
+ * @returns {string}
+ */
+export function plain(text) {
+  return text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/(^|[\s(])\*([^*\s][^*]*)\*/g, '$1$2')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * The cells of a Markdown table row. Escaped pipes are not used in the sources.
+ * @param {string} line
+ * @returns {string[]}
+ */
+export function cells(line) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('|')) return [];
+  return trimmed
+    .slice(1, trimmed.endsWith('|') ? -1 : undefined)
+    .split('|')
+    .map((cell) => cell.trim());
+}
+
+/**
+ * The lines of one `## ` section whose heading starts with `prefix`, up to the next `## `.
+ * @param {string} markdown
+ * @param {string} prefix
+ * @returns {string[]}
+ */
+export function section(markdown, prefix) {
+  const lines = markdown.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.startsWith(`## ${prefix}`));
+  if (start === -1) throw new Error(`Section "## ${prefix}" not found`);
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => line.startsWith('## '));
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+/**
+ * Data rows of every table in `lines` whose first cell matches `idPattern`.
+ * @param {string[]} lines
+ * @param {RegExp} idPattern
+ * @returns {string[][]}
+ */
+export function tableRows(lines, idPattern) {
+  return lines.map(cells).filter((row) => row.length > 0 && idPattern.test(row[0] ?? ''));
+}
+
+/**
+ * Every evidence ID named in a text, with ranges such as "EV-03-03 to EV-03-09" expanded.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function evidenceIds(text) {
+  const ids = new Set();
+  const rangePattern = /EV-(\d{2})-(\d{2})\s+to\s+EV-(\d{2})-(\d{2})/g;
+  for (const match of text.matchAll(rangePattern)) {
+    const [, phaseA, fromRaw, phaseB, toRaw] = match;
+    if (phaseA !== phaseB) continue;
+    for (let n = Number(fromRaw); n <= Number(toRaw); n += 1) ids.add(`EV-${phaseA}-${String(n).padStart(2, '0')}`);
+  }
+  for (const match of text.matchAll(/EV-\d{2}-\d{2}/g)) ids.add(match[0]);
+  return [...ids].sort();
+}
+
+/**
+ * Risk register: the summary table of section 5 joined with the threat descriptions of section 4.
+ * @param {string} markdown docs/threat-model/threat-model.md
+ */
+export function parseRisks(markdown) {
+  /** @typedef {{ id: string, title: string, fields: { label: string, text: string, items: string[] }[] }} RiskDetail */
+  /** @type {Map<string, RiskDetail>} */
+  const details = new Map();
+  /** @type {RiskDetail | undefined} */
+  let current;
+  for (const line of section(markdown, '4.')) {
+    const heading = /^### (T-\d+) (.+)$/.exec(line);
+    if (heading) {
+      const detail = { id: heading[1] ?? '', title: plain(heading[2] ?? ''), fields: [] };
+      details.set(detail.id, detail);
+      current = detail;
+      continue;
+    }
+    if (current === undefined) continue;
+    const field = /^- \*\*([^*]+?):\*\*\s*(.*)$/.exec(line);
+    if (field) {
+      current.fields.push({ label: plain(field[1] ?? ''), text: plain(field[2] ?? ''), items: [] });
+      continue;
+    }
+    const item = /^ {2,}- (.+)$/.exec(line);
+    const last = current.fields.at(-1);
+    if (item && last) last.items.push(plain(item[1] ?? ''));
+  }
+  const rows = tableRows(section(markdown, '5.'), /^T-\d+$/);
+  return rows.map((row) => {
+    const [
+      id = '',
+      threat = '',
+      likelihood = '',
+      impact = '',
+      inherent = '',
+      treatment = '',
+      residual = '',
+      related = '',
+    ] = row;
+    const detail = details.get(id);
+    if (detail === undefined) throw new Error(`Risk ${id} has no section in the threat model`);
+    return {
+      id,
+      threat: plain(threat),
+      title: detail.title,
+      likelihood: plain(likelihood),
+      impact: plain(impact),
+      inherent: plain(inherent),
+      treatment: plain(treatment),
+      residual: plain(residual),
+      limitations: [...plain(related).matchAll(/L-\d+/g)].map((m) => m[0]),
+      fields: detail.fields,
+    };
+  });
+}
+
+/**
+ * Limitations register.
+ * @param {string} markdown docs/security/limitations.md
+ */
+export function parseLimitations(markdown) {
+  const rows = tableRows(markdown.split(/\r?\n/), /^L-\d+$/);
+  return rows.map(([id = '', limitation = '', why = '', response = '', demonstration = '']) => ({
+    id,
+    limitation: plain(limitation),
+    why: plain(why),
+    response: plain(response),
+    demonstration: plain(demonstration),
+  }));
+}
+
+/**
+ * ISMS: scope, management-system clauses and Annex A controls.
+ * @param {string} markdown docs/security/isms-control-mapping.md
+ */
+export function parseIsms(markdown) {
+  const scope = plain(
+    section(markdown, '1.')
+      .filter((line) => line.trim() !== '')
+      .join(' '),
+  );
+  const clauses = tableRows(section(markdown, '2.'), /^\d+(\.\d+)*(, \d+(\.\d+)*)*$/).map(
+    ([clause = '', requirement = '', implementation = '']) => ({
+      clause,
+      requirement: plain(requirement),
+      implementation: plain(implementation),
+    }),
+  );
+  const annex = section(markdown, '3.');
+  const legend = annex.find((line) => line.startsWith('Status values:'));
+  const controls = tableRows(annex, /^\d+\.\d+( to \d+\.\d+)?$/).map((row) => {
+    const [control = '', title = '', status = '', implementation = '', ...evidence] = row;
+    const evidenceText = evidence.join(', ');
+    return {
+      control,
+      title: plain(title),
+      theme: themeOf(control),
+      status: plain(status),
+      implementation: plain(implementation),
+      evidenceText: plain(evidenceText),
+      evidence: evidenceIds(evidenceText),
+    };
+  });
+  return { scope, statusLegend: plain(legend ?? ''), clauses, controls };
+}
+
+/**
+ * ISO/IEC 27001:2022 Annex A theme of a control number.
+ * @param {string} control
+ */
+export function themeOf(control) {
+  const theme = control.split('.')[0];
+  return theme === '5' ? 'Organizational' : theme === '6' ? 'People' : theme === '7' ? 'Physical' : 'Technological';
+}
+
+/**
+ * Evidence plan items (ID, what, how, demonstrates, subject tags).
+ * @param {string} markdown docs/report/evidence-plan.md
+ */
+export function parseEvidencePlan(markdown) {
+  return tableRows(section(markdown, '3.'), /^EV-\d{2}-\d{2}$/).map(
+    ([id = '', evidence = '', how = '', demonstrates = '', tags = '']) => ({
+      id,
+      phase: Number(id.slice(3, 5)),
+      evidence: plain(evidence),
+      how: plain(how),
+      demonstrates: plain(demonstrates),
+      // "All" in the plan means every subject tag.
+      tags:
+        plain(tags) === 'All'
+          ? ['CRY', 'CLD', 'ISMS', 'APP']
+          : plain(tags)
+              .split(/,\s*/)
+              .filter((tag) => tag !== ''),
+    }),
+  );
+}
+
+/**
+ * Evidence index rows: which items are captured, with links to the committed files.
+ * @param {string} markdown docs/report/evidence/index.md
+ */
+export function parseEvidenceIndex(markdown) {
+  return tableRows(markdown.split(/\r?\n/), /^EV-\d{2}-\d{2}/).map(
+    ([idCell = '', file = '', date = '', jira = '', caption = '']) => {
+      const links = [...file.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)].map((m) => ({
+        label: m[1] ?? '',
+        path: posix.normalize(posix.join('docs/report/evidence', m[2] ?? '')),
+      }));
+      const pending = /^pending\b/i.test(plain(file));
+      return {
+        ids: evidenceIds(idCell),
+        qualifier: plain(
+          idCell.replace(/EV-\d{2}-\d{2}(\s+to\s+EV-\d{2}-\d{2})?/g, '').replace(/^[\s,]+|[\s,]+$/g, ''),
+        ),
+        location: links.length > 0 || pending ? '' : plain(file),
+        links,
+        pending,
+        date: plain(date),
+        jira: plain(jira),
+        caption: plain(caption),
+      };
+    },
+  );
+}
+
+/**
+ * Evidence IDs a committed evidence file belongs to, from its name: "EV-06-01_rows.txt",
+ * "EV-01-06a_build.txt" and "EV-11-06-07_recovery.txt" (two items).
+ * @param {string} path
+ * @returns {string[]}
+ */
+export function evidenceIdsOfFile(path) {
+  const name = posix.basename(path);
+  const match = /^EV-(\d{2})-(\d{2})(?:-(\d{2}))?[a-z]?[_.-]/.exec(name);
+  if (match === null) return [];
+  const [, phase, first, second] = match;
+  return [`EV-${phase}-${first}`, ...(second === undefined ? [] : [`EV-${phase}-${second}`])];
+}
+
+/**
+ * The status of one planned evidence item, from the committed files, the index and the phase plan.
+ * captured: a committed file (or a recorded location) exists for it and no part is pending.
+ * partial: some parts are captured, others pending. pending: due in a completed phase but not captured.
+ * deferred: its phase was deferred by the project owner. planned: its phase is a later workstream.
+ * @param {{ id: string, phase: number }} item
+ * @param {ReturnType<typeof parseEvidenceIndex>} index
+ * @param {readonly string[]} [files] committed evidence files, repository-relative
+ */
+export function evidenceStatus(item, index, files = []) {
+  const rows = index.filter((row) => row.ids.includes(item.id));
+  const captured =
+    rows.some((row) => !row.pending && (row.links.length > 0 || row.location !== '')) ||
+    files.some((file) => evidenceIdsOfFile(file).includes(item.id));
+  const open = rows.filter((row) => row.pending);
+  if (captured) return open.length > 0 ? 'partial' : 'captured';
+  if (DEFERRED_PHASES.includes(item.phase)) return 'deferred';
+  if (LATER_PHASES.includes(item.phase)) return 'planned';
+  return 'pending';
+}
+
+/**
+ * Parameter register rows (CP-xx): name and value as the register states them.
+ * @param {string} markdown docs/crypto/crypto-decisions.md
+ */
+export function parseParameters(markdown) {
+  return tableRows(section(markdown, '1.'), /^CP-\d+$/).map(([id = '', name = '', value = '', notes = '']) => ({
+    id,
+    name: plain(name),
+    value: plain(value),
+    notes: plain(notes),
+  }));
+}
+
+/**
+ * Cloud documents: the shared-responsibility matrix and the designed network exposure.
+ * @param {string} responsibility docs/cloud/shared-responsibility.md
+ * @param {string} deployment docs/cloud/deployment-architecture.md
+ */
+export function parseCloud(responsibility, deployment) {
+  const matrix = section(responsibility, '2.');
+  const header = cells(matrix.find((line) => line.startsWith('| Layer')) ?? '');
+  const services = header.slice(1).map(plain);
+  const layers = matrix
+    .map(cells)
+    .filter((row) => row.length === header.length && row[0] !== 'Layer' && !/^-+$/.test(row[0] ?? ''))
+    .map(([layer = '', ...owners]) => ({ layer: plain(layer), owners: owners.map(plain) }));
+  const exposure = section(deployment, '2.')
+    .map(cells)
+    .filter((row) => row.length === 4 && row[0] !== 'Endpoint' && !/^-+$/.test(row[0] ?? ''))
+    .map(([endpoint = '', exposedTo = '', port = '', notes = '']) => ({
+      endpoint: plain(endpoint),
+      exposedTo: plain(exposedTo),
+      port: plain(port),
+      notes: plain(notes),
+    }));
+  return { services, layers, exposure };
+}
+
+/**
+ * Builds every Trust Center data file from the document texts.
+ * @param {{ threatModel: string, limitations: string, isms: string, evidencePlan: string, evidenceIndex: string, cryptoDecisions: string, responsibility: string, deployment: string }} docs
+ * @param {readonly string[]} evidenceFiles committed files under docs/report/evidence, repository-relative
+ */
+export function buildTrustData(docs, evidenceFiles) {
+  const risks = parseRisks(docs.threatModel);
+  const limitations = parseLimitations(docs.limitations);
+  const isms = parseIsms(docs.isms);
+  const plan = parseEvidencePlan(docs.evidencePlan);
+  const index = parseEvidenceIndex(docs.evidenceIndex);
+  const evidence = plan.map((item) => {
+    const rows = index.filter((row) => row.ids.includes(item.id));
+    const linked = rows.flatMap((row) => row.links.map((link) => ({ label: link.label, path: link.path })));
+    const named = evidenceFiles
+      .filter((file) => evidenceIdsOfFile(file).includes(item.id) && !linked.some((link) => link.path === file))
+      .map((file) => ({ label: posix.basename(file), path: file }));
+    return {
+      ...item,
+      status: evidenceStatus(item, index, evidenceFiles),
+      files: [...linked, ...named],
+      locations: rows.map((row) => row.location).filter((location) => location !== ''),
+      captions: rows.map((row) => (row.qualifier === '' ? row.caption : `${row.qualifier}: ${row.caption}`)),
+      date: rows.map((row) => row.date).find((date) => date !== '') ?? '',
+    };
+  });
+  const parameters = parseParameters(docs.cryptoDecisions);
+  return {
+    'risks.json': { source: 'docs/threat-model/threat-model.md', risks },
+    'limitations.json': { source: 'docs/security/limitations.md', limitations },
+    'isms.json': { source: 'docs/security/isms-control-mapping.md', ...isms },
+    'evidence.json': {
+      source: ['docs/report/evidence-plan.md', 'docs/report/evidence/index.md'],
+      repository: REPOSITORY_URL,
+      deferredPhases: DEFERRED_PHASES,
+      laterPhases: LATER_PHASES,
+      evidence,
+    },
+    'parameters.json': { source: 'docs/crypto/crypto-decisions.md', parameters },
+    'cloud.json': {
+      source: ['docs/cloud/shared-responsibility.md', 'docs/cloud/deployment-architecture.md'],
+      ...parseCloud(docs.responsibility, docs.deployment),
+    },
+  };
+}
+
+/**
+ * Stable JSON text with a trailing newline, as committed.
+ * @param {unknown} value
+ */
+export function serialize(value) {
+  return `${JSON.stringify(value, null, 2)}\n`;
+}

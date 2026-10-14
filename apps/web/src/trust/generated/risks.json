@@ -1,0 +1,2276 @@
+{
+  "source": "docs/threat-model/threat-model.md",
+  "risks": [
+    {
+      "id": "T-01",
+      "threat": "Stolen database",
+      "title": "Stolen database",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Medium",
+      "limitations": [
+        "L-05",
+        "L-08"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02, A-03, A-05, A-06, A-07, A-08",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker (ADV-5) obtains a copy of the PostgreSQL database.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "Database credentials leak from the VM or CI, a provider snapshot or backup export is exposed, or the database endpoint is reachable from the internet with a weak password. The attacker dumps all tables.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Client-side encryption of content, filenames, note titles and secrets; room keys stored only as RSA-OAEP envelopes; Argon2id password hashes; session tokens and recovery codes stored as SHA-256 digests; TOTP secrets encrypted under a key held outside the database; database reachable only from the VM; TLS with certificate verification; least-privilege database roles; provider encryption at rest.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Metadata is disclosed (L-05). Weak passwords and Vault Passphrases can be attacked offline (T-03, T-22).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Canary scan: E2E tests store unique canary strings in files, filenames, notes and secrets, then a test searches a database dump for them and must find none. Schema review against the \"must never exist\" list. Connectivity test that non-allowlisted and non-TLS connections fail.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-02",
+      "threat": "Stolen object storage",
+      "title": "Stolen object-storage data",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [
+        "L-05"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02, A-07",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker reads or copies the content bucket.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A bucket is made public by mistake, storage keys leak, or a provider-side incident exposes objects.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Only AES-256-GCM ciphertext is stored; FEKs are wrapped and live in the database, not in storage; object keys are random and never derived from filenames; public access blocked; presigned URLs short-lived and scoped; storage credential restricted to one bucket.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Object count and sizes are disclosed. An attacker with write access can delete objects (availability), mitigated by versioning.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Canary scan of the bucket; anonymous GET and LIST attempts must fail; expired presigned URLs must fail.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-03",
+      "threat": "Stolen password hashes",
+      "title": "Stolen password hashes",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure, then Spoofing",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-05",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Offline cracking of Argon2id password hashes after T-01.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The attacker runs a GPU-based guessing attack against the dumped hashes and logs in as users with weak passwords.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Argon2id with memory-hard parameters and per-hash salts (CP-05); minimum length and blocklist (CP-06); MFA; the auth password does not unlock the vault, so a cracked password yields no plaintext; parameters upgradeable by rehash on login.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Weak passwords of users without MFA fall eventually, giving access to metadata and ciphertext but not plaintext.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Unit test that stored hashes use the registered parameters; test that login with outdated parameters triggers a rehash; test that password policy rejects blocklisted passwords.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-04",
+      "threat": "Malicious member",
+      "title": "Malicious authenticated member",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-03",
+        "L-09"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Elevation of privilege, Tampering, Repudiation",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-02, A-07",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "A member (ADV-3) abuses legitimate access.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A MEMBER tries to promote themselves, remove others, edit or delete content of others, send spam secrets, or exfiltrate plaintext.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Authorization matrix with least privilege; ownership rules (OL-04); ADMINs cannot create ADMINs; two-person approval for ADMIN invitations in CONFIDENTIAL and RESTRICTED; rate limits; audit trail with content-access events at EXTENDED and FULL levels; AAD binding stops ciphertext swapping between items.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "A member can copy everything their role lets them read (L-03). Attribution of content to an individual relies on the server (L-09).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Matrix tests for every action and role; privilege-escalation tests (role fields in bodies rejected, MEMBER role changes denied); tests that MEMBERs cannot edit or delete others' items.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-05",
+      "threat": "Non-member room access",
+      "title": "Unauthorized room access by a non-member",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure, Elevation of privilege",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-02, A-04, A-07",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An authenticated non-member (ADV-2) reaches room data.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The attacker guesses or learns a room ID and calls room endpoints, requests envelopes, or asks for presigned URLs.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Membership check first on every room route (OL-01); 404 for non-members; envelopes served only to their recipient (OL-05); presigned URLs only after authorization (OL-07); envelopes are useless to anyone except the holder of the matching private key.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "An authorization bug could expose ciphertext and metadata, but not plaintext, because the attacker has no envelope wrapped to their key.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Integration tests calling every room endpoint as a non-member; PLATFORM_ADMIN treated as a non-member in tests.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-06",
+      "threat": "BOLA / IDOR",
+      "title": "Broken object-level authorization (BOLA / IDOR)",
+      "likelihood": "H",
+      "impact": "H",
+      "inherent": "Critical",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Elevation of privilege, Information disclosure, Tampering",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-02, A-07",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "A member of room A manipulates identifiers to act on objects of room B or of other users.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The attacker calls /api/rooms/A/files/<fileId of room B>, changes a room ID in a body, reveals a secret addressed to someone else, or revokes another user's invitation.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Every object is loaded by (ID, room ID) (OL-02); body identifiers validated against the room (OL-03); ownership from the database (OL-04); scoped repository functions; route registry forces an action declaration for every route.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "New endpoints added without tests. Mitigated by the route inventory test.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Automated cross-room identifier-swap tests for every resource type and endpoint, expecting 404 and no side effects; route inventory test.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood High, Impact High, inherent Critical. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-07",
+      "threat": "Ciphertext modification",
+      "title": "Ciphertext modification",
+      "likelihood": "L",
+      "impact": "M",
+      "inherent": "Low",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [
+        "L-10"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-02",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker with write access to storage or the database (ADV-6) modifies, truncates, swaps or replays ciphertext or wrapped keys.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The attacker flips bits in a file object, swaps wrapped FEKs between two files, moves an envelope to another room, or restores an older note revision.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "AES-GCM authentication with context-bound AAD for every ciphertext and wrapped key; OAEP labels binding envelopes to room, version, user and key; room-key commitments; ciphertext SHA-256 as an early storage check; decryption fails closed with no partial plaintext; files are immutable.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Tampering destroys availability of the affected item. Rollback of mutable items is not always detectable (L-10).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Tamper tests: bit flips in content, manifest, wrapped DEK and envelope; swaps between items, rooms and versions; each must fail authentication and show no plaintext.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact Medium, inherent Low. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-08",
+      "threat": "Session theft",
+      "title": "Session theft",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-06, A-07",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker obtains and uses a valid session.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "Cookie theft through XSS, network interception, session fixation, token leakage in logs or URLs, or an unattended unlocked device.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "256-bit opaque tokens in __Host- cookies with HttpOnly, Secure and SameSite=Strict; only SHA-256 digests stored; the server never accepts a token it did not issue; rotation at login, MFA verification, step-up and password or MFA changes; other sessions revoked on password, MFA or vault changes; idle and absolute timeouts; at most 10 sessions per user; session list with revocation; tokens never in URLs or logs; HSTS (../security/session-and-csrf.md). A stolen session still cannot decrypt, because unlocking needs the Vault Passphrase.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "A live stolen session can perform non-cryptographic actions such as deleting content. Step-up requirements limit destructive actions.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "The session suite: cookie attributes; a planted token is not promoted at login (fixation); each rotation and invalidation event; revoked and expired tokens rejected; idle and absolute expiry; session-limit eviction; log search for token values.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-09",
+      "threat": "Credential stuffing",
+      "title": "Credential stuffing",
+      "likelihood": "H",
+      "impact": "M",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Medium",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-05, A-07",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Automated login attempts with username and password pairs leaked from other services.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A botnet tries thousands of leaked pairs from many IP addresses.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Rate limits per IP in Nginx and per account and per identifier HMAC in the API; progressive backoff; generic error messages; MFA (mandatory for CONFIDENTIAL and RESTRICTED rooms); password blocklist; failed-login metrics on the Security Dashboard; optional breached-password check deferred.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Distributed low-rate attacks against STANDARD-only users without MFA. Success gives metadata and ciphertext, not plaintext.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Scripted login bursts must hit 429 and backoff; tests that login attempts are recorded; dashboard shows the spike.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood High, Impact Medium, inherent High. Treatment: Mitigate. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-10",
+      "threat": "Online brute force",
+      "title": "Online brute force of passwords, TOTP codes and recovery codes",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-05",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Targeted guessing against one account.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The attacker guesses a known user's password, then tries all 6-digit TOTP codes or recovery codes.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Per-account progressive backoff (no permanent lockout, to avoid lockout denial of service); at most 5 TOTP attempts per pre-auth state and per time window; TOTP replay protection; recovery codes with at least 100 bits of entropy, single use; audit events for failures.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Backoff slows but does not stop a patient attacker against a weak password; MFA covers this. Because there is no permanent lockout, the backoff can be abused in the other direction: anyone who knows an address can delay that user's next login by up to 15 minutes at a time (L-30). This is the accepted price of avoiding lockout-based denial of service.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Tests for TOTP attempt limits, replay rejection, recovery code reuse rejection, and backoff timing.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-11",
+      "threat": "Malicious file upload",
+      "title": "Malicious file upload",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-11"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Elevation of privilege (on other clients), Denial of service",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-11",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "A member uploads malware, active content (HTML, SVG with scripts) or oversized files.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The attacker hopes the platform renders the file inline in the application origin (stored XSS), that another member runs it, or that storage fills up.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "The server never parses, renders or executes content (it only sees ciphertext); filenames are encrypted and never used as storage paths; downloads are forced to application/octet-stream with Content-Disposition: attachment; client-side previews limited to an allowlist of image types rendered from blob URLs, never HTML or SVG inline; CSP; size limits (CP-19) and quotas; warning for executable types.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "The server cannot scan encrypted files for malware (L-11); members can share malware with each other.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Upload HTML and SVG payloads and verify they are never rendered inline; path-traversal filenames do not affect storage keys; size-limit and quota tests.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-12",
+      "threat": "XSS",
+      "title": "Cross-site scripting (XSS)",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Medium",
+      "limitations": [
+        "L-01"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Elevation of privilege, Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-03, A-04, A-06",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Attacker-controlled script runs in the CipherMesh origin.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A display name, room name, note or filename contains a script payload that is rendered unsafely. The script runs where the vault is unlocked, reads decrypted content and uses (but cannot export) non-extractable keys.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "React escaping; no dangerouslySetInnerHTML; user content rendered as text only; strict CSP (script-src 'self' plus hashes, 'wasm-unsafe-eval' only, object-src 'none', base-uri 'none', frame-ancestors 'none'); no third-party scripts; HttpOnly cookies; non-extractable keys; Trusted Types considered in Phase 15.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Any successful XSS compromises everything the victim has unlocked in that tab. This is why XSS is treated as critical for a client-side encryption design.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "XSS payload corpus injected into every user-controlled field and rendered in Playwright with a dialog and console listener; CSP header tests; CSP violation reporting during assessment; DAST scan.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-13",
+      "threat": "CSRF",
+      "title": "Cross-site request forgery (CSRF)",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing, Tampering",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02, A-07",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Another site makes the victim's browser send state-changing requests with the victim's cookie.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A malicious page auto-submits a form to remove a member or revoke a secret, or signs the victim into an attacker's account (login CSRF).",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "SameSite=Strict as one layer, not the defence. Same-origin verification on every state-changing request, including login and registration: Sec-Fetch-Site: same-origin, otherwise an exact Origin match, and requests with neither header are rejected. JSON-only bodies and a required X-CipherMesh-Request header, which forces a CORS preflight the API never approves. No state changes on GET; no CORS (../security/session-and-csrf.md).",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Low. XSS in the CipherMesh origin bypasses every CSRF defence (T-12). Moving the web client to another origin would require a synchronizer token and an ADR.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "The csrf suite: cross-site form posts and foreign-origin fetches; missing custom header; Sec-Fetch-Site cross-site and same-site; Origin: null; neither header present; login CSRF; content-type rejection; GET handlers without side effects; Origin behaviour under no-referrer in three browser engines.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-14",
+      "threat": "Injection",
+      "title": "Injection",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Information disclosure, Elevation of privilege",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02, A-05, A-07, A-11",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Untrusted input is interpreted as code or query structure.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "SQL injection through a raw query, prototype pollution through JSON keys such as __proto__, log injection with newline characters, command injection, or server-side request forgery.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Prisma parameterized queries; lint rule forbidding $queryRawUnsafe, eval, new Function and child_process; strict schemas that reject unknown keys; structured logging that escapes values; the server never fetches user-supplied URLs; no user-controlled file paths.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Low, as long as lint rules and review hold.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Injection payload fuzzing on all string inputs; prototype-pollution tests; lint rules enforced in CI; DAST.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-15",
+      "threat": "Information disclosure",
+      "title": "Sensitive information disclosure through the application",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Low",
+      "limitations": [
+        "L-05"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-05, A-07, A-09",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "The application leaks data through errors, over-broad responses, logs, headers or enumeration.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "An endpoint returns a full user object including passwordHash; a production error shows a stack trace; the user lookup reveals which emails are registered; source maps expose internals; the server version header helps an attacker.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Explicit response projections with output schemas; generic errors with request IDs; no stack traces in production; exact-match, rate-limited user lookup; server tokens hidden in Nginx; dotfiles denied; source maps not served publicly.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Registration and user lookup reveal whether an email is registered, rate-limited and accepted.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Output-schema tests failing on unknown fields; tests searching responses for forbidden field names; production-mode error tests; header checks.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate and Accept. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-16",
+      "threat": "Exposed environment secrets",
+      "title": "Exposed environment secrets",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-09",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Server secrets leak from the repository, images, CI logs, screenshots or tickets.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A .env file is committed; a secret is baked into an image layer; docker inspect shows environment variables; a screenshot in the evidence folder shows credentials.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": ".gitignore rules; secret scanning in CI and optionally as a pre-commit hook; secrets mounted as files at runtime, never in Dockerfiles or image layers; .dockerignore; CI secret masking; evidence redaction rules; least-privilege credentials; rotation procedure.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Human error in screenshots and tickets; mitigated by review before commit.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Secret scan of the full git history in CI; image history inspection; evidence review checklist.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-17",
+      "threat": "Compromised cloud credentials",
+      "title": "Compromised cloud credentials",
+      "likelihood": "L",
+      "impact": "H",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Transfer",
+      "residual": "Medium",
+      "limitations": [
+        "L-06"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing, Elevation of privilege",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02, A-09, A-10, A-11",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker (ADV-8) controls the cloud console account, API tokens or deployment credentials.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "Phishing of the cloud account, a leaked API token, or reuse of a personal password.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "MFA on cloud, GitHub and Jira accounts; no daily use of root or owner accounts; per-component credentials with minimal scope; credential inventory and rotation; billing and activity alerts where the provider offers them; client-side encryption keeps stored content confidential even under this attack unless malicious code is deployed (T-24).",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Full infrastructure destruction or code replacement is possible. Backups and the ability to rebuild from the repository reduce the impact.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Configuration review evidence (MFA enabled, scoped keys); test that the storage credential cannot access other buckets.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact High, inherent Medium. Treatment: Mitigate and Transfer (provider controls). Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-18",
+      "threat": "Misconfigured storage",
+      "title": "Misconfigured object storage",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure, Tampering",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02, A-11",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Storage configuration exposes or endangers objects.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "Public-read ACLs, listing enabled, CORS allowing any origin, presigned URLs valid for days, no versioning, or the anchor bucket writable by the API credential.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Block-public-access settings; private ACLs; CORS limited to the application origin and to PUT and GET; presigned lifetimes from CP-20; versioning and lifecycle rules for old versions; separate anchor bucket with retention lock and a write-only credential; storage configuration recorded as evidence and verified by a script.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Provider features differ; some controls may be approximated on the chosen provider.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Anonymous access tests; CORS preflight from a foreign origin must fail; presigned expiry tests; attempt to delete an anchored checkpoint must fail.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-19",
+      "threat": "Compromised VM",
+      "title": "Compromised VM",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-02"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Elevation of privilege, all categories",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01 (for users active during compromise), A-05, A-06, A-07, A-08, A-09, A-10",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker (ADV-7) gains root on the VM.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "An unpatched service, stolen SSH key or container escape gives root. The attacker reads server secrets, reads and writes the database, and replaces the served JavaScript.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Hardening (SSH keys only, no root login, allowlisted SSH sources, automatic security updates, minimal packages); only 80 and 443 public; non-root, read-only containers without the Docker socket; secrets as files with restrictive permissions; least-privilege database and storage credentials; audit checkpoints anchored outside the VM; backups; rebuild-from-scratch incident procedure. Migration and database-owner credentials are never stored on the VM, so the attacker cannot disable the append-only audit protection.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "High while compromised. Users who load the application during the compromise can have passphrases and plaintext captured (L-02). Content at rest stays encrypted for users who do not log in during that window. The attacker also holds the Level 1 audit signing key (T-38) and can activate room-key versions of its own (T-36).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "CIS-guided hardening review with a Lynis report; external port scan; SSH configuration tests (password login refused); Docker Bench for Security report.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-20",
+      "threat": "Audit modification",
+      "title": "Audit-record modification",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [
+        "L-13",
+        "L-25"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Repudiation",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-08",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker changes or deletes audit events to hide activity.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A database-level attacker (ADV-6) edits an event, deletes a range, or recomputes the whole chain after editing.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "API and worker database roles have no UPDATE or DELETE on audit tables, and a trigger rejects such statements; SHA-256 hash chain over canonical records; gap-free sequence numbers; hourly verification; Ed25519-signed checkpoints exported to a retention-locked bucket with a write-only credential; offline verifier that fetches checkpoints independently; the worker refuses to sign when the chain no longer matches the last anchored checkpoint; checkpoints after security-critical events; weekly external witness copies; migration credentials never on the VM. The trust model per compromise scenario is in ADR-009 section 8.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Events after the last anchored checkpoint can be rewritten or truncated by an attacker with full database access; a compromised server can stop recording events (L-13). Signed checkpoints prove nothing once the signing key is compromised, which at Level 1 includes a VM compromise (L-25, T-38).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Tamper test on a copy: edit, delete and reorder events; recompute the chain without the signing key; the verifier must report the first broken sequence number or the checkpoint mismatch.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-21",
+      "threat": "Removed member",
+      "title": "Removed room member",
+      "likelihood": "H",
+      "impact": "M",
+      "inherent": "High",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-04",
+        "L-24"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure, Elevation of privilege",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-04",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "A removed or departed member (ADV-4) keeps or regains access to content created after they left.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The removed member keeps cached keys and downloaded plaintext. They try to use old envelopes or to upload during the removal window. Later they obtain a database leak and try to decrypt new content with the old key.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "",
+          "items": [
+            "Removal, leaving, suspension and deletion delete all of the member's envelopes and end their API access in one transaction, which also sets the room to REKEY_REQUIRED (INV-07, ADR-013).",
+            "The room is write-locked until a new version is activated, and pending uploads are cancelled.",
+            "The server computes the rekey recipient set, excluding the departed member, and finalize rejects any other set.",
+            "Writes that name an old version fail with KEY_VERSION_STALE.",
+            "The RESTRICTED history rule (PC-07) limits what new members receive."
+          ]
+        },
+        {
+          "label": "Residual risk",
+          "text": "Information already obtained cannot be revoked (L-04). Old content stays decryptable with old keys if its ciphertext leaks later. Re-encryption is deferred (OCD-07). A server-side attacker colluding with the former member could activate a key version of its own (T-36). The room is read-only until an OWNER or ADMIN completes the rekey (L-24). Implemented in Phase 11 (section 14); the starter's browser chooses the new key (L-63).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "After removal, every room endpoint returns 404 for the removed user. Writes return 409 until finalize. The recipient snapshot excludes the removed user, and a finalize that includes them is rejected. New items use v+1. A test holding the old RKM cannot unwrap DEKs created after the rekey.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood High, Impact Medium, inherent High. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-22",
+      "threat": "Stolen encrypted private key",
+      "title": "Stolen encrypted private key",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-08"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-03, then A-04 and A-01",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Offline guessing of a Vault Passphrase using the encrypted private key from a database copy.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "After T-01, the attacker runs Argon2id with candidate passphrases and the stored salt and parameters, and uses the AES-GCM tag to recognize a correct guess.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Argon2id memory-hard parameters with a floor and a ceiling enforced by the browser and the API (CP-04); passphrase minimum length, blocklist and identity checks (CP-06); a new salt on every vault write; no server-side verifier; parameters upgradeable by a signed re-wrap. Phase 4: implemented as specified in ../crypto/vault.md; target m = 64 MiB, t = 3, p = 1. The record is also served to its owner's sessions, so a stolen session yields the same offline guessing opportunity (L-39).",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Weak passphrases fall to targeted attacks (L-08). A cracked vault exposes every room key ever wrapped to that key and every secret sent to it.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "RFC 9106 known-answer tests; client refuses to create or unlock vaults below the floor; API rejects vault uploads below the floor; benchmark documented as evidence. Phase 4: packages/crypto/src/argon2id.test.ts, vault.test.ts, tests/vault/setup.test.ts and rewrap.test.ts; benchmark in crypto-decisions section 8; negative control NC-04-08.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-23",
+      "threat": "Compromised client",
+      "title": "Compromised client or browser",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Accept",
+      "residual": "High",
+      "limitations": [
+        "L-01"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure, Spoofing",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-03, A-04, A-06",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Malware, a malicious extension or physical access on the user device (ADV-10).",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A keylogger records the Vault Passphrase; an extension reads decrypted notes; someone uses an unlocked, unattended laptop.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Keys only in memory; non-extractable keys; vault auto-lock (CP-22); session idle timeout; no plaintext persistence; guidance for RESTRICTED rooms.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "High and accepted. CipherMesh cannot protect a device that is itself compromised (L-01).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Playwright checks that no key material or plaintext appears in localStorage, sessionStorage, IndexedDB or cookies after unlock and use; auto-lock timer test. Phase 4: tests/e2e/vault.spec.ts in three engines (storage including the Cache API, network capture, auto-lock with a controlled clock, sign-out and session-end locks) and negative controls NC-04-12 to NC-04-14.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Accept. Residual: High (accepted, documented).",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-24",
+      "threat": "Malicious code delivery",
+      "title": "Malicious application code delivery",
+      "likelihood": "L",
+      "impact": "H",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-02"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-10, then A-01, A-03, A-04",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Users receive modified JavaScript that exfiltrates passphrases or plaintext.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "An attacker controlling the VM (T-19), the TLS key, the build pipeline or a dependency (T-27) serves modified code.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Static assets built in CI from reviewed commits; content-hashed immutable filenames; strict CSP; Subresource Integrity where the build supports it; no third-party runtime scripts; published build hashes per release; hardened VM and pipeline.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Inherent to web delivery (L-02). There is no general browser mechanism for users to pin application code.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "CSP and SRI presence checks; CI records and publishes artifact hashes; a comparison script checks that deployed assets match the release hashes.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact High, inherent Medium. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-25",
+      "threat": "Public-key substitution",
+      "title": "Public-key substitution",
+      "likelihood": "L",
+      "impact": "H",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-07",
+        "L-18"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing, Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-04, then A-01",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker with control of the server or write access to the database substitutes a user's public key so that room keys are wrapped to the attacker.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "Before an ADMIN invites Bob, the attacker replaces Bob's public key with their own. The ADMIN browser wraps RKM to the attacker key; the attacker unwraps it and decrypts room content.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Fingerprints shown in the UI; mandatory fingerprint confirmation in RESTRICTED rooms, checked by the API against the current key; immutable keys per key ID; key changes audited and surfaced to room administrators; recipient key ID bound into the OAEP label. Phase 4: the fingerprint covers both public keys of an identity, a binding signature ties them to the user and key ID, and every browser verifies directory results and computes fingerprints itself (CM-T027); the database keeps identities write-once.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Users who skip out-of-band verification are exposed to an active server-side attacker (L-07, L-18). Fingerprint pinning is tracked as OCD-06. The Room Safety Code does not detect substitution when the attacker re-wraps the real key to the victim, because everyone then holds the same key.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "In a test database, replace a public key before invitation; the RESTRICTED flow must reject the confirmation; key-change events must appear in the audit log.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact High, inherent Medium. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-26",
+      "threat": "Denial of service",
+      "title": "Denial of service and resource exhaustion",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-20"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Denial of service",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-11",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Attackers exhaust CPU, memory, storage or database capacity.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "Floods of login requests (each costing an Argon2id computation), large or many uploads, audit-log flooding, expensive list queries.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Nginx rate limits and body-size limits; API rate limits per user and IP; a concurrency limit for Argon2id computations; upload size limits and quotas; pagination limits; container resource limits. Phase 4: vault and directory rate limits per user; in the browser, a KDF ceiling, one derivation at a time per tab and a 120-second worker timeout, so a modified vault record cannot make a browser derive without bound.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Volumetric attacks beyond VM capacity (L-20).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Rate-limit tests; a small load test of the login endpoint to confirm the Argon2id concurrency limit protects memory.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-27",
+      "threat": "Supply-chain compromise",
+      "title": "Dependency and supply-chain compromise",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Medium",
+      "limitations": [
+        "L-02"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Elevation of privilege",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-10, then A-01 and A-09",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Malicious code enters through an npm package, base image or CI action (ADV-9).",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A maintainer account of a popular package is phished and a malicious version is published, as happened to widely used npm packages in 2025. The update steals CI secrets or injects exfiltration code into the web bundle.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Few dependencies, each justified in review; lockfile with integrity hashes; dependency lifecycle scripts blocked unless allowlisted; automated vulnerability scanning and dependency review; CI actions pinned to commit SHAs; least-privilege CI tokens; SBOM generation; base images pinned by digest; crypto libraries wrapped behind interfaces and covered by known-answer tests.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "A malicious release that passes review and scanning. Delaying adoption of brand-new releases reduces exposure.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "CI audit gate; SBOM artifact per release; review evidence for dependency additions; secret scan of CI configuration.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-28",
+      "threat": "Metadata leakage",
+      "title": "Metadata leakage",
+      "likelihood": "H",
+      "impact": "L",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-05"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-07",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "The server or a data thief learns sensitive facts from metadata.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "Room names reveal projects; membership reveals relationships; file sizes and timing reveal activity; IP addresses in sessions reveal locations.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Encrypted filenames, MIME types and note titles; plaintext hashes only in encrypted manifests; random object keys; room-name warning in the UI; retention limits for sessions and login attempts; no IP addresses in audit details; aggregate-only dashboard for PLATFORM_ADMIN.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Accepted and documented (L-05).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Schema review; canary scan for filenames; review of dashboard and audit outputs for unnecessary personal data.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood High, Impact Low, inherent Medium. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-29",
+      "threat": "Room-key equivocation",
+      "title": "Room-key equivocation (different keys for different members)",
+      "likelihood": "L",
+      "impact": "H",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-22"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Spoofing",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-04",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Members of the same room are made to hold different key material for the same version, so one party can read or alter what others encrypt.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "",
+          "items": [
+            "One immutable commitment per version, stored server-side and checked by every client. This defeats scenario 1 while the server is honest.",
+            "Room Safety Code comparison over an independent channel (ADR-012). This detects scenario 2 when members compare.",
+            "Mismatch reports are audited, and the Security Dashboard counts them (SD-12, SD-15)."
+          ]
+        },
+        {
+          "label": "Residual risk",
+          "text": "Scenario 2 goes undetected for members who never compare codes (L-22). A server-side attacker that gives the same key to everyone is detected by neither control (T-36).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "An envelope with a different RKM is rejected by the commitment check. A test harness serves two browsers different keys and commitments, and their Safety Codes differ. Known-answer vectors for the Safety Code derivation.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact High, inherent Medium. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-30",
+      "threat": "Recovery and MFA abuse",
+      "title": "Abuse of account recovery and MFA management",
+      "likelihood": "L",
+      "impact": "H",
+      "inherent": "Medium",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing, Elevation of privilege",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-05",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker bypasses MFA through recovery or administrative reset.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The attacker guesses recovery codes, disables MFA from a stolen session, or persuades a PLATFORM_ADMIN to reset MFA.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Recovery codes with at least 100 bits of entropy, single use, rate limited; disabling MFA needs step-up (password and current TOTP); administrator-assisted resets follow a documented identity check, need step-up by the admin and are audited; resets never touch the vault, so they grant no plaintext access; no email-based reset exists.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Social engineering of the administrator. The procedure and audit trail make it detectable.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Tests for recovery-code reuse and rate limits; MFA disable without step-up is rejected; admin reset produces audit events.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact High, inherent Medium. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-31",
+      "threat": "Transport attacks",
+      "title": "Transport-layer attacks",
+      "likelihood": "L",
+      "impact": "H",
+      "inherent": "Medium",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure, Tampering",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-05, A-06, A-10",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Interception or modification of traffic.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "TLS stripping on first visit, weak cipher suites, mixed content, or an unverified database TLS connection vulnerable to interception.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "TLS 1.2 and 1.3 only with a modern configuration (CP-21); HTTP redirected to HTTPS; HSTS; no mixed content; database connections verify the provider certificate; object storage accessed over HTTPS only.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "First-visit exposure before HSTS is cached, unless the domain is preloaded.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "External TLS scan (for example testssl.sh or SSL Labs) as evidence; test that database connections fail with an untrusted certificate.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact High, inherent Medium. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-32",
+      "threat": "Rollback or withholding",
+      "title": "Server-side rollback or withholding",
+      "likelihood": "L",
+      "impact": "L",
+      "inherent": "Low",
+      "treatment": "Accept",
+      "residual": "Low",
+      "limitations": [
+        "L-10"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Denial of service",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "The server serves older versions of mutable data or hides items.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A database-level attacker restores an older note revision or an older vault record, or hides a member from the member list.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Revision numbers in AAD; optimistic concurrency; the browser remembers the highest revision seen during a session and warns on regression; audit events for changes.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Not fully detectable without trusted client-side state (L-10).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Test that a stored revision with a mismatched AAD revision fails; session-level regression warning test.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact Low, inherent Low. Treatment: Accept. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-33",
+      "threat": "External link leakage",
+      "title": "Leakage of external one-time links (stretch feature)",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-03"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Someone other than the intended recipient opens an external link first.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The link is posted in a chat that stores history, or is seen over a shoulder.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Only in STANDARD rooms (PC-11); the secret's AES-256-GCM key (SEK) travels only in the URL fragment; POST-to-reveal; burn-after-reading mandatory; maximum 24 hours; Referrer-Policy: no-referrer; the recipient sees an \"already opened\" message, which reveals interception.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Accepted for STANDARD content only.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Tests that the fragment is never sent to the server, that GET does not consume the secret, and that a second reveal fails.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-34",
+      "threat": "Management SaaS leakage",
+      "title": "Leakage through project-management SaaS",
+      "likelihood": "L",
+      "impact": "M",
+      "inherent": "Low",
+      "treatment": "Mitigate, Transfer",
+      "residual": "Low",
+      "limitations": [],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-09, A-12",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Sensitive information leaks through Jira or GitHub.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A ticket or pull request contains a credential, a database dump or a working exploit for an unfixed finding, and the project is visible to more people than intended.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Team-only project permissions; MFA; redaction rules; restricted detail for open security findings; secret scanning on the repository.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Low; depends on team discipline.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Periodic review of permissions and of open security findings; secret scan.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact Medium, inherent Low. Treatment: Mitigate and Transfer (platform security). Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-35",
+      "threat": "Identity spoofing via unverified identifiers",
+      "title": "Identity spoofing through unverified account identifiers",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-21"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-04",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker registers an account with another person's email address or a confusable name and receives invitations or secrets meant for that person.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "Knowing that Bob will be invited, the attacker registers Bob's address first; the baseline has no email verification. The inviter looks up the address, sees a plausible display name and invites the attacker, whose browser then receives the room key legitimately.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Identifiers are treated and labelled as unverified; the lookup shows the key fingerprint and the account creation date (implemented in Phase 4: exact address only, an own vault required, the same 404 for unknown, vault-less and disabled accounts, 20 lookups per 10 minutes, emailVerified: false); fingerprint confirmation is required in RESTRICTED rooms and prompted in CONFIDENTIAL rooms; OWNER approval of ADMIN invitations (PC-04); invitation and membership events are audited.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "In STANDARD rooms, and where users skip the prompted comparison, an impersonator can be invited by mistake (L-21). Email verification would need an email service, which is new runtime SaaS and requires an ADR.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Lookup responses and UI label the identifier as unverified; a RESTRICTED invitation without a matching confirmed fingerprint is rejected.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate and Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-36",
+      "threat": "Injected room-key version by a server-side attacker",
+      "title": "Injected room-key version or envelope by a server-side attacker",
+      "likelihood": "L",
+      "impact": "H",
+      "inherent": "Medium",
+      "treatment": "Mitigate (ADR-015, implemented in Phase 6)",
+      "residual": "Low (for an attacker limited to the server; the paths that remain are rated under T-25, T-23 and T-24)",
+      "limitations": [
+        "L-23",
+        "L-46"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing, Information disclosure",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-04, then A-01",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "An attacker who can write to the database or control API responses distributes a key it knows. RSA-OAEP has no sender authentication, public keys are public, and commitments come from the same server. Clients therefore cannot tell that no authorized member created the key.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "Through SQL injection or a compromised VM, the attacker inserts version v+1 with its own RKM. It adds envelopes for every member and a matching commitment, and marks the version current. All members encrypt new content under a key the attacker knows. All Safety Codes match, because everyone holds the same key. A variant injects a single envelope for a newly invited member.",
+          "items": []
+        },
+        {
+          "label": "Security controls (baseline)",
+          "text": "",
+          "items": [
+            "Server-side authorization of rekey operations. It helps only while the server is honest.",
+            "Parameterized queries and least-privilege database roles, which limit database write access.",
+            "Audit events for every key version, which a database-level attacker could also forge in the unanchored tail.",
+            "The UI shows who created each version (server-asserted), and the rekey review lists recipients."
+          ]
+        },
+        {
+          "label": "Decided mitigation (OCD-12, ADR-015, accepted 2026-10-05)",
+          "text": "every identity has an ECDSA P-256 signing key covered by the fingerprint (implemented in Phase 4). From Phase 6 the creator of each key version signs a statement with the commitment and the recipient list, membership grants are signed back to a signed genesis statement, and clients refuse a version unless the signatures verify, the creator's authority follows from the grant chain and the decrypted key matches the signed commitment (CD-24).",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Mitigated by the Phase 6 implementation (CM-T033 to CM-T036; section 12). A server-side attacker cannot produce a version that members accept; the attack now needs identity substitution that users do not detect (T-25), a legitimate member's keys (T-23), or control of the served code (T-24). Grants are statements, not revocable credentials (L-46).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "Phase 4: identity binding, fingerprint and signature tests (Wycheproof ECDSA vectors, identity.test.ts, NC-04-05, NC-04-07). Phase 6: the key-injection suite (unsigned, forged, wrongly attributed and unauthorized versions, commitment mismatch, missing recipient) and a negative control that removes the verification.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact High, inherent Medium. Treatment: Mitigate (implemented in Phase 6). Residual: Low for an attacker limited to the server, re-rated when Phase 6 implemented the verification; the remaining paths are carried by T-25, T-23 and T-24.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-37",
+      "threat": "Rekey abuse and incomplete rekeys",
+      "title": "Rekey operation abuse and incomplete rekeys",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [
+        "L-24"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Denial of service, Elevation of privilege",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-04, A-11",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Rekey requests are replayed, raced or left incomplete. A removed member could keep access, a stale key could be activated, or a room could stay write-locked.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "An ADMIN's browser repeats a finalize after a timeout. Two ADMINs rekey at the same time. An old finalize payload that includes the removed member's envelope is submitted again. The rekeying browser crashes. A malicious ADMIN keeps starting operations to hold the room locked.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "",
+          "items": [
+            "One live operation per room with a 10-minute lease, and at most 10 starts per room per hour (CP-25).",
+            "Finalize is bound to the operation ID, base version and membership epoch.",
+            "The envelope set must equal the server's recipient snapshot.",
+            "Replays are idempotent by payload digest, and stale, expired or superseded operations are rejected.",
+            "Reads continue while locked, the OWNER can cancel another admin's operation, and every transition is audited."
+          ]
+        },
+        {
+          "label": "Residual risk",
+          "text": "A malicious OWNER or ADMIN can delay a rekey, which harms availability, or leak keys, an insider risk outside the cryptographic model. Rooms without an active OWNER or ADMIN stay read-only (L-24).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "The rekey suite: replay, concurrent start, stale epoch, expired lease, wrong recipient set, crash recovery, old-version writes, rate limit.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-38",
+      "threat": "Audit signing-key compromise",
+      "title": "Audit checkpoint signing-key compromise",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium (Level 1)",
+      "limitations": [
+        "L-25"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing, Repudiation",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-08, A-09",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "The checkpoint signing key is stolen and used to sign checkpoints for a forged history.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The key file is read from the VM (Level 1), or leaked through a backup or an evidence file. The attacker signs checkpoints over a rewritten chain and presents them as proof.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "",
+          "items": [
+            "The key is mounted only into the worker container, protected by file permissions, and never placed in images, CI or evidence.",
+            "Anchors created before the compromise cannot be replaced (retention lock), and weekly witness copies are kept outside the cloud account.",
+            "Revoked key IDs are listed in the repository.",
+            "Optional Level 2 uses a provider-managed, non-exportable key (OCD-13)."
+          ]
+        },
+        {
+          "label": "Residual risk",
+          "text": "At Level 1 a VM compromise includes the key. Signatures made after the compromise prove nothing, and detection relies on earlier anchors and witness copies (L-25, ADR-009 section 8).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "The verifier rejects checkpoints signed with a revoked key after the revocation time and reports conflicting checkpoints for the same sequence number. The hardening checklist verifies the key file's location and permissions.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate and Accept. Residual: Medium at Level 1, Low at Level 2.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-39",
+      "threat": "Over-privileged database roles and schema drift",
+      "title": "Over-privileged database roles and schema drift",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [
+        "L-26",
+        "L-28"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Elevation of privilege, Tampering",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02, A-05, A-07, A-08",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "A runtime database role holds more privileges than it needs, or the live schema differs from the reviewed migrations, so a compromised or buggy API process can change the schema, the audit table, other roles or data it should never touch.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The API connects as the migration role or an administrator because of a configuration mistake; a manual hotfix adds a column or drops an index outside the migrations; a later migration grants DELETE or TRUNCATE broadly. An attacker with code execution in the API container then alters tables, disables the audit trigger or deletes tombstoned records.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Four roles with fixed attributes (no superuser, CREATEDB, CREATEROLE, BYPASSRLS, membership or ownership for runtime roles); an explicit grant matrix in a reviewed migration; the API configuration accepts only cm_api; migration credentials never on the VM; statement and idle-transaction timeouts for runtime roles; a Prisma CLI wrapper that refuses db push, migrate dev and migrate reset; a drift check in CI that requires an explicit \"no difference\" result.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "The migration role and the provider administrator still hold full control (L-26, L-28). A reviewed migration can widen grants, so the protection relies on review and on the privilege test failing first.",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "tests/database/privileges.test.ts compares live privileges with an independent copy of the matrix and checks role attributes, ownership and escalation attempts; tests/database/migrations.test.ts runs the drift check with a negative control; tests/security/startup-config.test.ts rejects other roles in DATABASE_URL.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-41",
+      "threat": "Security-profile bypass and silent weakening",
+      "title": "Security-profile bypass and silent weakening of a room",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [
+        "L-59",
+        "L-60",
+        "L-61",
+        "L-62"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Elevation of privilege, Tampering, Repudiation",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-01, A-02, A-07, A-08 (content, ciphertext and envelopes, metadata, audit trail)",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "A member reaches a CONFIDENTIAL or RESTRICTED room, or performs a sensitive operation in it, without meeting the profile; or a room is weakened (downgraded, its lifetimes extended) without the controls the profile document requires and without a trace.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A member without MFA calls a room route directly; a client sends a weaker profile, a forged policy version or a role in the request; a request picks a secondary route that forgot the gate; a write starts under STANDARD while the OWNER upgrades the room, and lands after it under the old rules; a stolen session downgrades a RESTRICTED room with an old step-up; a database row with an unknown policy version is served under a default; a downgrade extends lifetimes.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "The versioned, frozen policy catalogue in code (no database table can change a value, CM-T046); the room's rules resolved only from its stored profile and version, an unknown version fails closed (POLICY_UNSUPPORTED); PC-01 and PC-02 in the central room authorizer for every room route and again on the locked room row inside every write; PC-03 declared by each sensitive route, checked at the gate and again under the lock; profile changes OWNER-only, on the locked row with a stale-expectation check, upgrades requiring the new profile's access requirements, downgrades a step-up within 5 minutes; upgrades shorten lifetimes and revoke rule-breaking invitations and secrets in the same transaction; database triggers let expiry move only earlier; PROFILE_UPGRADED and high-severity PROFILE_DOWNGRADED events.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Reads use the profile at the start of the request (L-59); profiles are per room, not per device (L-60); what members already obtained is not taken back (L-61); profile events are log entries until the Phase 12 ledger (L-33, L-62).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "tests/policy/policy-matrix.test.ts (every control and profile, PC-01 and PC-02 on every room route), tests/policy/profile-change.test.ts (forced lock order for concurrent changes and writes), tests/security/policy-catalogue.test.ts, the BOLA suite and negative controls NC-10-01 to NC-10-12.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-40",
+      "threat": "Unauthorized replacement or reset of a vault",
+      "title": "Unauthorized replacement or reset of a vault",
+      "likelihood": "L",
+      "impact": "H",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Low",
+      "limitations": [
+        "L-07",
+        "L-40"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Spoofing, Denial of service",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-03, A-13, then A-04 and A-01",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Someone other than the owner replaces the wrapped private keys or the whole identity of a user, so that the user loses the identity or contacts later wrap keys to an identity the attacker controls.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "With a stolen session (T-08), the attacker uploads a re-wrap under a passphrase of their choice, or resets the vault with an identity they generated. A variant replays an earlier, legitimately signed re-wrap to restore an old passphrase.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Setup and re-wrap require a recent step-up and reset a strict one (account password and MFA code); every re-wrap is signed by the identity's signing key and applied by compare-and-swap on the previous salt, so it cannot be forged or replayed; the identity columns are write-once, one identity per user is ACTIVE, and a retired identity can never be reactivated (database trigger); a reset revokes all other sessions and gives the user a new fingerprint that contacts can notice; security events record every change.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "An attacker with the account password and the second factor can reset the vault. That destroys the victim's identity (availability) and installs one the attacker controls, which contacts detect only through the fingerprint change (L-07). A database-level attacker bypasses the API checks entirely (T-25, T-32).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "tests/vault/rewrap.test.ts (modified after signing, signed by another identity, replayed, stale, weaker parameters), tests/vault/reset-and-directory.test.ts (strict step-up, wrong target, sessions revoked), database constraint tests (write-once identity, final retired status), negative control NC-04-07.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact High, inherent Medium. Treatment: Mitigate and Accept. Residual: Low.",
+          "items": []
+        }
+      ]
+    }
+  ]
+}

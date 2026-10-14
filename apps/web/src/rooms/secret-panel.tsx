@@ -4,11 +4,22 @@ import { roomRuleFor, SECRET_LIMITS, type ProfilePolicy, type RoomRole } from '@
 import type { RoomMember, SecretMetadataView } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
-import { Alert, Button, Card, SecondaryButton } from '../components/ui';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  controlClass,
+  EmptyState,
+  labelClass,
+  Loading,
+  SecondaryButton,
+} from '../components/ui';
 import { ApiError } from '../lib/api';
 import { useVault } from '../vault/use-vault';
 import { describeSecretError, SECRET_REVEAL_WARNING, SECRETS_EXPLANATION } from './messages';
 import { mayAttempt } from './permissions';
+import { SecretReceipt } from './receipts';
 import { listSecrets, revealSecret, revokeSecret, SECRET_MAX_KIB, secretFits, sendSecret } from './secrets';
 
 /**
@@ -44,8 +55,9 @@ const STATUS_LABEL: Readonly<Record<SecretMetadataView['status'], string>> = {
   REVOKED: 'Revoked',
 };
 
-const inputClass =
-  'w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-sky-500 focus:outline-none';
+const inputClass = controlClass;
+
+const STATUS_TONE = { ACTIVE: 'info', REVEALED: 'neutral', EXPIRED: 'neutral', REVOKED: 'warning' } as const;
 
 export function SecretPanel({
   roomId,
@@ -234,9 +246,8 @@ export function SecretPanel({
         : `From ${nameOf(view.senderId)} to ${nameOf(view.recipientUserId)}`;
 
   return (
-    <Card title="Secrets">
+    <Card title="Secrets" icon="secret" description={SECRETS_EXPLANATION}>
       <div data-testid="secrets-card" className="space-y-4">
-        <p className="text-xs text-slate-500">{SECRETS_EXPLANATION}</p>
         {message === undefined ? null : (
           <div data-testid="secret-message">
             <Alert kind={message.kind}>{message.text}</Alert>
@@ -246,7 +257,7 @@ export function SecretPanel({
         {!unlocked ? (
           <p className="text-sm text-slate-400" data-testid="secrets-locked">
             Secrets are encrypted and decrypted on this device.{' '}
-            <Link className="text-sky-400 underline" href="/vault">
+            <Link className="text-accent-400 underline" href="/vault">
               Unlock your vault
             </Link>{' '}
             to send or reveal them.
@@ -254,9 +265,14 @@ export function SecretPanel({
         ) : !canCreate ? null : !writable ? (
           <p className="text-sm text-slate-400">New secrets cannot be sent until the room key is rotated.</p>
         ) : composing ? (
-          <form className="space-y-3" onSubmit={(e) => void onSend(e)} noValidate aria-label="New secret">
-            <label className="block space-y-1">
-              <span className="text-sm text-slate-300">For</span>
+          <form
+            className="space-y-3 rounded-lg border border-slate-800 bg-slate-950/40 p-4"
+            onSubmit={(e) => void onSend(e)}
+            noValidate
+            aria-label="New secret"
+          >
+            <label className="block space-y-1.5">
+              <span className={labelClass}>For</span>
               <select name="recipient" data-testid="secret-recipient" className={inputClass} defaultValue="">
                 <option value="" disabled>
                   Choose a member
@@ -268,10 +284,8 @@ export function SecretPanel({
                 ))}
               </select>
             </label>
-            <label className="block space-y-1">
-              <span className="text-sm text-slate-300">
-                Secret (encrypted plain text, at most {SECRET_MAX_KIB} KiB)
-              </span>
+            <label className="block space-y-1.5">
+              <span className={labelClass}>Secret (encrypted plain text, at most {SECRET_MAX_KIB} KiB)</span>
               <textarea
                 name="secret"
                 value={text}
@@ -291,13 +305,9 @@ export function SecretPanel({
                 This secret is longer than {SECRET_MAX_KIB} KiB and cannot be sent.
               </p>
             )}
-            <label className="block space-y-1">
-              <span className="text-sm text-slate-300">Expires after</span>
-              <select
-                name="lifetime"
-                data-testid="secret-lifetime"
-                className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-              >
+            <label className="block space-y-1.5">
+              <span className={labelClass}>Expires after</span>
+              <select name="lifetime" data-testid="secret-lifetime" className={`${controlClass} sm:w-auto`}>
                 {lifetimeChoices(policy).map((choice) => (
                   <option key={choice.label} value={String(choice.ms)}>
                     {choice.label}
@@ -316,7 +326,7 @@ export function SecretPanel({
               Destroy after the first reveal
               {rules.burnMandatory ? ' (always on in restricted rooms)' : ''}
             </label>
-            <p className="text-xs text-amber-200">
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
               Once this secret is revealed, it cannot be retrieved again through CipherMesh. The recipient can still
               copy what they see.
             </p>
@@ -352,15 +362,16 @@ export function SecretPanel({
         )}
 
         {!loaded ? (
-          <p className="text-sm text-slate-400" role="status">
-            Loading secrets…
-          </p>
+          <Loading label="Loading secrets…" />
         ) : secrets.length === 0 ? (
-          <p className="text-sm text-slate-400" data-testid="secrets-empty">
-            No secrets sent to or from you in this room.
-          </p>
+          <EmptyState icon="secret" title="No secrets sent to or from you in this room." testId="secrets-empty">
+            A secret is encrypted for one member and can be destroyed after its first reveal.
+          </EmptyState>
         ) : (
-          <ul className="divide-y divide-slate-800 rounded border border-slate-800" aria-label="Secrets">
+          <ul
+            className="divide-y divide-slate-800 overflow-hidden rounded-lg border border-slate-800"
+            aria-label="Secrets"
+          >
             {secrets.map((view) => {
               const mine = view.recipientUserId === selfId;
               const shown = revealed.get(view.id);
@@ -368,7 +379,10 @@ export function SecretPanel({
                 <li key={view.id} className="space-y-3 px-4 py-3" data-testid="secret-row" data-secret-id={view.id}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <span className="block font-medium">{describe(view)}</span>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-white">{describe(view)}</span>
+                        <Badge tone={STATUS_TONE[view.status]}>{view.status.toLowerCase()}</Badge>
+                      </span>
                       <span className="block text-xs text-slate-400" data-testid="secret-status">
                         {STATUS_LABEL[view.status]}
                         {view.burnAfterReading ? ' · destroyed after the first reveal' : ' · can be revealed again'}
@@ -428,9 +442,10 @@ export function SecretPanel({
                       ) : null}
                     </span>
                   </div>
+                  <SecretReceipt view={view} revealed={shown !== undefined} />
                   {confirmReveal === view.id ? (
                     <div className="space-y-2" data-testid="secret-reveal-warning">
-                      <Alert kind="info">{SECRET_REVEAL_WARNING}</Alert>
+                      <Alert kind="warning">{SECRET_REVEAL_WARNING}</Alert>
                       <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
@@ -456,7 +471,7 @@ export function SecretPanel({
                     <div className="space-y-2" data-testid="secret-view">
                       {/* Untrusted text: React renders it as text, never as HTML or Markdown (T-12). */}
                       <div
-                        className="whitespace-pre-wrap break-all rounded border border-slate-800 bg-slate-950 p-3 font-mono text-sm"
+                        className="whitespace-pre-wrap break-all rounded-lg border border-accent-500/30 bg-slate-950/70 p-4 font-mono text-sm text-slate-100"
                         data-testid="secret-view-text"
                         tabIndex={-1}
                       >

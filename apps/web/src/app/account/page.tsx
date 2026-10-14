@@ -14,7 +14,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
 import { QrCode } from '../../components/qr-code';
-import { Alert, Button, Card, Field, SecondaryButton } from '../../components/ui';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  DetailList,
+  Field,
+  Loading,
+  PageHeader,
+  SecondaryButton,
+} from '../../components/ui';
 import { api, ApiError, describeError, formText } from '../../lib/api';
 import { vaultController } from '../../vault/controller';
 
@@ -56,100 +66,126 @@ export default function AccountPage() {
     }
   }
 
-  if (info === undefined) return <p className="text-slate-400">Loading…</p>;
+  if (info === undefined) return <Loading />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Account</h1>
-        <SecondaryButton
-          onClick={() =>
-            void act(async () => {
-              // The vault is locked before the session ends (session-and-csrf.md section 5).
-              await vaultController.logout();
-              router.replace('/login');
-            })
-          }
-        >
-          Sign out
-        </SecondaryButton>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Settings"
+        title="Account"
+        description="Sign-in security for your account. Every protection here is enforced by the server; this page shows what it answers."
+        actions={
+          <SecondaryButton
+            onClick={() =>
+              void act(async () => {
+                // The vault is locked before the session ends (session-and-csrf.md section 5).
+                await vaultController.logout();
+                router.replace('/login');
+              })
+            }
+          >
+            Sign out
+          </SecondaryButton>
+        }
+      />
       {message === undefined ? null : <Alert kind={message.kind}>{message.text}</Alert>}
 
-      <Card title="Vault">
-        <p className="text-sm text-slate-400">
-          Your Vault holds your cryptographic identity, protected by a Vault Passphrase that is separate from this
-          account password and never leaves your browser.{' '}
-          <Link className="text-sky-400 underline" href="/vault">
-            Open the vault
-          </Link>
-        </p>
-      </Card>
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        <div className="space-y-6">
+          <Card
+            title="Signed in"
+            icon="account"
+            actions={
+              info.user.mfaEnabled ? (
+                <Badge tone="success" icon="checkCircle">
+                  Two-step sign-in on
+                </Badge>
+              ) : (
+                <Badge tone="warning" icon="alert">
+                  Two-step sign-in off
+                </Badge>
+              )
+            }
+          >
+            <DetailList
+              items={[
+                { term: 'Name', value: info.user.displayName },
+                { term: 'Email (not verified)', value: info.user.email },
+                { term: 'Multi-factor authentication', value: info.user.mfaEnabled ? 'On' : 'Off' },
+                {
+                  term: 'Session ends at the latest',
+                  value: new Date(info.session.absoluteExpiresAt).toLocaleString(),
+                },
+                {
+                  term: 'Last identity confirmation',
+                  value:
+                    info.session.stepUpAt === null
+                      ? 'None in this session'
+                      : new Date(info.session.stepUpAt).toLocaleString(),
+                },
+              ]}
+            />
+          </Card>
 
-      <Card title="Signed in">
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-          <dt className="text-slate-400">Name</dt>
-          <dd>{info.user.displayName}</dd>
-          <dt className="text-slate-400">Email (not verified)</dt>
-          <dd>{info.user.email}</dd>
-          <dt className="text-slate-400">Multi-factor authentication</dt>
-          <dd>{info.user.mfaEnabled ? 'On' : 'Off'}</dd>
-          <dt className="text-slate-400">Session ends at the latest</dt>
-          <dd>{new Date(info.session.absoluteExpiresAt).toLocaleString()}</dd>
-          <dt className="text-slate-400">Last identity confirmation</dt>
-          <dd>
-            {info.session.stepUpAt === null ? 'None in this session' : new Date(info.session.stepUpAt).toLocaleString()}
-          </dd>
-        </dl>
-      </Card>
+          <Card title="Vault" icon="vault">
+            <p className="text-sm text-slate-400">
+              Your Vault holds your cryptographic identity, protected by a Vault Passphrase that is separate from this
+              account password and never leaves your browser.{' '}
+              <Link className="font-medium text-accent-300 hover:text-accent-200" href="/vault">
+                Open the vault
+              </Link>
+            </p>
+          </Card>
+          <Mfa info={info} act={act} />
+        </div>
+        <div className="space-y-6">
+          <StepUp
+            mfaEnabled={info.user.mfaEnabled}
+            onDone={() => {
+              setMessage(undefined);
+              void load();
+            }}
+          />
+          <PasswordChange mfaEnabled={info.user.mfaEnabled} act={act} />
 
-      <StepUp
-        mfaEnabled={info.user.mfaEnabled}
-        onDone={() => {
-          setMessage(undefined);
-          void load();
-        }}
-      />
-      <Mfa info={info} act={act} />
-      <PasswordChange mfaEnabled={info.user.mfaEnabled} act={act} />
-
-      <Card title="Sessions">
-        <ul className="divide-y divide-slate-800 text-sm">
-          {sessions.map((s) => (
-            <li key={s.id} className="flex items-center justify-between gap-4 py-2">
-              <span>
-                {s.userAgent ?? 'Unknown browser'} · last active {new Date(s.lastSeenAt).toLocaleString()}
-                {s.current ? ' · this session' : ''}
-              </span>
-              {s.current ? null : (
-                <SecondaryButton
-                  onClick={() =>
-                    void act(async () => {
-                      await api('POST', '/auth/sessions/revoke', statusOkResponseSchema, { sessionId: s.id });
-                    })
-                  }
-                >
-                  Sign out
-                </SecondaryButton>
-              )}
-            </li>
-          ))}
-        </ul>
-        <SecondaryButton
-          onClick={() =>
-            void act(async () => {
-              await api('POST', '/auth/sessions/revoke-others', statusOkResponseSchema);
-            })
-          }
-        >
-          Sign out all other sessions
-        </SecondaryButton>
-      </Card>
-      <p className="text-xs text-slate-500">
-        <Link className="underline" href="/">
-          Back to the start page
-        </Link>
-      </p>
+          <Card
+            title="Sessions"
+            icon="browser"
+            description="Opaque tokens in HttpOnly cookies; the server stores only their digests."
+          >
+            <ul className="divide-y divide-slate-800 overflow-hidden rounded-lg border border-slate-800 text-sm">
+              {sessions.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
+                  <span className="min-w-0 break-words text-slate-200">
+                    {s.userAgent ?? 'Unknown browser'} · last active {new Date(s.lastSeenAt).toLocaleString()}
+                    {s.current ? ' · this session' : ''}
+                  </span>
+                  {s.current ? null : (
+                    <SecondaryButton
+                      onClick={() =>
+                        void act(async () => {
+                          await api('POST', '/auth/sessions/revoke', statusOkResponseSchema, { sessionId: s.id });
+                        })
+                      }
+                    >
+                      Sign out
+                    </SecondaryButton>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <SecondaryButton
+              onClick={() =>
+                void act(async () => {
+                  await api('POST', '/auth/sessions/revoke-others', statusOkResponseSchema);
+                })
+              }
+            >
+              Sign out all other sessions
+            </SecondaryButton>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
@@ -173,7 +209,7 @@ function StepUp({ mfaEnabled, onDone }: { readonly mfaEnabled: boolean; readonly
     }
   }
   return (
-    <Card title="Confirm your identity">
+    <Card title="Confirm your identity" icon="fingerprint">
       <p className="text-sm text-slate-400">
         Sensitive changes need a confirmation within the last 15 minutes. The server checks it; it cannot be skipped
         from the browser.
@@ -202,12 +238,12 @@ function Mfa({
 
   if (codes !== undefined) {
     return (
-      <Card title="Recovery codes">
+      <Card title="Recovery codes" icon="key" tone="warning">
         <Alert kind="info">
           Store these codes somewhere safe and offline. Each works once. They are shown only now; CipherMesh keeps only
           one-way digests of them.
         </Alert>
-        <ul className="grid grid-cols-2 gap-2 font-mono text-sm">
+        <ul className="grid grid-cols-2 gap-2 rounded-lg border border-slate-800 bg-slate-950/60 p-4 font-mono text-sm">
           {codes.map((c) => (
             <li key={c}>{c}</li>
           ))}
@@ -234,13 +270,15 @@ function Mfa({
       });
     };
     return (
-      <Card title="Set up the authenticator app">
+      <Card title="Set up the authenticator app" icon="fingerprint">
         <p className="text-sm text-slate-400">
           Scan the code with an authenticator app, or enter the key manually. It is shown once and is not activated
           until you enter a valid code.
         </p>
         <QrCode value={enrollment.otpauthUri} label="QR code for the authenticator app" />
-        <p className="break-all font-mono text-sm">{enrollment.secret}</p>
+        <p className="break-all rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 font-mono text-sm">
+          {enrollment.secret}
+        </p>
         <form className="space-y-3" onSubmit={confirm} noValidate>
           <Field label="Code from the app" name="code" autoComplete="one-time-code" inputMode="numeric" />
           <div className="flex gap-3">
@@ -260,7 +298,12 @@ function Mfa({
   }
 
   return (
-    <Card title="Multi-factor authentication">
+    <Card
+      title="Multi-factor authentication"
+      id="mfa"
+      icon="lock"
+      description="A time-based code from an authenticator app. Confidential and restricted rooms require it."
+    >
       {info.user.mfaEnabled ? (
         <div className="flex flex-wrap gap-3">
           <SecondaryButton
@@ -320,7 +363,7 @@ function PasswordChange({
     });
   };
   return (
-    <Card title="Change the account password">
+    <Card title="Change the account password" icon="key">
       <p className="text-sm text-slate-400">All your other sessions are signed out after the change.</p>
       <form className="space-y-3" onSubmit={onSubmit} noValidate>
         <Field label="Current password" name="currentPassword" type="password" autoComplete="current-password" />

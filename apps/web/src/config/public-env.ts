@@ -12,6 +12,24 @@ function readApiBasePath(): string {
   return value;
 }
 
+/**
+ * Which environment this build was made for (Phase 14, CM-T061). A build-time label only: it is
+ * shown so nobody mistakes a development build for the cloud deployment, and it is never
+ * presented as a verification of anything. Unknown values fail the build.
+ */
+export const DEPLOYMENT_ENVIRONMENTS = ['development', 'cloud-demonstration'] as const;
+export type DeploymentEnvironment = (typeof DEPLOYMENT_ENVIRONMENTS)[number];
+
+function readDeploymentEnvironment(): DeploymentEnvironment {
+  const value = process.env['NEXT_PUBLIC_CM_ENVIRONMENT'] ?? 'development';
+  const known = DEPLOYMENT_ENVIRONMENTS.find((environment) => environment === value);
+  if (known === undefined) {
+    throw new Error(`NEXT_PUBLIC_CM_ENVIRONMENT must be one of ${DEPLOYMENT_ENVIRONMENTS.join(', ')}`);
+  }
+  return known;
+}
+
 export const publicEnv = Object.freeze({
   apiBasePath: readApiBasePath(),
+  deploymentEnvironment: readDeploymentEnvironment(),
 });

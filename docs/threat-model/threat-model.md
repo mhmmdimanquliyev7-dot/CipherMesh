@@ -683,3 +683,16 @@ Prompt 13 implemented the rekey state machine, leaving a room, re-sharing keys, 
 
 Phase 11 review: three findings. **SF-11-01** (found by the cross-browser E2E): the WebKit build Playwright runs on Linux returned an RSA-OAEP message with its leading zero bytes dropped, so 1 in 256 honest room keys were refused as tampered; fixed in `unwrap32` with decision CD-33 and the NC-11-13 control. **Stale E2E assertion:** `rooms.spec.ts` matched the Phase 6 banner wording, which Phase 11 changed; the assertion was updated to the new wording and still checks that the lock notice is shown. **Documentation gap:** the PC-14 room text said "not enforced yet" after the worker enforced it; corrected with the profile document.
 
+## 15. Phase 14 implementation check (security dashboard and Trust Center)
+
+Phase 14 and Prompt 16.5 were delivered together (2026-10-14) after the project owner deferred Phases 12, 13, 15 and 16 on 2026-10-13. No asset, trust boundary or data flow of content changed; two entry points were added and the client gained static pages. Risks are not re-rated here: the re-rating planned after Phase 12 moves with it (section 7).
+
+| Entry point or change | Threats considered | Controls and tests |
+|---|---|---|
+| `GET /admin/security-dashboard` (PA-01) | T-15 and T-28 (disclosure of room metadata through a monitoring view), T-06 (non-administrators), T-26 (expensive queries) | Registry administrator gate, 404 for everyone else, 401 without a session; aggregates only by construction (metric IDs, value keys and integers; `tests/dashboard` canary check for room names, room and user IDs and emails); counts over indexed metadata columns, no content or key column selected; a GET that writes nothing (route inventory) |
+| Public Trust Center pages (`/trust/*`) | T-15 (exposure of governance detail), T-24 (served code) | Static pages built from documents that are already public in the repository; no API call except the dashboard and the public probes; no third-party script, font or image; no browser storage (E2E); external links open GitHub with `noreferrer` |
+| Live checks | T-31 (transport), T-15 | Same-origin `HEAD` of the page and `GET /health`, `GET /ready` without credentials; results labelled as observations of the serving origin only (L-69) |
+| Global sign-out control | T-08 (session left open) | Locks the vault, then ends the session (session-and-csrf.md section 5), as on the Account page |
+| Encryption receipts | T-15, T-12 | Show suite, key version, sizes and the browser's own integrity result; no key, IV, wrapped key or ciphertext; rendered outside the untrusted note view (the XSS test still asserts no element in it) |
+
+Not implemented (deferred): the audit ledger metrics of the dashboard (SD-10, SD-11, SD-12, SD-15, L-70) and the T-20 controls of Phase 12.

@@ -23,3 +23,6 @@ packages/crypto/src/passphrase-blocklist.ts
 packages/crypto/src/kdf/argon2id-wasm.ts
 # Published test vectors (Project Wycheproof and OpenSSL), kept byte-for-byte as generated.
 packages/crypto/vectors/
+
+# Generated from the normative documents by apps/web/scripts/generate-trust-data.mjs (checked byte for byte).
+apps/web/src/trust/generated/

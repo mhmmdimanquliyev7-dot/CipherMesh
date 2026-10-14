@@ -34,7 +34,11 @@ test('the shell loads under the strict CSP without violations', async ({ page })
   expect(csp).not.toMatch(/'unsafe-inline'|'unsafe-eval'/);
 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Client-side encrypted');
-  await expect(page.getByText('Not yet available', { exact: false }).first()).toBeVisible();
+  // The start page states what is built; the Trust Center link is part of the public frame.
+  await expect(page.getByRole('link', { name: 'Create an account' })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Public' }).getByRole('link', { name: 'Trust Center' }),
+  ).toBeVisible();
   await page.waitForLoadState('networkidle');
 
   expect(await page.evaluate(() => window.__cspViolations)).toEqual([]);

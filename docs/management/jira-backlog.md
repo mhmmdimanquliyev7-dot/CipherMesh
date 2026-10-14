@@ -2,6 +2,10 @@
 
 Status: Phase 0.5 specification, ready for import; CM-T023, CM-T025 to CM-T028, CM-T033, CM-T034, CM-T036, CM-T050 and CM-T053 were updated in Phase 4 to match ADR-015, as CM-T086 requires (markdown and CSV changed together). Nothing has been created in Jira. The same data is exported as [jira-backlog.csv](jira-backlog.csv), and the import steps are in [jira-import-guide.md](jira-import-guide.md). Related: [jira-workflow.md](jira-workflow.md), [project-roadmap.md](project-roadmap.md).
 
+## Schedule change (project owner decision, 2026-10-13)
+
+The project owner approved delivering Phase 14 (CM-T061, CM-T062) together with Prompt 16.5 (complete UI/UX redesign) before the university deadline, and deferring until after the university delivery: CM-EPIC-11 / Phase 12 (CM-T054 to CM-T058), Phase 13 (CM-T059, CM-T060), Phase 15 (CM-T073) and Phase 16 (CM-T074 to CM-T076). Scope and acceptance criteria of the deferred items are unchanged; their status stays Backlog. The Prompt 16.5 redesign and the Security & Trust Center are recorded under CM-T061 and CM-T062 ([phase-14-traceability.md](phase-14-traceability.md)). The next workstream is Phases 17 to 19 (cloud deployment and hardening).
+
 ## How to use this backlog
 
 - **IDs are placeholders.** `CM-T001` to `CM-T087` identify work items here and in every other document. Jira assigns real keys (for example `CM-42`) on import. The placeholder ID is kept at the start of each Jira summary, so documents and tests stay traceable.
@@ -761,6 +765,7 @@ Priority expresses impact, not order. Phases and dependency links set the order,
   - Empty data produces empty states, never invented values.
   - Responses contain no room names or content.
 - **Security considerations:** No fake scores; privacy of room metadata (T-28).
+- **Implementation (2026-10-14):** `GET /admin/security-dashboard`; SD-01 to SD-09, SD-13 and SD-14 implemented with exact-value tests (`tests/dashboard`); SD-10, SD-11, SD-12 and SD-15 reported NOT_IMPLEMENTED because CM-T056 (Phase 12) is deferred. The dependency on CM-T056 is therefore partly unmet by decision.
 
 #### CM-T062 Security Dashboard UI
 - **Epic:** CM-EPIC-12 | **Priority:** P1 | **Labels:** frontend | **Depends on:** CM-T061
@@ -770,6 +775,7 @@ Priority expresses impact, not order. Phases and dependency links set the order,
   - Displayed values match the API.
   - No composite "security score" anywhere.
 - **Security considerations:** Monitoring evidence for ISO/IEC 27001 clause 9.1.
+- **Implementation (2026-10-14):** `/trust/dashboard`, part of the Security & Trust Center delivered with Prompt 16.5; audit integrity, downgrades and Safety Code reports are shown as not implemented, with the reason. Evidence EV-14-01, EV-14-02.
 
 ---
 

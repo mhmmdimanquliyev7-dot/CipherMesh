@@ -8,10 +8,10 @@ import {
 } from '@ciphermesh/validation';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Card, SecondaryButton } from '../../components/ui';
+import { Alert, Button, Card, EmptyState, Loading, PageHeader, SecondaryButton } from '../../components/ui';
+import { ProfileBadge, RoleBadge } from '../../rooms/badges';
 import { api, ApiError } from '../../lib/api';
 import { describeRoomError } from '../../rooms/messages';
-import { ROLE_LABEL } from '../../rooms/permissions';
 
 /**
  * The signed-in user's own invitations (Phase 6, SS-03, CM-T035). Accepting makes the user a member
@@ -60,38 +60,46 @@ export default function InvitationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Invitations</h1>
-      <p className="max-w-3xl text-sm text-slate-400">
-        Invitations to rooms. After you accept, the room key is opened and checked on this device with your unlocked
-        vault; a key that fails the check is not used.
-      </p>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Invitations"
+        description="Invitations to rooms. After you accept, the room key is opened and checked on this device with your unlocked vault; a key that fails the check is not used."
+      />
       {message === undefined ? null : <Alert kind={message.kind}>{message.text}</Alert>}
-      <Card title="Your invitations">
+      <Card title="Your invitations" icon="invitations">
         {invitations === undefined ? (
-          <p className="text-slate-400">Loading…</p>
+          <Loading />
         ) : invitations.length === 0 ? (
-          <p className="text-sm text-slate-400">You have no open invitations.</p>
+          <EmptyState icon="invitations" title="You have no open invitations.">
+            When someone invites you, the invitation appears here. There is no link or token to share.
+          </EmptyState>
         ) : (
-          <ul className="divide-y divide-slate-800 rounded border border-slate-800" aria-label="Your invitations">
+          <ul
+            className="divide-y divide-slate-800 overflow-hidden rounded-lg border border-slate-800"
+            aria-label="Your invitations"
+          >
             {invitations.map((invitation) => (
               <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                <span className="space-x-2 text-sm">
-                  <span className="font-medium">{invitation.room.name}</span>
-                  <span className="text-xs text-slate-400">
-                    {invitation.room.securityProfile} · {ROLE_LABEL[invitation.role]} · from{' '}
-                    {invitation.invitedBy.displayName}
-                    {invitation.status === 'PENDING_APPROVAL' ? ' · waiting for the room owner to approve' : ''}
+                <span className="min-w-0 space-y-1.5 text-sm">
+                  <span className="block break-words font-medium text-white">{invitation.room.name}</span>
+                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+                    <ProfileBadge profile={invitation.room.securityProfile} />
+                    <RoleBadge role={invitation.role} />
+                    <span>
+                      from {invitation.invitedBy.displayName}
+                      {invitation.status === 'PENDING_APPROVAL' ? ' · waiting for the room owner to approve' : ''}
+                    </span>
                   </span>
                 </span>
                 <span className="flex gap-2">
-                  <SecondaryButton
+                  <Button
                     type="button"
                     disabled={invitation.status !== 'PENDING'}
                     onClick={() => void respond(invitation, true)}
                   >
                     Accept
-                  </SecondaryButton>
+                  </Button>
                   <SecondaryButton type="button" onClick={() => void respond(invitation, false)}>
                     Decline
                   </SecondaryButton>

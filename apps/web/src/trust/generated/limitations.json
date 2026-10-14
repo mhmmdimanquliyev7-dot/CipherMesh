@@ -1,0 +1,495 @@
+{
+  "source": "docs/security/limitations.md",
+  "limitations": [
+    {
+      "id": "L-01",
+      "limitation": "A compromised browser or device can read plaintext while the legitimate user has it decrypted, and can capture the Vault Passphrase as it is typed",
+      "why": "Decryption must happen somewhere the user can read the result",
+      "response": "Keys only in memory, non-extractable where possible, vault auto-lock, no persistence of plaintext, guidance for RESTRICTED rooms",
+      "demonstration": "Show that a script with page access can read decrypted note text but cannot export the non-extractable private key"
+    },
+    {
+      "id": "L-02",
+      "limitation": "Client-side encryption does not protect against a malicious web application served after server compromise. Whoever controls the served JavaScript can capture passphrases and plaintext",
+      "why": "Browsers fetch application code from the server on each visit; there is no general mechanism for users to pin code of ordinary websites",
+      "response": "Static, content-hashed assets built in CI from reviewed commits; strict CSP; no third-party scripts; published build hashes; hardened VM",
+      "demonstration": "Explain in the report with the trust-boundary diagram (TB-03); compare with native apps and browser extensions such as code-verification extensions"
+    },
+    {
+      "id": "L-03",
+      "limitation": "Burn-after-reading cannot stop the recipient from copying the plaintext (copy and paste, screenshots, photos)",
+      "why": "Anything a person can read, they can record",
+      "response": "Clear UI warning; secrets rendered as text; at-most-once delivery",
+      "demonstration": "Reveal a secret, copy it, show that the server copy is gone but the copied text remains"
+    },
+    {
+      "id": "L-04",
+      "limitation": "Key rotation protects future data only. It cannot revoke plaintext or keys that a removed member already obtained",
+      "why": "Knowledge cannot be taken back",
+      "response": "Mandatory rotation on removal, immediate loss of API access, audit trail",
+      "demonstration": "Remove a member, show that new content uses version v+1 and that the old key cannot unwrap new DEKs, while old downloads stay readable offline"
+    },
+    {
+      "id": "L-05",
+      "limitation": "Metadata is visible to the server: room names, membership, roles, sizes, timestamps, access patterns, IP addresses in sessions",
+      "why": "The server needs metadata to authorize, enforce policy and audit",
+      "response": "Filenames, types and note titles encrypted; room names flagged as non-confidential; retention limits for IP data",
+      "demonstration": "Show a database row: ciphertext for content, clear text for room name and sizes"
+    },
+    {
+      "id": "L-06",
+      "limitation": "Availability depends on the cloud provider and one VM",
+      "why": "Single-region, single-VM design chosen for simplicity",
+      "response": "Managed database backups, object versioning, documented restore procedure",
+      "demonstration": "Restore test evidence"
+    },
+    {
+      "id": "L-07",
+      "limitation": "The server is the public-key directory. An attacker controlling the server or database could substitute public keys unless users compare fingerprints out of band",
+      "why": "No independent key directory or transparency log",
+      "response": "Fingerprints in the UI, mandatory confirmation in RESTRICTED rooms, audited key changes, keys bound to envelope labels. The Room Safety Code does not detect substitution",
+      "demonstration": "Simulate a substituted key in a test database and show the fingerprint mismatch in the RESTRICTED invitation flow"
+    },
+    {
+      "id": "L-08",
+      "limitation": "Weak Vault Passphrases can be guessed offline by anyone holding a copy of the database",
+      "why": "The encrypted private key must be stored somewhere accessible to all devices of the user",
+      "response": "Argon2id with memory-hard parameters (Phase 4: m = 64 MiB, t = 3, p = 1, CP-04), a minimum of 16 characters, a 3,350-entry blocklist and identity checks, a new salt on every vault write, no server-side verifier",
+      "demonstration": "Show the time for one Argon2id derivation (pnpm bench:vault) and extrapolate guessing cost for short versus long passphrases"
+    },
+    {
+      "id": "L-09",
+      "limitation": "Attribution among members relies on the server. A shared room key proves \"someone with the room key\" produced a ciphertext, not which member",
+      "why": "Content items are not signed. Per-user signing keys (CD-23, ADR-015) attribute room key versions and membership grants since Phase 6, not individual files, notes or secrets",
+      "response": "Uploader recorded from the authenticated session; audit trail; signed key versions, genesis statements and grants (Phase 6)",
+      "demonstration": "Explain with the key hierarchy"
+    },
+    {
+      "id": "L-10",
+      "limitation": "The server can withhold data or serve an older version of mutable data such as a note or the vault record",
+      "why": "Clients have no independent record of the latest state",
+      "response": "Revision numbers in AAD, optimistic concurrency, audit events",
+      "demonstration": "Explain; optional test that swapping revisions fails authentication"
+    },
+    {
+      "id": "L-11",
+      "limitation": "Encrypted files cannot be scanned for malware by the server",
+      "why": "The server never sees plaintext",
+      "response": "Files never rendered or executed by the server; downloads forced as attachments; warnings; size limits",
+      "demonstration": "Upload a harmless test file (for example the EICAR test string) and show it is stored only as ciphertext"
+    },
+    {
+      "id": "L-12",
+      "limitation": "Backups retain deleted, expired and burned ciphertext until backup retention ends",
+      "why": "Managed backups and object versioning are outside per-item control",
+      "response": "The data stays encrypted; retention periods documented",
+      "demonstration": "Show backup retention settings"
+    },
+    {
+      "id": "L-13",
+      "limitation": "The audit ledger is tamper-evident, not tamper-proof. An attacker with full database access can rewrite events after the last anchored checkpoint, and a compromised server can simply stop recording events",
+      "why": "Hashes detect changes only against a trusted reference",
+      "response": "Designed, not implemented: the hash chain, signed checkpoints and the verifier (Phase 12) were deferred by the project owner on 2026-10-13; today only the append-only grants and trigger exist, and security events go to the redacted log (L-33). Design: Append-only grants, hash chain, signed checkpoints in retention-locked storage, external witness copies, offline verifier. Trust model per compromise scenario in ADR-009 section 8",
+      "demonstration": "Modify an event in a test database and show the verifier pinpointing it"
+    },
+    {
+      "id": "L-14",
+      "limitation": "Download and \"view-only\" restrictions cannot be enforced cryptographically",
+      "why": "Whoever can decrypt can save the plaintext",
+      "response": "PC-12 controls whether the API issues ciphertext at all",
+      "demonstration": "Explain in the policy section"
+    },
+    {
+      "id": "L-15",
+      "limitation": "JavaScript cannot reliably wipe memory",
+      "why": "Garbage collection, immutable strings, JIT copies",
+      "response": "Minimize key lifetime, non-extractable keys, auto-lock",
+      "demonstration": "Explain"
+    },
+    {
+      "id": "L-16",
+      "limitation": "No post-quantum protection. RSA-OAEP envelopes recorded today could be decrypted by a future large quantum computer",
+      "why": "Standard post-quantum KEMs are not yet available in WebCrypto",
+      "response": "Algorithm suite identifiers allow future migration",
+      "demonstration": "Explain"
+    },
+    {
+      "id": "L-17",
+      "limitation": "Losing the Vault Passphrase loses the personal key; access returns only if admins re-share room keys, and only for versions the history policy allows",
+      "why": "No key escrow by design",
+      "response": "Vault reset to a new identity (Phase 4), re-share flow (Phase 6 onward); the optional user-held recovery key (OCD-10) is not implemented",
+      "demonstration": "Demonstrate a vault reset and, from Phase 6, a re-share"
+    },
+    {
+      "id": "L-18",
+      "limitation": "Fingerprint confirmation cannot prove that people compared fingerprints",
+      "why": "The server only sees the confirmed value",
+      "response": "Mandatory confirmation step in RESTRICTED rooms, clear UI instructions",
+      "demonstration": "Explain"
+    },
+    {
+      "id": "L-19",
+      "limitation": "Audit records only server-observable actions. Client-side decryption is not observable",
+      "why": "Decryption happens in the browser",
+      "response": "Audit records ciphertext issuance (for example download URLs), not \"file opened\"",
+      "demonstration": "Explain in the audit section"
+    },
+    {
+      "id": "L-20",
+      "limitation": "No resistance to large-scale DDoS",
+      "why": "No CDN or WAF in the baseline",
+      "response": "Nginx and API rate limits, body-size limits",
+      "demonstration": "Explain"
+    },
+    {
+      "id": "L-21",
+      "limitation": "Account identifiers (email addresses) are not verified, so a look-alike account can be invited by mistake",
+      "why": "No email service in the baseline",
+      "response": "Identifiers labelled unverified; fingerprints and account age shown at invitation; confirmation required in RESTRICTED rooms (T-35)",
+      "demonstration": "Register a look-alike test account and show the fingerprint mismatch in the invitation dialog"
+    },
+    {
+      "id": "L-22",
+      "limitation": "The Room Safety Code detects key inconsistency only when members actually compare it over an independent channel. It does not show who else holds the key, does not detect a key that every member received from an attacker (T-36) or key substitution with re-wrapping (T-25), and malicious JavaScript can display a fake code (L-02)",
+      "why": "The code is derived from the key each browser holds, so it can only show whether two members hold the same key",
+      "response": "Optional comparison with advisory prompts, clear wording, mismatch reporting (ADR-012)",
+      "demonstration": "Give two test browsers different keys through a test harness and show that their codes differ"
+    },
+    {
+      "id": "L-23",
+      "limitation": "Room-key versions are authenticated by signatures from Phase 6, which leaves identity substitution, a legitimate member's keys and the served code as the ways to inject a key (T-36). A server-side attacker without a member's signing key can no longer give members a key of its own: clients refuse an unsigned, wrongly signed or unauthorized version (ADR-015 section 4.1)",
+      "why": "RSA-OAEP has no sender authentication and public keys are public, so authenticity comes from ECDSA signatures over the commitment and the recipient list, checked against a chain of signed grants back to the signed genesis statement",
+      "response": "Implemented in Phase 6 (CM-T033, CM-T036): the key-injection suite, the API's own signature checks and NC-06-01 to NC-06-05. Not covered: a substituted identity under a user ID (T-25, L-07), an authorized OWNER or ADMIN colluding with the server (L-22), rekeyed versions (Phase 11), and grants as statements rather than revocable credentials (L-46)",
+      "demonstration": "packages/crypto/src/room-keys.test.ts (injected, forged and unauthorized versions are refused)"
+    },
+    {
+      "id": "L-24",
+      "limitation": "A mandatory rekey needs an OWNER or ADMIN with an unlocked vault. Until one completes it, the room is read-only",
+      "why": "Only member browsers hold room keys; the server cannot rotate them (ADR-013)",
+      "response": "Immediate prompt to the removing admin, banners, a count on the Security Dashboard, lease-based recovery from crashes",
+      "demonstration": "Show a write-locked room and its recovery after a simulated crash"
+    },
+    {
+      "id": "L-25",
+      "limitation": "At Level 1 the audit signing key is stored on the application VM. A VM compromise also compromises checkpoint signatures from then on",
+      "why": "No independent key custody in the baseline",
+      "response": "Worker-only key file, retention-locked anchors, weekly external witness copies, optional Level 2 provider key (OCD-13)",
+      "demonstration": "Explain with the audit trust model; revoke a test key and show the verifier rejecting later signatures"
+    },
+    {
+      "id": "L-26",
+      "limitation": "The database owner can switch off the append-only protection. The migration role (table owner) or a superuser can disable the audit trigger, alter the table or drop it",
+      "why": "PostgreSQL gives table owners full control; the migrations need an owner",
+      "response": "Runtime roles hold only SELECT and INSERT; triggers reject UPDATE, DELETE and TRUNCATE for every role; the migration credential never lives on the VM. Detection comes from the hash chain and external checkpoints in Phase 12 (ADR-009); until then, a modification by the owner is not detectable",
+      "demonstration": "tests/database/audit.test.ts disables the trigger as the owner inside a rolled-back transaction"
+    },
+    {
+      "id": "L-27",
+      "limitation": "Database constraints check shapes, not meaning. A CHECK can require 384 bytes in an envelope column, but cannot tell an RSA-OAEP ciphertext from 384 bytes of plaintext. The forbidden-field checker reads names, not values",
+      "why": "The server cannot decrypt, so it cannot verify ciphertext semantics",
+      "response": "Sizes and NULL rules in CHECK constraints, client-side encryption in packages/crypto, response projections, and the planned canary scan of database dumps (T-01)",
+      "demonstration": "Insert 384 bytes of readable text as an envelope in a test database: the constraint accepts it, the canary scan finds it"
+    },
+    {
+      "id": "L-28",
+      "limitation": "Local database roles differ from the managed service. Locally the container administrator is a superuser; the managed provider's administrator is not, and provider IAM decides who reaches the instance",
+      "why": "Development runs on a single container",
+      "response": "The same role names, attributes and grant migration in both environments; the provisioning of the managed database (CM-T067, Phase 18) records the cloud side",
+      "demonstration": "Compare tests/database/privileges.test.ts output locally and against the managed database in Phase 18"
+    },
+    {
+      "id": "L-29",
+      "limitation": "The local development database has no TLS. It listens on 127.0.0.1 only",
+      "why": "TLS on the developer container adds certificate management without protecting a loopback connection",
+      "response": "Outside production, the API accepts a connection without sslmode=verify-full only to a loopback host; production requires verify-full",
+      "demonstration": "tests/security/startup-config.test.ts"
+    },
+    {
+      "id": "L-30",
+      "limitation": "Anyone who knows an email address can delay that user's login. Wrong passwords for the address trigger the progressive backoff (up to 15 minutes at a time)",
+      "why": "There is no permanent lockout on purpose; a backoff that an attacker cannot trigger would also not stop the attacker",
+      "response": "Backoff capped at 15 minutes, never permanent; per-address limits slow the attacker; MFA does not depend on the backoff; events show the pattern",
+      "demonstration": "tests/auth/abuse.test.ts: five wrong passwords block the right one for 30 seconds"
+    },
+    {
+      "id": "L-31",
+      "limitation": "The TOTP encryption key cannot be rotated yet. Only one key is active; a rotation needs a re-encryption tool",
+      "why": "Built in Phase 3 without key-rotation tooling",
+      "response": "The key ID is stored with every ciphertext, so rotation can be added without a schema change; the key lives outside the database",
+      "demonstration": "Explain; planned with the deployment secrets work (Phase 17)"
+    },
+    {
+      "id": "L-32",
+      "limitation": "Rate limits are per process and in memory. A restart resets them, and several API instances would each count separately",
+      "why": "The baseline runs one API process on one VM",
+      "response": "Per-account backoff is stored in the database and survives restarts; Nginx limits are added in Phase 17",
+      "demonstration": "Restart the API and show that the account backoff persists while the address window resets"
+    },
+    {
+      "id": "L-33",
+      "limitation": "Authentication, vault and room authorization security events are written to the application log, not yet to the tamper-evident audit ledger. A VM-level attacker can alter or delete log lines",
+      "why": "INV-09 requires hash-chained audit rows; the chain is built in Phase 12, and append-only rows inserted earlier could never be chained",
+      "response": "One event catalogue and one sink, so Phase 12 switches all call sites at once; login attempts are also kept in the database",
+      "demonstration": "Explain with the audit trust model"
+    },
+    {
+      "id": "L-34",
+      "limitation": "TOTP can be phished in real time. A fake site can relay a code within its validity window",
+      "why": "TOTP has no origin binding; WebAuthn is a stretch goal (OCD-11)",
+      "response": "Short validity, replay protection, step-up for sensitive actions, CSP and no third-party scripts",
+      "demonstration": "Explain; compare with passkeys"
+    },
+    {
+      "id": "L-35",
+      "limitation": "Registration reveals whether an email address is already registered (409)",
+      "why": "Silent acceptance needs an email service for verification, which the baseline does not have (DF-01, T-15)",
+      "response": "Rate-limited per address; login itself reveals nothing",
+      "demonstration": "tests/auth/registration.test.ts"
+    },
+    {
+      "id": "L-36",
+      "limitation": "The breached-password lists are a static snapshot. New breaches are not reflected until the list is rebuilt",
+      "why": "Online breach checks would send password material (even hashed prefixes) to a third party",
+      "response": "30,402 entries for account passwords and 3,350 for Vault Passphrases from the UK NCSC and Pwdb lists, rebuilt reproducibly by a pinned, checksum-verified script; length matters more than the list",
+      "demonstration": "Show a refused common password and the rebuild script"
+    },
+    {
+      "id": "L-37",
+      "limitation": "The Vault KDF parameters were chosen from laptop measurements only. No phone was measured, and on slow phones a derivation may take several seconds",
+      "why": "No mid-range phone was available in Phase 4, and Chromium's CPU throttling does not slow the worker proportionally, so it is no substitute",
+      "response": "The target was not raised beyond m = 64 MiB, t = 3, keeping a margin; parameters are stored per vault and can be raised later by a signed re-wrap; a 120-second timeout fails clearly instead of hanging",
+      "demonstration": "Run pnpm bench:vault on a phone browser when one is available and record it in crypto-decisions section 8"
+    },
+    {
+      "id": "L-38",
+      "limitation": "The vault lock is client-side behaviour. The server cannot verify that a browser locked its vault, and modified or malicious client code can keep keys in memory",
+      "why": "Only the browser holds the unlocked keys; the server never sees them",
+      "response": "Auto-lock after 15 minutes without trusted user input, on sign-out, on pagehide, when the session ends and after a reset; keys are non-extractable; tested in three engines",
+      "demonstration": "Leave a test vault idle and show it locked; explain why the server cannot enforce it"
+    },
+    {
+      "id": "L-39",
+      "limitation": "Anyone holding a valid session can download the owner's encrypted vault record and guess the passphrase offline, as a database thief could (L-08)",
+      "why": "Every device of the user must be able to fetch the record before it can be unlocked; requiring a step-up for each unlock would not add secrecy, because the record is designed to be safe to store",
+      "response": "Session controls (T-08), vault read limits per user, Argon2id cost and the passphrase policy; the record never contains a verifier",
+      "demonstration": "Explain with T-22: the session gives the same material as a database copy, for one user"
+    },
+    {
+      "id": "L-40",
+      "limitation": "A passphrase change does not replace the keys. Someone who has an old copy of the vault record (for example from a backup or an earlier download) and learns the old passphrase can still open the same private keys",
+      "why": "Re-wrapping keeps the identity, so contacts do not have to verify a new fingerprint",
+      "response": "Recommend a vault reset (new identity) after a suspected passphrase leak; the UI says so on the passphrase-change form",
+      "demonstration": "Change a test passphrase, then open a saved copy of the old record with the old passphrase"
+    },
+    {
+      "id": "L-41",
+      "limitation": "The directory reveals whether an email address has a cryptographic identity. A signed-in user with a vault can test addresses",
+      "why": "Inviting someone requires finding their public key by address (CM-T027)",
+      "response": "Exact match only, an own vault required, the same 404 for unknown, vault-less and disabled accounts, 20 lookups per 10 minutes per user, throttling events; registration already reveals taken addresses (L-35)",
+      "demonstration": "tests/vault/reset-and-directory.test.ts"
+    },
+    {
+      "id": "L-42",
+      "limitation": "Resolved in Phase 10. Until Phase 10, profile access rules were checked when a room was created, not on every room request: PC-01 and PC-02 bound the creator only, and RESTRICTED removals needed no step-up (PC-03)",
+      "why": "The roadmap built the policy engine (CM-T046, CM-T047) in Phase 10, after rooms (Phase 5)",
+      "response": "Since Phase 10 the central room authorizer applies PC-01 and PC-02 of the room's stored policy on every room request and every write re-applies them on the locked room row; PC-03 covers every sensitive operation that exists (authorization model 9.11). What remains is recorded as L-59 to L-62",
+      "demonstration": "tests/policy/policy-matrix.test.ts (PC-01 and PC-02 on every room route, PC-03 on every sensitive operation); NC-10-01 and NC-10-03"
+    },
+    {
+      "id": "L-43",
+      "limitation": "Rooms created before Phase 6 have no key version and stay without one. They record key version 1 but hold no genesis statement, key version row or envelope. New rooms cannot be created without key version 1 (CM-T033)",
+      "why": "Room keys are created in the browser, and the server must never create or backfill one (INV-04). No document describes a client-side initialization of an existing keyless room, and none was invented",
+      "response": "Such a room cannot be invited to (no envelope set can name a version it lacks), holds no content, and its key panel says there is no key. The only rooms of this kind are development and test rooms of Phases 5 and 6: nothing is deployed. A transition, if ever needed, requires an architecture decision before it is built",
+      "demonstration": "Database view of a legacy room: no room_key_versions or key_envelopes rows; tests/authz/room-keys.test.ts (a room without a genesis statement has no keys to open)"
+    },
+    {
+      "id": "L-44",
+      "limitation": "Resolved in Phase 11. Until Phase 11, a room that lost a member stayed REKEY_REQUIRED until the rekey state machine exists, and a re-enabled account or a reset identity does not get its rooms back.** Removal and account suspension lock the room for content writes and invitations (PC-16); nothing can unlock it before CM-T050 and CM-T051, and a suspended member is reinstated, or a reset identity receives keys again, only through the re-share flow (AZ-14), which the backlog assigns to CM-T053 in Phase 11 and Phase 6 does not implement",
+      "why": "INV-07 requires the lock in the same transaction as the loss; faking a rekey would break it. Re-sharing is only safe together with the rekey rules of ADR-013",
+      "response": "The lock is real and visible in the UI; reads and membership administration continue; invitations and acceptances are refused with 409 REKEY_REQUIRED while the room is locked (Phase 6); until content writes exist (Phase 7) the lock blocks nothing else",
+      "demonstration": "Remove a member, then show the room's key state, the refused invitation and the notice in the UI"
+    },
+    {
+      "id": "L-45",
+      "limitation": "Room creation reveals whether a known room ID was ever used, and has no per-user quota. A creator who submits the ID of an existing or deleted room gets 409 ROOM_ID_UNAVAILABLE; any account with a vault can create many rooms",
+      "why": "Room IDs are chosen by the browser because they enter cryptographic contexts (DF-05); deleted rooms keep a tombstone",
+      "response": "UUIDv4 IDs cannot be guessed (OL-09), so only someone who already knows an ID learns that it was used, never whether the room still exists; creation needs an ACTIVE vault; rate limits for the API arrive with Nginx (Phase 17)",
+      "demonstration": "tests/authz/rooms-lifecycle.test.ts (reused ID)"
+    },
+    {
+      "id": "L-46",
+      "limitation": "A signed membership grant is a statement, not a revocable credential. The verification rule of ADR-015 section 4.1 cannot see a demotion, a removal or an ownership transfer away: an earlier grant still counts as authority there, and the key-version signer must only have held OWNER or ADMIN authority at some point",
+      "why": "Grants are signed once and stored; the rule is evaluated by each client from signed statements alone, and a signed removal or demotion statement is not part of the Phase 6 design",
+      "response": "Membership and roles are enforced by the API (INV-05, INV-07). Members cannot be added to a version's readers by an old grant alone, because they also need an envelope, which only a holder of the key can create. The point matters from Phase 11, when members other than the creator sign key versions: CM-T050 must decide how a former ADMIN's signature is rejected (for example by a signed demotion statement or by the membership epoch)",
+      "demonstration": "Remove an ADMIN, then show that a version signed by that ADMIN before the removal still verifies in the browser; planned with the Phase 11 tests"
+    },
+    {
+      "id": "L-47",
+      "limitation": "File size, upload time and file count are visible to the server and to the storage provider; files are limited to 50 MiB and have no resumable upload. Ciphertext length is plaintext length plus 16 bytes (T-28). A file is encrypted in one operation in browser memory and uploaded in one request; an interrupted upload starts over. Browser memory use at the 50 MiB limit was not measured: no tested engine reported page memory, so the figure rests on an estimate of a few hundred MiB for the plaintext, ciphertext and transient WebCrypto copies (crypto-decisions section 9), and phones were not tested. Chunked or streaming encryption (OCD-09) would need its own ADR",
+      "why": "CP-19 single-shot design",
+      "response": "The limit is enforced by the browser, the schema, a database CHECK and the signed content length; the UI states it; the benchmark of CP-19 shows 50 MiB encrypted and decrypted in about 150 ms to 0.9 s on a laptop; measure memory and test phones before raising the limit",
+      "demonstration": "pnpm bench:files, tests/files/files-upload.test.ts"
+    },
+    {
+      "id": "L-48",
+      "limitation": "Removing a member does not take back files they already downloaded or ciphertext they already fetched. After removal the API refuses their requests, and, since Phase 11, the next key version protects new files once the rekey finalizes; a file stored under an older key version stays readable to anyone who holds that version. A downloaded file is saved unencrypted on the member's device, outside CipherMesh",
+      "why": "Authorized members can decrypt; \"view-only\" cannot be enforced (L-14)",
+      "response": "The UI says so next to the file list; removal sets REKEY_REQUIRED so no new file is written under the old key; no re-encryption of history (CD-12)",
+      "demonstration": "tests/files/files-upload.test.ts (write lock), the Files panel text"
+    },
+    {
+      "id": "L-49",
+      "limitation": "Deleted and expired files can survive in backups, object versioning and downloaded copies (see L-12). In the live system the row is a tombstone without the wrapped FEK or manifest, and the object is deleted at once or by the worker with retries",
+      "why": "Provider backups and versioning are outside per-item control",
+      "response": "Reads refuse expired files before the worker runs (INV-14); lifecycle rules on the bucket are a safety net (Phase 19)",
+      "demonstration": "tests/files/files-access.test.ts, files-cleanup.test.ts"
+    },
+    {
+      "id": "L-51",
+      "limitation": "Note metadata is visible to the server: who wrote and who last changed each note, how often it changes (the revision), when, its expiry, and its approximate size (ciphertext length is the document length plus 16 bytes). Titles are encrypted with the body, so the server cannot tell titles from bodies",
+      "why": "The server needs identifiers and revisions to authorize, order saves and expire notes",
+      "response": "No padding; the room's note count is bounded (D-08-01)",
+      "demonstration": "tests/notes/notes-lifecycle.test.ts"
+    },
+    {
+      "id": "L-52",
+      "limitation": "Notes keep only the current revision and have no merge. Two editors who start from the same revision cannot both save: the second gets a conflict and must merge by hand from the text kept in the editor. A deleted or overwritten revision cannot be restored from the live system",
+      "why": "Version history and collaborative editing are not in the Phase 8 scope (DF-12: only the current revision is stored)",
+      "response": "Optimistic concurrency with 409 and no lost text in the editor; deletion asks for confirmation",
+      "demonstration": "tests/notes/notes-lifecycle.test.ts, tests/e2e/notes.spec.ts"
+    },
+    {
+      "id": "L-53",
+      "limitation": "Who wrote or changed a note is the server's statement, not a signature (see L-09). Any member with the room key can produce a valid note ciphertext; authorId and updatedById come from the session that stored it",
+      "why": "Content items are not signed (CD-23 scope)",
+      "response": "Server-side authorization of every write; events record the actor",
+      "demonstration": "tests/notes/notes-access.test.ts"
+    },
+    {
+      "id": "L-54",
+      "limitation": "Removing a member does not take back notes they already read or copied, and notes written before the rekey stay encrypted under key versions the removed member held (no re-encryption of history, CD-12). After removal the API refuses every note request from them, and the room refuses new note content until the rekey finalizes (INV-07, Phase 11)",
+      "why": "Plaintext a member saw is outside CipherMesh",
+      "response": "API refusal (404) at once; REKEY_REQUIRED blocks new content",
+      "demonstration": "tests/notes/notes-access.test.ts"
+    },
+    {
+      "id": "L-50",
+      "limitation": "The file name, type and size shown for a file come from the uploader's browser. A member who uploads can choose any name or MIME type; the manifest is authenticated, not truthful. The browser sanitizes names before saving, never renders HTML or SVG, previews only raster images through a blob: URL, and warns before saving executable types, but cannot judge file contents",
+      "why": "The server cannot scan or parse ciphertext (L-11)",
+      "response": "Text-only rendering; forced attachment downloads; allowlisted previews",
+      "demonstration": "tests/e2e/files.spec.ts, packages/crypto/src/files.test.ts"
+    },
+    {
+      "id": "L-55",
+      "limitation": "Secret metadata is visible to the server and to the room's OWNER and ADMINs: who sent a secret to whom and for which identity key, whether it burns after reading, its lifetime, when it was created, revealed, revoked or expired, and its approximate size (ciphertext length is the document length plus 16 bytes). The reveal time tells the sender and the administrators when the recipient opened it",
+      "why": "The server needs these facts to authorize, release once and expire secrets; OWNER and ADMIN need the list to revoke (AZ-25, OL-14)",
+      "response": "Text and SEK never leave the sender's and the recipient's browsers; MEMBERs and VIEWERs see only what they sent or received; lists never carry ciphertext",
+      "demonstration": "tests/secrets/secrets-lifecycle.test.ts (lists)"
+    },
+    {
+      "id": "L-56",
+      "limitation": "Who sent a secret is the server's statement, not a signature (see L-09, L-53). Anyone holding the recipient's public key, including a compromised server, can produce a valid secret for them; the sender shown comes from the session that stored it",
+      "why": "Secrets are not signed: DF-09 and CD-06 specify envelope encryption only, and signing content would need an ADR (CD-23 scope)",
+      "response": "Server-side authorization of every creation; the recipient key is authenticated against the room's signed statements, so a secret is readable only by the intended member; creation events record the actor",
+      "demonstration": "Explain in the report: authenticity of the content (AES-GCM) is not authenticity of the sender"
+    },
+    {
+      "id": "L-57",
+      "limitation": "Burn-after-reading is at most once, not exactly once, and proves release, not reading. The server destroys the ciphertext in the transaction that returns it: if the response is lost, the tab closes or decryption fails after that commit, the secret is gone. The server can show that it released the ciphertext once; it cannot show that the browser decrypted it or that a person read or understood it. A server or database operator who copies the row before the reveal keeps ciphertext that only the recipient's key opens (see L-12), and a malicious server can withhold or delete secrets",
+      "why": "This is the trade-off DF-09 chose: a retry that could deliver twice would break one-time retrieval",
+      "response": "POST-only reveal after an explicit, warned click; the vault must be unlocked before the request is sent; a non-burn option exists outside RESTRICTED rooms; the UI states the trade-off",
+      "demonstration": "tests/secrets/secrets-concurrency.test.ts (client disconnect)"
+    },
+    {
+      "id": "L-58",
+      "limitation": "Revealed text in the browser is dropped, not wiped. Hiding a secret, locking the vault or leaving the page removes it from the page and from React state, but JavaScript cannot erase strings from memory; the garbage collector reclaims them later. The recipient's screen, clipboard, screenshots and memory dumps are outside CipherMesh (L-01, L-03)",
+      "why": "The web platform has no secure-erase primitive for strings",
+      "response": "Text kept only in component state, never in browser storage, URLs, titles or notifications (E2E storage checks); raw SEK bytes are overwritten inside the crypto package",
+      "demonstration": "tests/e2e/secrets.spec.ts"
+    },
+    {
+      "id": "L-59",
+      "limitation": "A read is judged by the room's profile at the start of the request. Reads (file and note reads, download URLs, lists, a non-locking request) are not serialized with a profile change: a request that passed the gates an instant before an upgrade commits completes under the old profile. Writes, invitations, membership changes and reveals re-apply the gates on the locked room row, so they cannot slip past a change",
+      "why": "Locking the room row for every read would serialize all readers of a room behind each other",
+      "response": "The gates use the stored state of the request's start, like the membership check (authorization model 9.4); every later request uses the new profile; content written afterwards follows it at once",
+      "demonstration": "The forced-order tests of tests/policy/profile-change.test.ts show the write side; a read started before the change is the documented window"
+    },
+    {
+      "id": "L-60",
+      "limitation": "Profiles are per room, not per person or device. A member who meets a room's profile in one session can still copy what they decrypt; PC-01 and PC-02 check the session's MFA and sign-in age, not the device, and GET /rooms (SS-06) still lists a room, with its name, profile and the member's role, to a member whose session does not meet it (decision D-10-07)",
+      "why": "The server sees sessions, not devices; the list lets the member learn why a room refuses them",
+      "response": "The room itself, its members, keys and content are refused until the session meets the profile; room names are flagged as non-confidential (T-28)",
+      "demonstration": "Upgrade a room to CONFIDENTIAL and show a member without MFA the list entry and the refusal (EV-10-02)"
+    },
+    {
+      "id": "L-61",
+      "limitation": "Profile changes do not re-encrypt or rotate keys, and an upgrade does not take back what members already obtained. Material decrypted or downloaded under the weaker profile stays with the people who obtained it; an upgrade shortens lifetimes and revokes open invitations and re-readable secrets, but members who lose access by PC-01 keep their envelopes until a rekey (Phase 11)",
+      "why": "Profiles govern access, handling and lifetime; the cryptographic protection is the same in every profile (section 4 of the profile document)",
+      "response": "Immediate refusal of every request that does not meet the new profile; high-severity event for every downgrade; nothing is extended by a downgrade",
+      "demonstration": "Downgrade a room and show the PROFILE_DOWNGRADED event with severity HIGH (EV-10-03)"
+    },
+    {
+      "id": "L-62",
+      "limitation": "One profile control is a catalogue value only until a later phase: PC-11 (external one-time links, CM-T045, stretch). PC-14 (the room-key cryptoperiod) has been enforced by the worker since Phase 11 (L-66). Audit events, including the profile events, still go to the redacted log, not to the hash-chained ledger (L-33, Phase 12)",
+      "why": "The audit ledger is a later phase (roadmap)",
+      "response": "The catalogue holds the approved values, tests compare them with the profile table,",
+      "demonstration": "tests/policy/policy-matrix.test.ts PC-11 case, tests/rekey/rekey-lifecycle.test.ts (PC-14)"
+    },
+    {
+      "id": "L-63",
+      "limitation": "A rekeyed key version is trusted to the browser that made it. The starter's browser chooses the new room key material. The server checks the recipient set, the signature, the order of versions and that a commitment is not reused, but cannot check that the envelopes hold the key the starter signed for. Members verify the signed statement and the commitment, and compare the Room Safety Code; none of this shows that the starter kept or leaked the key (T-36, L-23)",
+      "why": "Only member browsers hold room keys; the server must not (INV-01, ADR-013)",
+      "response": "Every member's browser refuses a version without a valid starter signature, a fork, or an envelope of another recipient, even if the server stores it; only OWNER and ADMIN can start; starts are audited and rate-limited (CP-25)",
+      "demonstration": "tests/rekey/rekey-lifecycle.test.ts (forged version), packages/crypto/src/rekey.test.ts"
+    },
+    {
+      "id": "L-64",
+      "limitation": "The compromise flag of a vault reset is declared by the user, not detected. The server cannot tell a lost passphrase from a stolen device. Without the flag, the user's old envelopes are deleted and the new identity waits for a re-share, but the rooms are not locked, so a room key the attacker already holds stays current",
+      "why": "No server-side signal separates the two cases; locking every room on every reset would make a forgotten passphrase a room-wide outage",
+      "response": "The reset form states the difference, the runbook tells users to choose the flag when in doubt, administrators see MEMBER_IDENTITY_REPLACED and can start a manual rotation (R8)",
+      "demonstration": "tests/rekey/identity-reshare.test.ts (reset with and without the flag), runbook-compromised-identity-key.md"
+    },
+    {
+      "id": "L-65",
+      "limitation": "A re-share or a rekey for a reset member relies on an administrator checking the new fingerprint through another channel. The browser flags a key the room has never signed, and RESTRICTED rooms require the fingerprint to be confirmed, but in STANDARD and CONFIDENTIAL rooms an administrator can accept an unconfirmed key. A signed grant records authority; it does not prove that the person behind the new key is the member (T-25). Grants are kept as history so statements signed by an old identity stay verifiable, which also means an old identity's earlier statements keep their authority (L-46)",
+      "why": "Identity is a public key; mapping it to a person is a human step",
+      "response": "Fingerprint confirmation in RESTRICTED rooms (PC-05), role ceilings for re-shares, MEMBER_IDENTITY_REPLACED and KEYS_RESHARED events, the Room Safety Code",
+      "demonstration": "tests/rekey/identity-reshare.test.ts (ceilings, RESTRICTED, grant history)"
+    },
+    {
+      "id": "L-66",
+      "limitation": "Cryptoperiods and key destruction are enforced by the worker, and only for what the database holds. PC-14 locks a CONFIDENTIAL or RESTRICTED room when the worker next runs after the period ends, so a room can run past it by one worker interval; STANDARD rooms have no cryptoperiod. Destroying a RETIRED version deletes its envelopes from the database only when no live file or note names it (no re-encryption of history, CD-12); backups keep them until their retention ends (L-12). A room that already holds a copy of a destroyed version's key material outside CipherMesh is unaffected",
+      "why": "The worker is the only scheduled actor; old content must stay readable",
+      "response": "The 14-day reminder (PC-14), the lock at expiry, destruction recorded as KEY_VERSION_DESTROYED, the commitment and signed statement kept",
+      "demonstration": "tests/rekey/rekey-lifecycle.test.ts (cryptoperiod and destruction)"
+    },
+    {
+      "id": "L-67",
+      "limitation": "There is no account-deletion feature, so key-lifecycle R4 (account deletion → REKEY_REQUIRED) has no trigger. The reason code MEMBER_DELETED is defined and reserved. If account deletion is added, it must remove the memberships, delete the envelopes, advance the epoch and set REKEY_REQUIRED in one transaction, exactly as removal does, with a test",
+      "why": "Account deletion was never in the product scope; only disabling (PA-03) exists",
+      "response": "Disabling suspends memberships, deletes envelopes and locks the rooms (R3)",
+      "demonstration": "tests/rekey/identity-reshare.test.ts (disable and re-enable)"
+    },
+    {
+      "id": "L-68",
+      "limitation": "The Security & Trust Center is compiled from the public documents at build time. It shows what the threat model, the control mapping, the limitations, the evidence plan and index and the committed evidence files state, not live operational state; a wrong document makes the Trust Center wrong",
+      "why": "The client is a static export (ADR-011); a page cannot read the repository at runtime, and documents are the normative source",
+      "response": "The build fails when the generated data differs from the documents (generate-trust-data.mjs --check); tests resolve every curated reference, refuse \"verified\" without captured evidence and refuse forbidden wording; statuses come from the documents and the evidence files only",
+      "demonstration": "Change a status in the control mapping and show the web build failing until the data is regenerated"
+    },
+    {
+      "id": "L-69",
+      "limitation": "The live checks observe only the server that served the page, from one browser, at one moment. They are not monitoring: no history, no alerting, and whoever controls the response (a compromised server, an intercepting proxy the browser trusts) controls what they show",
+      "why": "A static page can only observe what its browser sees",
+      "response": "Each result names what was measured and when; a missing header is reported as missing; HSTS and every cloud-side control are shown as not configured until the cloud workstream exists; the probes are the public, unauthenticated liveness and readiness endpoints",
+      "demonstration": "Run the checks against the local HTTPS test server and point out the absent HSTS header"
+    },
+    {
+      "id": "L-70",
+      "limitation": "The platform security dashboard has no audit-ledger metrics and a partial platform view. SD-10, SD-11, SD-12 and SD-15 need the hash-chained ledger (Phase 12, deferred); the API does not probe object storage or the worker; values are computed on request, without history or trends",
+      "why": "Phase 12 was deferred by the project owner; no heartbeat or storage probe exists",
+      "response": "The four metrics are reported NOT_IMPLEMENTED with no value, never as zero; object storage and the worker are NOT_VERIFIED and the cloud NOT_CONNECTED; aggregates only, PLATFORM_ADMIN only (PA-01), 404 for everyone else",
+      "demonstration": "Show the dashboard with its not-implemented cards and the platform components"
+    }
+  ]
+}

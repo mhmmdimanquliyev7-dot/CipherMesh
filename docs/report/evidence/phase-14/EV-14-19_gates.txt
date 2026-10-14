@@ -1,0 +1,32 @@
+EV-14-19  Phase 14 + Prompt 16.5 gate results (CM-T061, CM-T062)
+Date: 2026-10-14. Branch: feature/CM-T061-trust-center-redesign. Local PostgreSQL 17 and S3 emulator
+containers, synthetic data only. Windows 11, Node.js 24.19.0.
+
+pnpm format:check                 PASS  All matched files use Prettier code style
+pnpm lint                         PASS  eslint . --max-warnings 0
+pnpm typecheck                    PASS  shared, crypto, validation, api, web
+pnpm test                         PASS  Test Files 91 passed (91); Tests 2326 passed (2326); 480.97 s
+  new: tests/dashboard/security-dashboard.test.ts (4), apps/web/scripts/trust-data.test.ts (9),
+       apps/web/src/trust/trust-content.test.ts (10), route-inventory additions
+pnpm test:e2e (Chromium, Firefox, WebKit)
+                                  PASS  169 passed, 0 failed, 20 skipped (5.5 min)
+  skipped: 16 by design, evidence-capture.spec.ts in each engine (on demand only),
+           the skip-link Tab check in WebKit (Tab does not focus links there by default)
+  note: an earlier full run had two Firefox page.goto hangs in second tabs (secrets two-tab,
+        rekey C), the known navigation-hang item; both passed when rerun
+pnpm security:negative-controls --only=NC-14
+                                  PASS  NC-14-01 to NC-14-06: 6 of 6 CAUGHT; Vitest baseline PASS;
+                                        sources restored byte for byte (5 files)
+pnpm security:negative-controls --only=NC-03-06,NC-04-16,NC-06-10,NC-08-09
+                                  PASS  4 of 4 CAUGHT (NC-04-16 retargeted to components/buttons.tsx);
+                                        Vitest and Playwright baselines PASS; sources restored
+anchor check of all controls      PASS  121 controls, 0 broken anchors
+pnpm test:coverage:crypto         PASS  Statements 98.36% (1203/1223), Branches 93.85% (657/700)
+pnpm test:coverage:authz          PASS  Statements 96.92% (126/130), Branches 97.24% (106/109)
+pnpm build                        PASS  CSP generated for 18 HTML files with 37 inline script hashes;
+                                        no inline style; trust:check matches the documents
+pnpm smoke:api                    PASS  Smoke test passed against the built API bundle
+pnpm db:validate / db:check-schema / db:drift
+                                  PASS  schema valid; no forbidden field; no drift
+pnpm audit:deps                   PASS  No known vulnerabilities found (no dependency added)
+pnpm scan:secrets --staged        PASS  76 commits and the staged changes: no leaks found

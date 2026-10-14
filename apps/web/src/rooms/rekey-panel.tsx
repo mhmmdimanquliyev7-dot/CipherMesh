@@ -6,7 +6,7 @@ import type { ProfilePolicy, RoomRole } from '@ciphermesh/shared';
 import type { RoomKeyStateResponse, RoomMember } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Card, SecondaryButton } from '../components/ui';
+import { Alert, Button, Card, Loading, SecondaryButton } from '../components/ui';
 import { ApiError } from '../lib/api';
 import { useVault } from '../vault/use-vault';
 import { roomKeys, type RekeyRecipientView } from './keys';
@@ -85,8 +85,8 @@ export function RekeyPanel({
 
   if (state === undefined) {
     return (
-      <Card title="Room key rotation">
-        {error === undefined ? <p className="text-sm text-slate-400">Loading…</p> : <Alert kind="error">{error}</Alert>}
+      <Card title="Room key rotation" icon="rotate">
+        {error === undefined ? <Loading /> : <Alert kind="error">{error}</Alert>}
       </Card>
     );
   }
@@ -148,7 +148,7 @@ export function RekeyPanel({
   const unconfirmed = review?.recipients.filter((r) => !r.knownHolder && !confirmed.has(r.userId)) ?? [];
 
   return (
-    <Card title="Room key rotation">
+    <Card title="Room key rotation" icon="rotate">
       <p className="text-sm text-slate-300" data-testid="rekey-state">
         Key version {state.currentKeyVersion} is current.{' '}
         {state.keyState === 'ACTIVE'
@@ -182,7 +182,7 @@ export function RekeyPanel({
       {canRotate && vault.kind !== 'unlocked' ? (
         <p className="text-sm text-slate-400">
           Room keys are made on this device.{' '}
-          <Link className="text-sky-400 underline" href="/vault">
+          <Link className="text-accent-400 underline" href="/vault">
             Unlock your vault
           </Link>{' '}
           to rotate the room key.
@@ -206,13 +206,16 @@ export function RekeyPanel({
       ) : null}
 
       {review === undefined ? null : (
-        <div className="space-y-3 rounded border border-sky-500/40 p-3" data-testid="rekey-review">
-          <p className="text-sm text-sky-200">
+        <div
+          className="space-y-3 rounded-lg border border-accent-500/40 bg-accent-500/5 p-4"
+          data-testid="rekey-review"
+        >
+          <p className="text-sm text-accent-200">
             The new key will be made on this device and wrapped for exactly these people. The server chose this list
             from its records; check it before you confirm.
           </p>
           <ul
-            className="divide-y divide-slate-800 rounded border border-slate-800"
+            className="divide-y divide-slate-800 overflow-hidden rounded-lg border border-slate-800"
             aria-label="Recipients of the new key"
           >
             {review.recipients.map((r) => (
@@ -225,7 +228,7 @@ export function RekeyPanel({
                     {r.kind === 'INVITEE' ? 'invited, not joined yet' : 'member'}
                   </span>
                 </p>
-                <p className="font-mono text-xs text-slate-300">{r.fingerprint}</p>
+                <p className="break-all font-mono text-xs text-slate-300">{r.fingerprint}</p>
                 {r.knownHolder ? null : (
                   <label className="flex items-start gap-2 text-xs text-amber-300">
                     <input
@@ -384,7 +387,7 @@ function Reshare({
         <p className="text-xs text-slate-500">Rotate the room key first; keys are shared again afterwards.</p>
       ) : null}
       {selected === undefined ? null : (
-        <div className="space-y-2 rounded border border-slate-700 p-3">
+        <div className="space-y-2 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
           <p className="text-xs text-slate-400">Their current fingerprint, computed on this device:</p>
           <p className="font-mono text-xs text-slate-300" data-testid="reshare-fingerprint">
             {formatFingerprint(selected.identity.fingerprint).join(' ')}

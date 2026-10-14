@@ -29,6 +29,7 @@
     "test:secrets": "vitest run --project secrets",
     "test:policy": "vitest run --project policy",
     "test:rekey": "vitest run --project rekey",
+    "test:dashboard": "vitest run --project dashboard",
     "test:coverage:crypto": "vitest run --project unit packages/crypto --coverage.enabled",
     "test:coverage:authz": "vitest run --project unit packages/shared/src/authorization packages/shared/src/policy --coverage.enabled --coverage.include=packages/shared/src/authorization.ts --coverage.include=packages/shared/src/policy.ts",
     "test:e2e": "playwright test",
@@ -53,6 +54,8 @@
     "bench:vault": "node scripts/bench/vault-browsers.mjs",
     "bench:files": "node scripts/bench/files-browsers.mjs",
     "security:negative-controls": "node scripts/security/negative-controls.mjs",
+    "trust:generate": "node apps/web/scripts/generate-trust-data.mjs",
+    "trust:check": "node apps/web/scripts/generate-trust-data.mjs --check",
     "postinstall": "node scripts/db/prisma.mjs generate"
   },
   "devDependencies": {

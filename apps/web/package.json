@@ -2,11 +2,12 @@
   "name": "@ciphermesh/web",
   "version": "0.0.0",
   "private": true,
-  "description": "CipherMesh web client: Next.js static export (ADR-011). Shell only in Phase 1.",
+  "description": "CipherMesh web client: Next.js static export (ADR-011).",
   "type": "module",
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 3100",
-    "build": "next build && node scripts/generate-csp.mjs",
+    "build": "node scripts/generate-trust-data.mjs --check && next build && node scripts/generate-csp.mjs",
+    "trust:generate": "node scripts/generate-trust-data.mjs",
     "typecheck": "tsc --project tsconfig.json"
   },
   "dependencies": {

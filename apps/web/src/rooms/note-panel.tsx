@@ -4,7 +4,7 @@ import { roomRuleFor, type ProfilePolicy, type RoomRole } from '@ciphermesh/shar
 import type { RoomMember } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
-import { Alert, Button, Card, SecondaryButton } from '../components/ui';
+import { Alert, Button, Card, controlClass, EmptyState, labelClass, Loading, SecondaryButton } from '../components/ui';
 import { ApiError } from '../lib/api';
 import { useVault } from '../vault/use-vault';
 import { roomKeys } from './keys';
@@ -28,6 +28,7 @@ import {
   type NoteEntry,
 } from './notes';
 import { mayAttempt } from './permissions';
+import { NoteReceipt } from './receipts';
 
 /**
  * The Notes section of a room (Phase 8, CM-T042). Titles and bodies exist only in this browser
@@ -54,8 +55,7 @@ function expiryChoices(policy: ProfilePolicy): { readonly label: string; readonl
   return [...choices].sort((a, b) => (a.days === preferred ? -1 : b.days === preferred ? 1 : 0));
 }
 
-const inputClass =
-  'w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-sky-500 focus:outline-none';
+const inputClass = controlClass;
 
 /** The text fields of a new note or an edit. Plain text only. */
 function NoteFields({
@@ -73,8 +73,8 @@ function NoteFields({
 }) {
   return (
     <>
-      <label className="block space-y-1">
-        <span className="text-sm text-slate-300">Title (encrypted, at most {NOTE_TITLE_MAX} characters)</span>
+      <label className="block space-y-1.5">
+        <span className={labelClass}>Title (encrypted, at most {NOTE_TITLE_MAX} characters)</span>
         <input
           name="title"
           value={title}
@@ -89,8 +89,8 @@ function NoteFields({
           spellCheck
         />
       </label>
-      <label className="block space-y-1">
-        <span className="text-sm text-slate-300">Note (encrypted plain text, at most {NOTE_MAX_KIB} KiB)</span>
+      <label className="block space-y-1.5">
+        <span className={labelClass}>Note (encrypted plain text, at most {NOTE_MAX_KIB} KiB)</span>
         <textarea
           name="body"
           value={body}
@@ -307,9 +307,8 @@ export function NotePanel({
           : 'Encrypted note';
 
   return (
-    <Card title="Notes">
+    <Card title="Notes" icon="note" description={NOTES_EXPLANATION}>
       <div data-testid="notes-card" className="space-y-4">
-        <p className="text-xs text-slate-500">{NOTES_EXPLANATION}</p>
         {message === undefined ? null : (
           <div data-testid="note-message">
             <Alert kind={message.kind}>{message.text}</Alert>
@@ -319,7 +318,7 @@ export function NotePanel({
         {vault.kind !== 'unlocked' ? (
           <p className="text-sm text-slate-400" data-testid="notes-locked">
             Notes are encrypted on this device.{' '}
-            <Link className="text-sky-400 underline" href="/vault">
+            <Link className="text-accent-400 underline" href="/vault">
               Unlock your vault
             </Link>{' '}
             to read and write them.
@@ -332,7 +331,12 @@ export function NotePanel({
         ) : !canCreate ? null : !writable ? (
           <p className="text-sm text-slate-400">New notes cannot be added or edited until the room key is rotated.</p>
         ) : composing ? (
-          <form className="space-y-3" onSubmit={(e) => void onCreate(e)} noValidate aria-label="New note">
+          <form
+            className="space-y-3 rounded-lg border border-slate-800 bg-slate-950/40 p-4"
+            onSubmit={(e) => void onCreate(e)}
+            noValidate
+            aria-label="New note"
+          >
             <NoteFields
               title={draft.title}
               body={draft.body}
@@ -344,13 +348,9 @@ export function NotePanel({
               }}
               disabled={busy !== undefined}
             />
-            <label className="block space-y-1">
-              <span className="text-sm text-slate-300">Expires</span>
-              <select
-                name="expiry"
-                data-testid="note-expiry"
-                className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-              >
+            <label className="block space-y-1.5">
+              <span className={labelClass}>Expires</span>
+              <select name="expiry" data-testid="note-expiry" className={`${controlClass} sm:w-auto`}>
                 {expiryChoices(policy).map((choice) => (
                   <option key={choice.label} value={choice.days === null ? '' : String(choice.days)}>
                     {choice.label}
@@ -390,15 +390,16 @@ export function NotePanel({
         )}
 
         {!loaded ? (
-          <p className="text-sm text-slate-400" role="status">
-            Loading notes…
-          </p>
+          <Loading label="Loading notes…" />
         ) : entries.length === 0 ? (
-          <p className="text-sm text-slate-400" data-testid="notes-empty">
-            No notes yet.
-          </p>
+          <EmptyState icon="note" title="No notes yet." testId="notes-empty">
+            Notes are encrypted in the author&apos;s browser; every revision gets its own key.
+          </EmptyState>
         ) : (
-          <ul className="divide-y divide-slate-800 rounded border border-slate-800" aria-label="Notes">
+          <ul
+            className="divide-y divide-slate-800 overflow-hidden rounded-lg border border-slate-800"
+            aria-label="Notes"
+          >
             {entries.map((entry) => {
               const { view } = entry;
               const open = selected === view.id;
@@ -418,7 +419,10 @@ export function NotePanel({
                       }}
                       data-testid="note-open"
                     >
-                      <span className="block break-all font-medium" data-testid="note-title">
+                      <span
+                        className="block break-all font-medium text-white hover:text-accent-200"
+                        data-testid="note-title"
+                      >
                         {labelOf(entry)}
                       </span>
                       <span className="block text-xs text-slate-400">
@@ -464,6 +468,8 @@ export function NotePanel({
                     ) : null}
                   </div>
                   {entry.rolledBack === true ? <Alert kind="error">{NOTE_ROLLBACK}</Alert> : null}
+                  {/* The receipt is application chrome, kept outside the view of the untrusted note text. */}
+                  {open ? <NoteReceipt entry={entry} /> : null}
                   {open ? (
                     <div className="space-y-3" data-testid="note-view">
                       {entry.problem === 'damaged' ? <Alert kind="error">{NOTE_INTEGRITY_ERROR}</Alert> : null}
@@ -478,12 +484,12 @@ export function NotePanel({
                         ) : null
                       ) : (
                         <>
-                          <h3 className="break-words text-base font-semibold" data-testid="note-view-title">
+                          <h3 className="break-words text-lg font-semibold text-white" data-testid="note-view-title">
                             {entry.opened.title}
                           </h3>
                           {/* Untrusted text: React renders it as text, never as HTML or Markdown (T-12). */}
                           <div
-                            className="whitespace-pre-wrap break-words rounded border border-slate-800 bg-slate-950 p-3 text-sm"
+                            className="whitespace-pre-wrap break-words rounded-lg border border-slate-800 bg-slate-950/70 p-4 text-sm leading-relaxed text-slate-100"
                             data-testid="note-view-body"
                           >
                             {entry.opened.body === '' ? (
@@ -528,7 +534,7 @@ export function NotePanel({
                             disabled={busy !== undefined}
                           />
                           {dirty ? (
-                            <p className="text-xs text-amber-200" data-testid="note-unsaved">
+                            <p className="text-xs font-medium text-amber-200" data-testid="note-unsaved">
                               Unsaved changes
                             </p>
                           ) : null}

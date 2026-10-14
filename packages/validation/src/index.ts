@@ -12,3 +12,4 @@ export * from './rekey';
 export * from './files';
 export * from './notes';
 export * from './secrets';
+export * from './dashboard';

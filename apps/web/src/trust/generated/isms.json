@@ -1,0 +1,656 @@
+{
+  "source": "docs/security/isms-control-mapping.md",
+  "scope": "The scope covers the design, development, deployment and demonstration operation of the CipherMesh platform: the web client, API and worker, the cloud VM, the managed database and object storage, and the management tooling (GitHub, Jira Cloud) used to build it. Physical security of data centres is the cloud provider's responsibility. People-related controls apply only in the limited sense of a student project team.",
+  "statusLegend": "Status values: Implemented by design (designed in Phase 0, built in the listed phase), Partial (limited by project context), Provider (responsibility transferred under shared responsibility), Not applicable.",
+  "clauses": [
+    {
+      "clause": "4.3",
+      "requirement": "Scope of the ISMS",
+      "implementation": "Section 1 of this document"
+    },
+    {
+      "clause": "5.2",
+      "requirement": "Information security policy",
+      "implementation": "CLAUDE.md and security-principles.md"
+    },
+    {
+      "clause": "6.1.2",
+      "requirement": "Risk assessment",
+      "implementation": "threat-model.md: assets, threats, likelihood, impact"
+    },
+    {
+      "clause": "6.1.3",
+      "requirement": "Risk treatment, applicability of controls",
+      "implementation": "Risk register treatments; section 3 of this document"
+    },
+    {
+      "clause": "6.2",
+      "requirement": "Security objectives",
+      "implementation": "Security goals G1 to G7 in system-overview.md"
+    },
+    {
+      "clause": "6.3",
+      "requirement": "Planning of changes",
+      "implementation": "Roadmap, phase gating and ADRs"
+    },
+    {
+      "clause": "7.5",
+      "requirement": "Documented information",
+      "implementation": "docs/, ADRs, Jira history, Git history"
+    },
+    {
+      "clause": "8.1",
+      "requirement": "Operational planning and control",
+      "implementation": "Jira workflow with SECURITY REVIEW and TESTING gates"
+    },
+    {
+      "clause": "8.2, 8.3",
+      "requirement": "Performing risk assessment and treatment",
+      "implementation": "Threat model review at the end of every phase"
+    },
+    {
+      "clause": "9.1",
+      "requirement": "Monitoring and measurement",
+      "implementation": "Security Dashboard (Phase 14: aggregates for the platform administrator, PA-01), CI security suites; audit verification runs are deferred with Phase 12"
+    },
+    {
+      "clause": "9.2",
+      "requirement": "Internal audit",
+      "implementation": "Phase 20 security assessment"
+    },
+    {
+      "clause": "9.3",
+      "requirement": "Management review",
+      "implementation": "Project owner approval at each phase gate"
+    },
+    {
+      "clause": "10.1, 10.2",
+      "requirement": "Continual improvement, corrective action",
+      "implementation": "Security Finding workflow with regression tests; residual risk re-rating"
+    }
+  ],
+  "controls": [
+    {
+      "control": "5.1",
+      "title": "Policies for information security",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "CLAUDE.md rules, security principles, invariants",
+      "evidenceText": "EV-00-07",
+      "evidence": [
+        "EV-00-07"
+      ]
+    },
+    {
+      "control": "5.2",
+      "title": "Roles and responsibilities",
+      "theme": "Organizational",
+      "status": "Partial",
+      "implementation": "Project roles in shared-responsibility.md; one person may hold several roles",
+      "evidenceText": "Report",
+      "evidence": []
+    },
+    {
+      "control": "5.3",
+      "title": "Segregation of duties",
+      "theme": "Organizational",
+      "status": "Partial",
+      "implementation": "Two-person approval of ADMIN invitations (PC-04); reviewer separate from author where the team allows; PLATFORM_ADMIN excluded from rooms",
+      "evidenceText": "EV-06-02, EV-00-06",
+      "evidence": [
+        "EV-00-06",
+        "EV-06-02"
+      ]
+    },
+    {
+      "control": "5.8",
+      "title": "Information security in project management",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "SECURITY REVIEW status, security considerations on every backlog item",
+      "evidenceText": "EV-00-05, EV-00-06",
+      "evidence": [
+        "EV-00-05",
+        "EV-00-06"
+      ]
+    },
+    {
+      "control": "5.9",
+      "title": "Inventory of information and assets",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "Asset list in the threat model (A-13, public identities, added in Phase 4), key inventory in key-hierarchy.md (identity signing key added in Phase 4), credential inventory (CM-T071)",
+      "evidenceText": "EV-00-04, EV-19-06",
+      "evidence": [
+        "EV-00-04",
+        "EV-19-06"
+      ]
+    },
+    {
+      "control": "5.12",
+      "title": "Classification of information",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "STANDARD, CONFIDENTIAL, RESTRICTED profiles. Phase 10: the classification scheme is a versioned, frozen catalogue in code (no table can change a value), each room governed by its stored profile and catalogue version; handling rules PC-01 to PC-13 and PC-15 to PC-16 enforced by the API and proven by the policy matrix (PC-11 and PC-14 by plan in later phases, L-62)",
+      "evidenceText": "EV-10-01",
+      "evidence": [
+        "EV-10-01"
+      ]
+    },
+    {
+      "control": "5.13",
+      "title": "Labelling of information",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "Profile shown on every room and in API responses. Phase 10: the room page shows the profile, the policy version and the rules the API enforces for it, read from the same catalogue",
+      "evidenceText": "EV-10-02, EV-10-04",
+      "evidence": [
+        "EV-10-02",
+        "EV-10-04"
+      ]
+    },
+    {
+      "control": "5.14",
+      "title": "Information transfer",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "Client-side encrypted files, notes and secrets; TLS. Phase 7: files travel as AES-256-GCM ciphertext between the browser and object storage through short-lived presigned URLs that sign one object, one method and one size (CP-20, OL-07); the API carries only the wrapped FEK and the encrypted manifest. Phase 8: notes travel as AES-256-GCM ciphertext with a wrapped NEK; titles and bodies never leave the browser in plaintext. Phase 9: secrets travel as AES-256-GCM ciphertext with only the 32-byte SEK wrapped to the recipient's authenticated key; a burn-after-reading secret is released once and destroyed in that transaction",
+      "evidenceText": "EV-09-01, EV-09-04, EV-08-01, EV-07-01, EV-07-06, EV-17-04",
+      "evidence": [
+        "EV-07-01",
+        "EV-07-06",
+        "EV-08-01",
+        "EV-09-01",
+        "EV-09-04",
+        "EV-17-04"
+      ]
+    },
+    {
+      "control": "5.15",
+      "title": "Access control",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "authorization-model.md; central room authorization module, shared matrix and route-registry enforcement built in Phase 5 (CM-T029, section 9 of the model); room lifecycle and membership routes built in Phase 5 (CM-T030, CM-T031) Phase 10: the profile access gates (PC-01, PC-02) on every room request and the PC-03 step-up for sensitive operations, in the central room authorizer and again on the locked room row (authorization model 9.11)",
+      "evidenceText": "EV-05-01",
+      "evidence": [
+        "EV-05-01"
+      ]
+    },
+    {
+      "control": "5.16",
+      "title": "Identity management",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "Account lifecycle (registration, disabling and re-enabling with immediate session revocation), PLATFORM_ADMIN only through the server-side CLI with MFA required (built in Phase 3)",
+      "evidenceText": "EV-03-05, EV-03-10",
+      "evidence": [
+        "EV-03-05",
+        "EV-03-10"
+      ]
+    },
+    {
+      "control": "5.17",
+      "title": "Authentication information",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "Argon2id with benchmarked parameters, CP-06 password policy with a breach blocklist, single-use recovery codes stored as digests, TOTP secrets encrypted at rest (built in Phase 3, authentication-security.md). Separate Vault Passphrase with its own policy, checked only in the browser and never transmitted or stored; no recovery or escrow path (built in Phase 4, ../crypto/vault.md)",
+      "evidenceText": "EV-03-01, EV-03-02, EV-04-01, EV-04-02",
+      "evidence": [
+        "EV-03-01",
+        "EV-03-02",
+        "EV-04-01",
+        "EV-04-02"
+      ]
+    },
+    {
+      "control": "5.18",
+      "title": "Access rights",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "Invitations, approvals, removal with an immediate write lock and a client-driven rekey (ADR-013); access review in CM-T080. Built in Phase 5: role changes within the role ceilings, removal with the write lock, ownership transfer with a step-up, and suspension of all memberships when an account is disabled (PA-03). Built in Phase 6: invitations with role ceilings, OWNER approval of ADMIN invitations in CONFIDENTIAL and RESTRICTED rooms (two-person rule, control 5.3), expiry set by the profile, revocation, and key delivery that is signed by the grantor and bound to the invitee's identity; the rekey follows. Built in Phase 11: leaving a room, rekeys started only by OWNER and ADMIN with one live operation, finalize only by the starter, re-sharing to a reset member under the invitation role ceilings, explicit reinstatement of a suspended member, the cryptoperiod of the profile and destruction of unused retired key versions",
+      "evidenceText": "EV-06-02, EV-11-01, EV-11-02, EV-11-04, EV-11-05",
+      "evidence": [
+        "EV-06-02",
+        "EV-11-01",
+        "EV-11-02",
+        "EV-11-04",
+        "EV-11-05"
+      ]
+    },
+    {
+      "control": "5.19 to 5.22",
+      "title": "Supplier relationships",
+      "theme": "Organizational",
+      "status": "Partial",
+      "implementation": "Provider selection ADR; Jira and GitHub treated as suppliers; shared-responsibility matrix. ICT supply chain (5.21): security libraries are selected against written criteria and reviewed (Phase 4: LIB-03 with a comparison, a code review finding and checksummed WebAssembly; LIB-05 kept in the repository)",
+      "evidenceText": "EV-17-01, EV-04-03, EV-04-12",
+      "evidence": [
+        "EV-04-03",
+        "EV-04-12",
+        "EV-17-01"
+      ]
+    },
+    {
+      "control": "5.23",
+      "title": "Information security for use of cloud services",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "service-models.md, shared-responsibility.md",
+      "evidenceText": "EV-18-01, EV-18-03",
+      "evidence": [
+        "EV-18-01",
+        "EV-18-03"
+      ]
+    },
+    {
+      "control": "5.24 to 5.27",
+      "title": "Incident management",
+      "theme": "Organizational",
+      "status": "Partial",
+      "implementation": "Compromise response table in the key lifecycle; Phase 11 adds the runbook for a lost or compromised identity key (../security/runbook-compromised-identity-key.md: user, administrator and operator steps, Jira security-finding record, verification table). The general incident procedure remains CM-T080",
+      "evidenceText": "EV-11-04, EV-11-05, Report",
+      "evidence": [
+        "EV-11-04",
+        "EV-11-05"
+      ]
+    },
+    {
+      "control": "5.28",
+      "title": "Collection of evidence",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "Evidence plan and redacted evidence files. Phase 14: the Trust Center evidence register lists every planned item with its status derived from the committed files and the index, missing items included. The tamper-evident audit ledger is deferred with Phase 12",
+      "evidenceText": "EV-14-16, EV-12-03",
+      "evidence": [
+        "EV-12-03",
+        "EV-14-16"
+      ]
+    },
+    {
+      "control": "5.33",
+      "title": "Protection of records",
+      "theme": "Organizational",
+      "status": "Partial",
+      "implementation": "Append-only audit table (grants and trigger, Phase 2). The hash chain and anchored checkpoints are designed (ADR-009) but deferred with Phase 12",
+      "evidenceText": "EV-02-02, EV-12-01, EV-12-04",
+      "evidence": [
+        "EV-02-02",
+        "EV-12-01",
+        "EV-12-04"
+      ]
+    },
+    {
+      "control": "5.34",
+      "title": "Privacy and protection of PII",
+      "theme": "Organizational",
+      "status": "Partial",
+      "implementation": "Metadata minimization, retention limits, no IP addresses in audit; metadata still visible (L-05)",
+      "evidenceText": "EV-03-06",
+      "evidence": [
+        "EV-03-06"
+      ]
+    },
+    {
+      "control": "5.35",
+      "title": "Independent review",
+      "theme": "Organizational",
+      "status": "Partial",
+      "implementation": "Phase 20 assessment; independence limited in a student team",
+      "evidenceText": "EV-20-01",
+      "evidence": [
+        "EV-20-01"
+      ]
+    },
+    {
+      "control": "5.37",
+      "title": "Documented operating procedures",
+      "theme": "Organizational",
+      "status": "Implemented by design",
+      "implementation": "Runbooks in infrastructure/deployment",
+      "evidenceText": "EV-19-07",
+      "evidence": [
+        "EV-19-07"
+      ]
+    },
+    {
+      "control": "6.1 to 6.8",
+      "title": "People controls",
+      "theme": "People",
+      "status": "Not applicable",
+      "implementation": "Student project context; awareness covered informally by project documentation",
+      "evidenceText": "Not applicable",
+      "evidence": []
+    },
+    {
+      "control": "7.1 to 7.14",
+      "title": "Physical controls",
+      "theme": "Physical",
+      "status": "Provider",
+      "implementation": "Data-centre security belongs to the cloud provider",
+      "evidenceText": "Provider documentation",
+      "evidence": []
+    },
+    {
+      "control": "8.1",
+      "title": "User endpoint devices",
+      "theme": "Technological",
+      "status": "Partial",
+      "implementation": "Vault auto-lock, non-extractable keys held only in memory, no key persistence, tested in three browser engines (built in Phase 4); device security is the user's (L-01, L-38)",
+      "evidenceText": "EV-04-04, EV-04-10",
+      "evidence": [
+        "EV-04-04",
+        "EV-04-10"
+      ]
+    },
+    {
+      "control": "8.2",
+      "title": "Privileged access rights",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "PLATFORM_ADMIN limits, SSH keys, database roles (four least-privilege roles and a tested grant matrix built in Phase 2, database-security.md)",
+      "evidenceText": "EV-02-03, EV-19-01",
+      "evidence": [
+        "EV-02-03",
+        "EV-19-01"
+      ]
+    },
+    {
+      "control": "8.3",
+      "title": "Information access restriction",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "RBAC, object-level rules, encryption as second layer. Object-level rules (OL-01, OL-02) are proven for every room route by the BOLA and IDOR suite built in Phase 5 (CM-T032) Phase 10: access depends on the room's classification too: a session that does not meet the profile is refused every room request",
+      "evidenceText": "EV-05-02",
+      "evidence": [
+        "EV-05-02"
+      ]
+    },
+    {
+      "control": "8.4",
+      "title": "Access to source code",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "GitHub permissions, protected main",
+      "evidenceText": "EV-01-02",
+      "evidence": [
+        "EV-01-02"
+      ]
+    },
+    {
+      "control": "8.5",
+      "title": "Secure authentication",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "TOTP MFA, opaque server-side sessions with rotation and revocation, login backoff without lockout, CSRF defences including login CSRF, step-up (built in Phase 3). Phase 4: vault setup and passphrase change need a recent step-up, a vault reset a strict one, and a reset ends all other sessions Phase 10: the room profile decides the session requirements: MFA and a password sign-in within 4 or 1 hours (CONFIDENTIAL, RESTRICTED), a step-up within 15 minutes for sensitive operations in RESTRICTED rooms and within 5 minutes for any downgrade",
+      "evidenceText": "EV-03-03 to EV-03-09, EV-04-08",
+      "evidence": [
+        "EV-03-03",
+        "EV-03-04",
+        "EV-03-05",
+        "EV-03-06",
+        "EV-03-07",
+        "EV-03-08",
+        "EV-03-09",
+        "EV-04-08"
+      ]
+    },
+    {
+      "control": "8.7",
+      "title": "Protection against malware",
+      "theme": "Technological",
+      "status": "Partial",
+      "implementation": "Forced attachment downloads, no inline rendering, CSP; no scanning of encrypted files (L-11)",
+      "evidenceText": "EV-08-02",
+      "evidence": [
+        "EV-08-02"
+      ]
+    },
+    {
+      "control": "8.8",
+      "title": "Management of technical vulnerabilities",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Dependency, container and secret scanning; patching",
+      "evidenceText": "EV-16-03",
+      "evidence": [
+        "EV-16-03"
+      ]
+    },
+    {
+      "control": "8.9",
+      "title": "Configuration management",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Compose, Nginx and hardening configuration in Git; checklists",
+      "evidenceText": "EV-19-03",
+      "evidence": [
+        "EV-19-03"
+      ]
+    },
+    {
+      "control": "8.10",
+      "title": "Information deletion",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Expiry, burn-after-reading, crypto-shredding of live data; backup caveat (L-12)",
+      "evidenceText": "EV-09-01",
+      "evidence": [
+        "EV-09-01"
+      ]
+    },
+    {
+      "control": "8.12",
+      "title": "Data leakage prevention",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Client-side encryption, log redaction, encrypted filenames. Phase 7: a canary scan finds no file name or content (in four encodings) in any table, the bucket or the log, and browser tests find none in any request or browser storage (tests/files, tests/e2e/files.spec.ts). Phase 4: browser tests inspect every vault request for the passphrase in five encodings and for private-key structures, and a log test searches for every secret and ciphertext used. Phase 8: a note canary scan finds no title or body (five encodings) in any table or the log, and browser tests find none in any request or browser storage (tests/notes, tests/e2e/notes.spec.ts). Phase 9: a secret canary scan finds no text (five encodings) in any table, the log or the events, and browser tests find none in any request or browser storage (tests/secrets, tests/e2e/secrets.spec.ts)",
+      "evidenceText": "EV-09-05, EV-08-03, EV-07-05, EV-04-01, EV-04-08",
+      "evidence": [
+        "EV-04-01",
+        "EV-04-08",
+        "EV-07-05",
+        "EV-08-03",
+        "EV-09-05"
+      ]
+    },
+    {
+      "control": "8.13",
+      "title": "Information backup",
+      "theme": "Technological",
+      "status": "Provider and team",
+      "implementation": "Managed backups plus team-tested restore",
+      "evidenceText": "EV-19-07",
+      "evidence": [
+        "EV-19-07"
+      ]
+    },
+    {
+      "control": "8.15",
+      "title": "Logging",
+      "theme": "Technological",
+      "status": "Partial",
+      "implementation": "Redacted structured application logs with the security-event catalogue; append-only audit table protection built in Phase 2; the hash chain (Phase 12) is deferred",
+      "evidenceText": "EV-01-09, EV-02-02, EV-12-01",
+      "evidence": [
+        "EV-01-09",
+        "EV-02-02",
+        "EV-12-01"
+      ]
+    },
+    {
+      "control": "8.16",
+      "title": "Monitoring activities",
+      "theme": "Technological",
+      "status": "Partial",
+      "implementation": "Phase 14: the platform security dashboard (aggregates from the database, each with its definition, PA-01) and liveness and readiness probes; audit verification runs are deferred with Phase 12; no alerting before the cloud workstream",
+      "evidenceText": "EV-14-01, EV-14-02, EV-01-06",
+      "evidence": [
+        "EV-01-06",
+        "EV-14-01",
+        "EV-14-02"
+      ]
+    },
+    {
+      "control": "8.17",
+      "title": "Clock synchronization",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "NTP on the VM (needed for TOTP and audit)",
+      "evidenceText": "EV-19-03",
+      "evidence": [
+        "EV-19-03"
+      ]
+    },
+    {
+      "control": "8.20",
+      "title": "Network security",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Provider and host firewalls, TLS",
+      "evidenceText": "EV-17-02, EV-19-05",
+      "evidence": [
+        "EV-17-02",
+        "EV-19-05"
+      ]
+    },
+    {
+      "control": "8.21",
+      "title": "Security of network services",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Database network restriction, bucket policies",
+      "evidenceText": "EV-18-02, EV-18-04",
+      "evidence": [
+        "EV-18-02",
+        "EV-18-04"
+      ]
+    },
+    {
+      "control": "8.22",
+      "title": "Segregation of networks",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Separate Docker networks; database reachable only from the VM",
+      "evidenceText": "EV-17-03",
+      "evidence": [
+        "EV-17-03"
+      ]
+    },
+    {
+      "control": "8.24",
+      "title": "Use of cryptography",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "docs/crypto/ and the parameter register. Phase 4: packages/crypto with narrow interfaces and known-answer tests from published sources, browser Argon2id selected by benchmark (ADR-010), identity signing keys decided before implementation (ADR-015), a specified vault format (../crypto/vault.md). Phase 6: room keys generated in the browser, envelopes bound to room, version, user and key, a signed commitment and signed statements verified before any key is used (ADR-015 section 4.1), ADR-007 accepted after a cross-engine test, the Room Safety Code word list selected by written criteria (LIB-08). Phase 11: browser-made rekeyed versions chained by signed statements, the wrap limit and the cryptoperiod, and an engine finding with its fix (SF-11-01, CD-33) found by cross-browser testing",
+      "evidenceText": "EV-06-01, EV-06-03, EV-06-04, EV-06-05, EV-06-06, EV-00-03, EV-07-01, EV-04-03, EV-04-06, EV-04-07, EV-11-03, EV-11-06, EV-11-07",
+      "evidence": [
+        "EV-00-03",
+        "EV-04-03",
+        "EV-04-06",
+        "EV-04-07",
+        "EV-06-01",
+        "EV-06-03",
+        "EV-06-04",
+        "EV-06-05",
+        "EV-06-06",
+        "EV-07-01",
+        "EV-11-03",
+        "EV-11-06",
+        "EV-11-07"
+      ]
+    },
+    {
+      "control": "8.25",
+      "title": "Secure development life cycle",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Workflow, Definition of Done, phase gates",
+      "evidenceText": "EV-01-01",
+      "evidence": [
+        "EV-01-01"
+      ]
+    },
+    {
+      "control": "8.26",
+      "title": "Application security requirements",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Invariants, policy profiles, ASVS target",
+      "evidenceText": "EV-10-01",
+      "evidence": [
+        "EV-10-01"
+      ]
+    },
+    {
+      "control": "8.27",
+      "title": "Secure system architecture and engineering principles",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Security principles, ADRs, trust boundaries",
+      "evidenceText": "EV-00-02",
+      "evidence": [
+        "EV-00-02"
+      ]
+    },
+    {
+      "control": "8.28",
+      "title": "Secure coding",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Coding conventions, forbidden-API lint rules. Phase 4: no cryptographic function accepts an IV, an algorithm or a raw AAD; the export surface and the test-only seam are fixed by a test; browser code may not import crypto internals (lint)",
+      "evidenceText": "EV-01-01, EV-04-07",
+      "evidence": [
+        "EV-01-01",
+        "EV-04-07"
+      ]
+    },
+    {
+      "control": "8.29",
+      "title": "Security testing in development and acceptance",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "security-testing-plan.md. Phase 4: 17 more negative controls (27 in total, five of them in a real browser), a 90% coverage gate for packages/crypto in CI, and cross-engine browser tests; security finding SF-04-01 fixed with a regression test that failed before the fix",
+      "evidenceText": "EV-16-01, EV-04-07, EV-04-09, EV-04-10",
+      "evidence": [
+        "EV-04-07",
+        "EV-04-09",
+        "EV-04-10",
+        "EV-16-01"
+      ]
+    },
+    {
+      "control": "8.31",
+      "title": "Separation of environments",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Local development versus production; no production credentials in development",
+      "evidenceText": "Report",
+      "evidence": []
+    },
+    {
+      "control": "8.32",
+      "title": "Change management",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Jira workflow plus pull requests; database changes only as reviewed migrations, with destructive Prisma commands refused and a drift check in CI (Phase 2). Phase 4: the cryptographic design change (OCD-12) was decided in an ADR and accepted by the project owner before any code was written; the identity migration fails rather than altering existing rows Phase 10: a policy value changes only through a reviewed pull request and a new catalogue version; profile changes are OWNER-only, recorded as events, downgrades with high severity",
+      "evidenceText": "EV-02-04, EV-21-01, EV-04-06, EV-04-13",
+      "evidence": [
+        "EV-02-04",
+        "EV-04-06",
+        "EV-04-13",
+        "EV-21-01"
+      ]
+    },
+    {
+      "control": "8.33",
+      "title": "Test information",
+      "theme": "Technological",
+      "status": "Implemented by design",
+      "implementation": "Synthetic data only: the seed uses reserved .test addresses, disabled accounts, no credentials and no key material (Phase 2)",
+      "evidenceText": "EV-02-05",
+      "evidence": [
+        "EV-02-05"
+      ]
+    }
+  ]
+}

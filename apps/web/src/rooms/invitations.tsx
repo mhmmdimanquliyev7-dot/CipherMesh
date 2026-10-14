@@ -8,7 +8,7 @@ import {
   type RoomInvitation,
 } from '@ciphermesh/validation';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
-import { Alert, Button, Card, Field, SecondaryButton } from '../components/ui';
+import { Alert, Button, Card, controlClass, Field, labelClass, SecondaryButton } from '../components/ui';
 import { api, formText } from '../lib/api';
 import { vaultController, type DirectoryResult } from '../vault/controller';
 import { roomKeys } from './keys';
@@ -85,21 +85,35 @@ export function InviteCard({
 
   if (roles.length === 0) return null;
   return (
-    <Card title="Invite a member">
+    <Card
+      title="Invite a member"
+      icon="invitations"
+      description="Look up an exact email address. The invitation carries the room key, wrapped in this browser to the invitee’s identity key."
+    >
       <form className="space-y-3" onSubmit={(e) => void onLookup(e)} noValidate>
         <Field label="Email address of the person to invite" name="email" type="email" required />
         <SecondaryButton type="submit">Look up</SecondaryButton>
       </form>
       {lookupError === undefined ? null : <Alert kind="error">{lookupError}</Alert>}
       {found === undefined ? null : (
-        <form className="space-y-3" onSubmit={(e) => void onInvite(e)} noValidate data-testid="invite-candidate">
+        <form
+          className="space-y-3 rounded-lg border border-slate-800 bg-slate-950/40 p-4"
+          onSubmit={(e) => void onInvite(e)}
+          noValidate
+          data-testid="invite-candidate"
+        >
           <p className="text-sm">
             <span className="font-medium">{found.displayName}</span>{' '}
-            <span className="text-xs text-amber-300">email address not verified</span>
+            <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-200">
+              email address not verified
+            </span>
           </p>
           <p className="text-xs text-slate-400">Account created {found.accountCreatedAt.slice(0, 10)}</p>
           <p className="text-xs text-slate-400">Fingerprint computed on this device:</p>
-          <p className="font-mono text-xs text-slate-200" data-testid="invitee-fingerprint">
+          <p
+            className="break-all rounded-md bg-slate-900 px-2 py-1.5 font-mono text-xs text-slate-200"
+            data-testid="invitee-fingerprint"
+          >
             {found.fingerprintGroups.join(' ')}
           </p>
           {rules.fingerprintConfirmation === 'optional' ? null : (
@@ -120,13 +134,9 @@ export function InviteCard({
             />
             I compared this fingerprint with {found.displayName} over a channel I trust, and it matches.
           </label>
-          <label className="block space-y-1">
-            <span className="text-sm text-slate-300">Role</span>
-            <select
-              name="role"
-              defaultValue={roles.includes('MEMBER') ? 'MEMBER' : roles[0]}
-              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-            >
+          <label className="block space-y-1.5">
+            <span className={labelClass}>Role</span>
+            <select name="role" defaultValue={roles.includes('MEMBER') ? 'MEMBER' : roles[0]} className={controlClass}>
               {roles.map((r) => (
                 <option key={r} value={r}>
                   {ROLE_LABEL[r]}
@@ -172,9 +182,12 @@ export function RoomInvitations({
 
   if (!mayAttempt('AZ-31', role)) return null;
   return (
-    <Card title="Open invitations">
+    <Card title="Open invitations" icon="clock">
       {invitations.length === 0 ? <p className="text-sm text-slate-400">No open invitations.</p> : null}
-      <ul className="divide-y divide-slate-800 rounded border border-slate-800" aria-label="Open invitations">
+      <ul
+        className="divide-y divide-slate-800 overflow-hidden rounded-lg border border-slate-800"
+        aria-label="Open invitations"
+      >
         {invitations.map((invitation) => {
           const canApprove =
             invitation.status === 'PENDING_APPROVAL' &&

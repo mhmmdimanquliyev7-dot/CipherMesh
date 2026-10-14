@@ -23,7 +23,12 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
-          include: ['packages/*/src/**/*.test.ts', 'apps/api/src/**/*.test.ts', 'apps/web/scripts/**/*.test.ts'],
+          include: [
+            'packages/*/src/**/*.test.ts',
+            'apps/api/src/**/*.test.ts',
+            'apps/web/scripts/**/*.test.ts',
+            'apps/web/src/**/*.test.ts',
+          ],
         },
       },
       { test: { name: 'integration', include: ['tests/integration/**/*.test.ts'] } },
@@ -128,6 +133,19 @@ export default defineConfig({
           fileParallelism: false,
           globalSetup: ['tests/database/global-setup.ts'],
           testTimeout: 60_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
+        // Platform security dashboard (Phase 14, CM-T061, CM-T062): exact aggregates need a database
+        // no other suite writes to, so this project has its own and runs one file at a time. Needs
+        // PostgreSQL and the local object storage (one scenario uploads a file).
+        test: {
+          name: 'dashboard',
+          include: ['tests/dashboard/**/*.test.ts'],
+          fileParallelism: false,
+          globalSetup: ['tests/database/global-setup.ts'],
+          testTimeout: 120_000,
           hookTimeout: 120_000,
         },
       },
