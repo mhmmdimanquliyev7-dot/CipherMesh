@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# cm-tls: publicly trusted certificates for the two host names (ADR-014, CM-T066).
+# Let's Encrypt, HTTP-01 through Nginx's /.well-known/acme-challenge/ (webroot CM_ACME_DIR), with
+# the host's certbot package and its systemd renewal timer. ECDSA P-256 keys.
+#
+#   sudo cm-tls placeholder   self-signed stand-ins so Nginx can start before the first issuance
+#   sudo cm-tls issue         request both certificates (Nginx must be running on port 80)
+#   sudo cm-tls install       copy the live certificates for Nginx (uid 101) and reload it;
+#                             certbot runs this as its deploy hook after every renewal
+#   sudo cm-tls status        expiry of the installed certificates (no key material printed)
+#   sudo cm-tls renew-test    certbot renew --dry-run against the staging CA (evidence EV-17-04)
+. "$(dirname "$0")/cm-lib.sh"
+cm_load_config
+self="$(cd "$(dirname "$0")" && pwd)/cm-tls"
+
+install_pair() { # <name> <fullchain> <privkey>
+  local dir="${CM_TLS_DIR}/$1"
+  mkdir -p "${dir}"
+  install -m 0644 -o 101 -g 101 "$2" "${dir}/fullchain.pem.new"
+  install -m 0600 -o 101 -g 101 "$3" "${dir}/privkey.pem.new"
+  mv -f "${dir}/fullchain.pem.new" "${dir}/fullchain.pem"
+  mv -f "${dir}/privkey.pem.new" "${dir}/privkey.pem"
+}
+
+case "${1:-}" in
+  placeholder)
+    cm_require openssl
+    for pair in "app:${CM_APP_HOST}" "files:${CM_FILES_HOST}"; do
+      name="${pair%%:*}" host="${pair#*:}"
+      [[ -s "${CM_TLS_DIR}/${name}/fullchain.pem" ]] && continue
+      tmp="$(mktemp -d)"
+      openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 2 -subj "/CN=${host}" \
+        -addext "subjectAltName=DNS:${host}" -keyout "${tmp}/key.pem" -out "${tmp}/cert.pem" 2> /dev/null
+      install_pair "${name}" "${tmp}/cert.pem" "${tmp}/key.pem"
+      rm -rf "${tmp}"
+      cm_info "placeholder certificate for ${name} (self-signed, 2 days; replace with cm-tls issue)"
+    done
+    ;;
+  issue)
+    cm_require certbot
+    mkdir -p "${CM_ACME_DIR}"
+    chmod 755 "${CM_ACME_DIR}"
+    for pair in "app:${CM_APP_HOST}" "files:${CM_FILES_HOST}"; do
+      name="${pair%%:*}" host="${pair#*:}"
+      certbot certonly --non-interactive --agree-tos --register-unsafely-without-email \
+        --webroot --webroot-path "${CM_ACME_DIR}" --cert-name "ciphermesh-${name}" --domain "${host}" \
+        --key-type ecdsa --elliptic-curve secp256r1 --deploy-hook "${self} install"
+    done
+    "${self}" install
+    ;;
+  install)
+    for name in app files; do
+      live="/etc/letsencrypt/live/ciphermesh-${name}"
+      [[ -s "${live}/fullchain.pem" ]] || cm_die "no certificate at ${live}"
+      install_pair "${name}" "${live}/fullchain.pem" "${live}/privkey.pem"
+    done
+    if [[ -n "$(cm_compose ps -q nginx 2> /dev/null)" ]]; then
+      cm_compose exec -T nginx nginx -t > /dev/null 2>&1 || cm_die 'nginx configuration test failed; not reloading'
+      cm_compose exec -T nginx nginx -s reload
+    fi
+    cm_info 'certificates installed for Nginx'
+    ;;
+  status)
+    cm_require openssl
+    for name in app files; do
+      cert="${CM_TLS_DIR}/${name}/fullchain.pem"
+      [[ -s "${cert}" ]] || { printf '%s: missing\n' "${name}"; continue; }
+      printf '%s: %s; issuer %s; valid until %s\n' "${name}" \
+        "$(openssl x509 -in "${cert}" -noout -subject | sed 's/^subject=//')" \
+        "$(openssl x509 -in "${cert}" -noout -issuer | sed 's/^issuer=//')" \
+        "$(openssl x509 -in "${cert}" -noout -enddate | cut -d= -f2)"
+    done
+    ;;
+  renew-test)
+    cm_require certbot
+    certbot renew --dry-run --no-random-sleep-on-renew
+    systemctl list-timers certbot.timer --no-pager || true
+    ;;
+  *)
+    cm_die 'usage: cm-tls placeholder|issue|install|status|renew-test'
+    ;;
+esac

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# cm-worker-run: runs the one-shot retention worker (CM-T017 to CM-T052) and records its outcome
+# for the platform dashboard. Started by ciphermesh-worker.timer. The worker logs counts only.
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker
+cm_load_config
+started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+result=success
+cm_compose --profile jobs run --rm --no-deps -T worker || result=failure
+mkdir -p "${CM_STATUS_DIR}"
+printf '{"schema":1,"lastRunAt":"%s","finishedAt":"%s","result":"%s"}\n' \
+  "${started}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${result}" > "${CM_STATUS_DIR}/worker.json.partial"
+chmod 644 "${CM_STATUS_DIR}/worker.json.partial"
+mv -f "${CM_STATUS_DIR}/worker.json.partial" "${CM_STATUS_DIR}/worker.json"
+[[ "${result}" == success ]] || cm_die 'worker run failed'

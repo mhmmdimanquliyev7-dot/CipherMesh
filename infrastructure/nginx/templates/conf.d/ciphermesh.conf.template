@@ -1,0 +1,154 @@
+# CipherMesh virtual hosts (CM-T066, ADR-014). Rendered at container start by envsubst:
+#   CM_APP_HOST     the application host name (static client and /api, one origin, INV-19)
+#   CM_FILES_HOST   the storage host name for presigned URLs; another host than the application
+#                   (SF-07-01: cookies are isolated by host, not by port)
+#   CM_STORAGE_BUCKET  the content bucket; the only path prefix forwarded to storage
+# Nginx listens on 80 and 443 inside its container as the unprivileged user (Docker lets
+# containers bind low ports without a capability), so the API's internal route to the storage
+# host and the browsers' route use the same port.
+
+# ------------------------------------------------------------------ port 80: ACME and redirect
+server {
+  listen 80 default_server;
+  server_name _;
+
+  # Container health probe: loopback only, answers a status word.
+  location = /nginx-health {
+    allow 127.0.0.1;
+    deny all;
+    access_log off;
+    default_type text/plain;
+    return 200 "ok";
+  }
+  # HTTP-01 challenges of the host's certbot (webroot mounted read-only).
+  location ^~ /.well-known/acme-challenge/ {
+    root /var/www/acme;
+    default_type text/plain;
+    try_files $uri =404;
+  }
+  location / {
+    if ($host = ${CM_APP_HOST}) { return 301 ${CM_APP_ORIGIN}$request_uri; }
+    if ($host = ${CM_FILES_HOST}) { return 301 ${CM_FILES_ORIGIN}$request_uri; }
+    return 444;
+  }
+}
+
+# ----------------------------------------- port 443: unknown host names get no TLS handshake
+server {
+  listen 443 ssl default_server;
+  server_name _;
+  ssl_reject_handshake on;
+}
+
+# ------------------------------------------------------------------ the application origin
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name ${CM_APP_HOST};
+
+  ssl_certificate /etc/ciphermesh/tls/app/fullchain.pem;
+  ssl_certificate_key /etc/ciphermesh/tls/app/privkey.pem;
+  include /etc/nginx/cm/tls.conf;
+
+  root /usr/share/nginx/html;
+  limit_conn cm_conn 30;
+
+  # Never serve dotfiles or source maps (deployment-architecture.md section 4).
+  location ~ /\. { return 404; }
+  location ~ \.map$ { return 404; }
+
+  # Authentication entry points: strict per-address limits in front of the API's own.
+  location ~ ^/api/(auth/(login|register|mfa/verify|mfa/recovery|step-up|password)|mfa/) {
+    limit_req zone=cm_auth burst=10 nodelay;
+    include /etc/nginx/cm/api-proxy.conf;
+  }
+  location = /api/directory/lookup {
+    limit_req zone=cm_lookup burst=10 nodelay;
+    include /etc/nginx/cm/api-proxy.conf;
+  }
+  location /api/ {
+    limit_req zone=cm_api burst=40 nodelay;
+    include /etc/nginx/cm/api-proxy.conf;
+  }
+  location = /api { return 404; }
+
+  # Content-hashed build assets: cache for a year.
+  location /_next/static/ {
+    include /etc/nginx/cm/static-headers.conf;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    try_files $uri =404;
+  }
+
+  # Pages of the static export (same resolution as tests/e2e/static-server.mjs): HTML is never cached.
+  location / {
+    include /etc/nginx/cm/static-headers.conf;
+    add_header Cache-Control "no-cache" always;
+    limit_except GET HEAD { deny all; }
+    try_files $uri $uri.html $uri/index.html =404;
+  }
+  error_page 404 /404.html;
+  location = /404.html {
+    internal;
+    include /etc/nginx/cm/static-headers.conf;
+    add_header Cache-Control "no-cache" always;
+  }
+}
+
+# ------------------------------------------------------------ the storage origin (SF-07-01)
+# Browsers reach single objects with presigned URLs; the API and the worker reach it for HEAD
+# and DELETE with the runtime credential (through this proxy's internal alias). The SeaweedFS
+# master, volume, filer and admin endpoints are never proxied: only signed object requests in
+# the content bucket are forwarded, everything else is refused here before storage sees it.
+map $request_method:$cm_presigned:$cm_signed_header $cm_storage_allowed {
+  default 0;
+  ~^OPTIONS: 1;
+  ~^(GET|PUT|HEAD|DELETE):1: 1;
+  ~^(GET|PUT|HEAD|DELETE):[01]:1$ 1;
+}
+map $args $cm_presigned {
+  default 0;
+  "~(^|&)X-Amz-Signature=[0-9a-f]{64}(&|$)" 1;
+}
+map $http_authorization $cm_signed_header {
+  default 0;
+  ~^AWS4-HMAC-SHA256\s 1;
+}
+
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name ${CM_FILES_HOST};
+
+  ssl_certificate /etc/ciphermesh/tls/files/fullchain.pem;
+  ssl_certificate_key /etc/ciphermesh/tls/files/privkey.pem;
+  include /etc/nginx/cm/tls.conf;
+
+  # One file is one AES-256-GCM message of at most 50 MiB plus its tag (CP-25, FILE_LIMITS).
+  client_max_body_size 51m;
+  proxy_request_buffering off;
+  limit_conn cm_conn 20;
+
+  # Object keys are f/<43 base64url characters> (apps/api/src/storage/object-store.ts).
+  location ~ "^/${CM_STORAGE_BUCKET}/f/[A-Za-z0-9_-]{43}$" {
+    limit_req zone=cm_files burst=40 nodelay;
+    # SF-07-01: a browser must never send a cookie to storage.
+    if ($http_cookie) { return 400; }
+    if ($cm_storage_allowed = 0) { return 403; }
+
+    proxy_pass http://object-storage:8333;
+    proxy_http_version 1.1;
+    # Presigned URLs are signed for this host name: forward it unchanged.
+    proxy_set_header Host $host;
+    proxy_set_header Connection "";
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header X-Forwarded-Host "";
+    proxy_set_header X-Forwarded-Proto "";
+    proxy_set_header Forwarded "";
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 60s;
+    proxy_send_timeout 60s;
+    include /tmp/conf.d/hsts.inc;
+    add_header X-Content-Type-Options "nosniff" always;
+  }
+  location / { return 403; }
+}

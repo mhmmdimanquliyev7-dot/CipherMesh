@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# cm-backup: consistent, encrypted backup of the cloud demonstration (ADR-014, CM-T072 adapted).
+#
+#   sudo cm-backup
+#
+# Contents of one backup (a tar archive, encrypted with age to CM_BACKUP_RECIPIENT):
+#   db.dump              pg_dump (custom format) of the ciphermesh database
+#   tables.txt           row count and SHA-256 digest of every table (lib/table-digests.sql)
+#   object-storage.tar   the SeaweedFS data volume (file ciphertext only)
+#   secrets.tar          the runtime secrets and the configuration (needed to restore: the TOTP key
+#                        decrypts the stored TOTP secrets; it is not in the database by design)
+#   meta.json            release, time, sizes
+# The VM holds only the age RECIPIENT (public key); the identity that decrypts backups stays with
+# the operator, so a backup copied off the VM is unreadable without it. Room content inside is
+# client-side ciphertext either way (INV-01).
+#
+# Consistency: the API and object storage are stopped for the few seconds of the dump and the
+# volume copy, so the database and the objects match. Nothing is deleted except backups older
+# than CM_BACKUP_KEEP_DAYS (default 7) in CM_BACKUP_DIR, and never the newest three.
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker age tar sha256sum
+cm_load_config
+[[ "${CM_BACKUP_RECIPIENT:-}" =~ ^age1[0-9a-z]{58}$ ]] || cm_die 'CM_BACKUP_RECIPIENT must be an age public key (age1...)'
+
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "${CM_BACKUP_DIR}"
+chmod 700 "${CM_BACKUP_DIR}"
+# Plaintext staging only in memory (tmpfs), removed on exit.
+work="$(mktemp -d "${CM_BACKUP_WORK_BASE:-/run}/cm-backup.XXXXXX")"
+restart_services() { cm_compose start api object-storage > /dev/null 2>&1 || cm_info 'WARNING: restart api and object-storage manually'; }
+trap 'restart_services; rm -rf "${work}"' EXIT
+
+cm_info 'stopping the API and object storage for a consistent copy'
+cm_compose stop api object-storage > /dev/null
+cm_compose exec -T -u postgres postgres pg_dump --format=custom --no-owner --dbname ciphermesh > "${work}/db.dump"
+cm_psql_superuser ciphermesh -At < "$(dirname "$0")/../lib/table-digests.sql" > "${work}/tables.txt"
+docker run --rm -v ciphermesh-object-storage-data:/data:ro --network none --entrypoint tar "${CM_POSTGRES_IMAGE}" \
+  -C /data -cf - . > "${work}/object-storage.tar"
+restart_services
+trap 'rm -rf "${work}"' EXIT
+cm_info 'services restarted'
+
+tar -C "$(dirname "${CM_SECRETS_DIR}")" -cf "${work}/secrets.tar" "$(basename "${CM_SECRETS_DIR}")" \
+  -C "$(dirname "${CM_CONFIG}")" "$(basename "${CM_CONFIG}")"
+cat > "${work}/meta.json" << EOF
+{"schema":1,"createdAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","release":"${CM_RELEASE}","tables":$(wc -l < "${work}/tables.txt"),"dbDumpBytes":$(stat -c %s "${work}/db.dump"),"objectStorageBytes":$(stat -c %s "${work}/object-storage.tar")}
+EOF
+
+archive="${CM_BACKUP_DIR}/ciphermesh-${stamp}.tar.age"
+tar -C "${work}" -cf - meta.json tables.txt db.dump object-storage.tar secrets.tar | age -r "${CM_BACKUP_RECIPIENT}" > "${archive}.partial"
+mv "${archive}.partial" "${archive}"
+digest="$(sha256sum "${archive}" | cut -d' ' -f1)"
+# Plain manifest next to the archive: counts and hashes only, no content.
+{
+  printf '{"schema":1,"archive":"%s","sha256":"%s","bytes":%s,"createdAt":"%s","release":"%s","tables":[' \
+    "$(basename "${archive}")" "${digest}" "$(stat -c %s "${archive}")" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${CM_RELEASE}"
+  awk -F'|' 'NR>1{printf ","} {printf "{\"table\":\"%s\",\"rows\":%s,\"sha256\":\"%s\"}", $1, $2, $3}' "${work}/tables.txt"
+  printf ']}\n'
+} > "${archive%.tar.age}.manifest.json"
+
+# Retention: keep the newest three always; delete older ones beyond CM_BACKUP_KEEP_DAYS.
+keep_days="${CM_BACKUP_KEEP_DAYS:-7}"
+mapfile -t old < <(ls -1t "${CM_BACKUP_DIR}"/ciphermesh-*.tar.age 2> /dev/null | tail -n +4)
+for file in "${old[@]}"; do
+  if [[ -n "$(find "${file}" -mtime "+${keep_days}" -print)" ]]; then
+    rm -f "${file}" "${file%.tar.age}.manifest.json"
+    cm_info "removed expired backup $(basename "${file}")"
+  fi
+done
+
+mkdir -p "${CM_STATUS_DIR}"
+printf '{"schema":1,"lastBackupAt":"%s","archive":"%s","sha256":"%s"}\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "${archive}")" "${digest}" | cm_write_private "${CM_STATUS_DIR}/backup.json"
+chmod 644 "${CM_STATUS_DIR}/backup.json"
+cm_info "backup written: $(basename "${archive}") sha256 ${digest}"

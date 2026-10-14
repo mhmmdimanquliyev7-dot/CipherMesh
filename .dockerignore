@@ -1,0 +1,33 @@
+# Build context of infrastructure/docker/Dockerfile (CM-T065). Secrets and local state never enter
+# an image: environment files, keys and certificates are excluded here, and the runtime images
+# copy only build output from the build stage. Dependencies are installed inside the build.
+.git
+**/node_modules
+.pnpm-store
+
+# Environment files and key material (CLAUDE.md section 8)
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.p8
+**/id_rsa*
+**/id_ed25519*
+cloud-secrets
+infrastructure/deployment/local
+
+# Build and test output (rebuilt inside the image)
+**/dist
+**/out
+**/out-meta
+**/.next
+**/*.tsbuildinfo
+apps/api/src/generated
+coverage
+playwright-report
+test-results
+blob-report
+sbom.cdx.json

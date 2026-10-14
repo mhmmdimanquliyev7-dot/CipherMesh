@@ -170,8 +170,9 @@ export default tseslint.config(
     },
   },
   {
-    // Build scripts, tooling configuration and tests run in Node outside the application.
-    files: ['**/scripts/**', 'tests/**', '*.config.*', '*.mjs', '**/*.test.ts'],
+    // Build scripts, tooling configuration and tests run in Node outside the application, and so
+    // do the operator tools of the cloud deployment (infrastructure/, ADR-014).
+    files: ['**/scripts/**', 'tests/**', '*.config.*', '*.mjs', '**/*.test.ts', 'infrastructure/**/*.mjs'],
     rules: {
       'no-console': 'off',
       'no-restricted-imports': 'off',

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# cm-storage-init: creates the private content bucket inside the SeaweedFS container (weed shell),
+# so no S3 credential with Admin or List rights is ever needed. Idempotent.
+#
+#   sudo cm-storage-init
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker
+cm_load_config
+bucket="${CM_STORAGE_BUCKET:-cm-files}"
+[[ "${bucket}" =~ ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$ ]] || cm_die 'CM_STORAGE_BUCKET is not a valid bucket name'
+
+cm_compose up --detach --wait object-storage
+existing="$(printf 's3.bucket.list\n' | cm_compose exec -T object-storage weed shell 2> /dev/null || true)"
+if grep -Eq "(^|[[:space:]])${bucket}([[:space:]]|$)" <<< "${existing}"; then
+  cm_info "bucket ${bucket} exists"
+else
+  printf 's3.bucket.create -name %s\n' "${bucket}" | cm_compose exec -T object-storage weed shell > /dev/null
+  printf 's3.bucket.list\n' | cm_compose exec -T object-storage weed shell 2> /dev/null | grep -q "${bucket}" \
+    || cm_die "bucket ${bucket} was not created"
+  cm_info "bucket ${bucket} created"
+fi

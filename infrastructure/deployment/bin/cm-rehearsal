@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# cm-rehearsal: runs the cloud stack (compose.cloud.yml) on a development machine, bound to
+# 127.0.0.1, with the same images, networks, Nginx configuration, database TLS and operator
+# scripts as the VM (ADR-014, Stage A validation). It is a rehearsal, NOT a cloud deployment:
+# the TLS certificates come from a throwaway local CA, and nothing is reachable from the network.
+#
+#   infrastructure/deployment/bin/cm-rehearsal up       build images, initialize, start
+#   infrastructure/deployment/bin/cm-rehearsal down     stop (volumes are kept)
+#   infrastructure/deployment/bin/cm-rehearsal destroy  stop and delete the rehearsal volumes
+#
+# Browsers reach https://app.localhost:8443 and https://files.localhost:8443 (*.localhost resolves
+# to loopback); trust the rehearsal CA (rehearsal-ca.crt in the work directory) or accept the
+# warning. Work directory: CM_REHEARSAL_DIR (default ~/.ciphermesh-rehearsal), never in the repo.
+set -euo pipefail
+# Git Bash would rewrite arguments that start with "/" (openssl subjects, container paths).
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
+here="$(cd "$(dirname "$0")" && pwd)"
+repo="$(cd "${here}/../../.." && pwd)"
+# Docker and the native OpenSSL on Windows need Windows paths (C:/...), which Git Bash accepts too.
+native() { if command -v cygpath > /dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
+work="$(native "${CM_REHEARSAL_DIR:-${HOME}/.ciphermesh-rehearsal}")"
+mkdir -p "${work}/run"
+export CM_BACKUP_WORK_BASE="${work}/run" TMPDIR="${work}/run"
+
+# Git Bash accepts these Windows-style paths too, so one form serves the scripts and Docker.
+export CM_REHEARSAL=1 CM_HOME="${work}" CM_CONFIG="${work}/cloud.env" CM_SECRETS_DIR="$(native "${work}/secrets")"
+export CM_RELEASE_DIR="$(native "${repo}")" CM_BACKUP_DIR="${work}/backups"
+export CM_TLS_DIR="$(native "${work}/tls")" CM_ACME_DIR="$(native "${work}/acme")"
+export CM_STATUS_DIR="$(native "${work}/status")" CM_EXTRA_CA_DIR="$(native "${work}/extra-ca")"
+. "${here}/cm-lib.sh"
+cm_require docker openssl
+
+command="${1:-up}"
+if [[ "${command}" == down || "${command}" == destroy ]]; then
+  [[ -r "${CM_CONFIG}" ]] || cm_die 'no rehearsal configuration'
+  cm_load_config
+  cm_compose --profile jobs --profile ops down
+  if [[ "${command}" == destroy ]]; then
+    docker volume rm ciphermesh-postgres-data ciphermesh-object-storage-data ciphermesh-postgres-tls ciphermesh-db-ca 2> /dev/null || true
+    cm_info "rehearsal volumes deleted; the work directory ${work} is kept"
+  fi
+  exit 0
+fi
+[[ "${command}" == up ]] || cm_die "unknown command ${command}"
+
+if [[ ! -r "${CM_CONFIG}" ]]; then
+  cat > "${CM_CONFIG}" << EOF
+# Local rehearsal of the cloud stack (cm-rehearsal). Loopback only; not a deployment.
+CM_RELEASE=rehearsal
+CM_APP_HOST=app.localhost
+CM_FILES_HOST=files.localhost
+CM_APP_ORIGIN=https://app.localhost:8443
+CM_FILES_ORIGIN=https://files.localhost:8443
+CM_PUBLISH_ADDRESS=127.0.0.1
+CM_HTTP_PORT=8080
+CM_HTTPS_PORT=8443
+CM_HSTS_MAX_AGE=0
+CM_STORAGE_BUCKET=cm-files
+CM_EXTRA_CA_IN_CONTAINER=/etc/ciphermesh/extra-ca/rehearsal-ca.crt
+EOF
+fi
+cm_load_config
+mkdir -p "${work}/tls/app" "${work}/tls/files" "${work}/acme" "${work}/status" "${work}/extra-ca" "${work}/secrets"
+
+# Throwaway rehearsal CA and one certificate per host name (stands in for Let's Encrypt).
+if [[ ! -s "${work}/tls/app/fullchain.pem" ]]; then
+  cm_info 'creating the rehearsal CA and host certificates'
+  tmp="$(mktemp -d "${work}/run/tls.XXXXXX")"
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 30 \
+    -subj '/CN=CipherMesh rehearsal CA (local only)' -addext 'basicConstraints=critical,CA:TRUE,pathlen:0' \
+    -addext 'keyUsage=critical,keyCertSign' -keyout "${tmp}/ca.key" -out "${work}/rehearsal-ca.crt" 2> /dev/null
+  for name in app files; do
+    host="${name}.localhost"
+    openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj "/CN=${host}" \
+      -keyout "${work}/tls/${name}/privkey.pem" -out "${tmp}/${name}.csr" 2> /dev/null
+    printf '%s\n' "subjectAltName=DNS:${host}" 'extendedKeyUsage=serverAuth' > "${tmp}/${name}.ext"
+    openssl x509 -req -in "${tmp}/${name}.csr" -CA "${work}/rehearsal-ca.crt" -CAkey "${tmp}/ca.key" \
+      -CAcreateserial -days 30 -extfile "${tmp}/${name}.ext" -out "${work}/tls/${name}/fullchain.pem" 2> /dev/null
+  done
+  cp "${work}/rehearsal-ca.crt" "${work}/extra-ca/rehearsal-ca.crt"
+  rm -rf "${tmp}"
+fi
+
+for image in api ops web; do
+  docker image inspect "ciphermesh-${image}:rehearsal" > /dev/null 2>&1 \
+    || cm_die "image ciphermesh-${image}:rehearsal missing; build it (docs/deployment/oracle-always-free.md section 6)"
+done
+
+"${here}/cm-pki"
+[[ -r "${CM_SECRETS_DIR}/api.env" ]] || "${here}/cm-secrets"
+# The rehearsal keeps its migrator password in the work directory; the VM never does.
+[[ -s "${work}/migrator-password.txt" ]] || (umask 077 && cm_random_hex 32 > "${work}/migrator-password.txt")
+"${here}/cm-db-init" < "${work}/migrator-password.txt"
+"${here}/cm-storage-init"
+cm_compose up --detach --wait
+cm_info "rehearsal running: ${CM_APP_ORIGIN} (storage ${CM_FILES_ORIGIN}); CA: ${work}/rehearsal-ca.crt"

@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# cm-restore-drill: proves that a backup can be restored, without touching the live system
+# (ADR-014, EV-19-07). The backup is restored into disposable containers on an isolated internal
+# Docker network with their own volumes, then verified:
+#   1. every table's row count and SHA-256 digest equals the manifest taken at backup time
+#      (users, rooms, memberships, key envelopes, wrapped keys, note ciphertext, file metadata);
+#   2. every AVAILABLE file object exists in the restored storage with the recorded size and
+#      ciphertext SHA-256 (lib/verify-objects.mjs).
+# Identical ciphertext and identical wrapped keys are what the members' browsers decrypt; the
+# browser-level check of a restore is done with cm-restore on an empty stack (backup-and-restore.md).
+#
+#   sudo cm-restore-drill /var/backups/ciphermesh/ciphermesh-<stamp>.tar.age < backup-identity.txt
+#   sudo cm-restore-drill --keep ...     leave the drill containers running for inspection
+#
+# Standard input: the age identity (private key) of the operator, used for this run only and kept
+# in a tmpfs directory that is deleted at the end. Output: counts and verdicts only.
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker age tar
+cm_load_config
+
+keep=false
+[[ "${1:-}" == "--keep" ]] && { keep=true; shift; }
+archive="${1:-}"
+[[ -r "${archive}" ]] || cm_die 'usage: cm-restore-drill [--keep] <backup.tar.age> < identity'
+image="ciphermesh-api:${CM_RELEASE}"
+docker image inspect "${image}" > /dev/null 2>&1 || cm_die "image ${image} missing"
+
+work="$(mktemp -d "${CM_BACKUP_WORK_BASE:-/run}/cm-drill.XXXXXX")"
+net=ciphermesh-drill
+cleanup() {
+  if ! ${keep}; then
+    docker rm -f cm-drill-postgres cm-drill-storage > /dev/null 2>&1 || true
+    docker volume rm ciphermesh-drill-pgdata ciphermesh-drill-storage > /dev/null 2>&1 || true
+    docker network rm "${net}" > /dev/null 2>&1 || true
+  fi
+  rm -rf "${work}"
+}
+trap cleanup EXIT
+started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+cat > "${work}/identity.txt"
+grep -q '^AGE-SECRET-KEY-1' "${work}/identity.txt" || cm_die 'standard input must be an age identity'
+cm_info 'decrypting the backup into a tmpfs work directory'
+age -d -i "${work}/identity.txt" "${archive}" | tar -C "${work}" -xf -
+rm -f "${work}/identity.txt"
+for part in db.dump tables.txt object-storage.tar secrets.tar meta.json; do
+  [[ -s "${work}/${part}" ]] || cm_die "backup part ${part} missing"
+done
+mkdir -p "${work}/secrets" && tar -C "${work}/secrets" -xf "${work}/secrets.tar"
+secrets="$(find "${work}/secrets" -name worker.env -printf '%h\n' | head -n 1)"
+[[ -n "${secrets}" ]] || cm_die 'worker.env missing in the backup'
+
+docker rm -f cm-drill-postgres cm-drill-storage > /dev/null 2>&1 || true
+docker volume rm ciphermesh-drill-pgdata ciphermesh-drill-storage > /dev/null 2>&1 || true
+docker network create --internal "${net}" > /dev/null 2>&1 || true
+drill_admin="$(cm_random_hex 24)"
+drill_worker="$(cm_random_hex 24)"
+
+cm_info 'drill database: empty PostgreSQL on the isolated network'
+printf '%s' "${drill_admin}" > "${work}/admin-password"
+chmod 644 "${work}/admin-password"
+docker run -d --name cm-drill-postgres --network "${net}" -v ciphermesh-drill-pgdata:/var/lib/postgresql/data \
+  -v "${work}/admin-password:/run/drill-admin:ro" -e POSTGRES_PASSWORD_FILE=/run/drill-admin \
+  -e POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --security-opt no-new-privileges:true "${CM_POSTGRES_IMAGE}" > /dev/null
+for _ in $(seq 1 60); do
+  docker exec cm-drill-postgres pg_isready -U postgres > /dev/null 2>&1 && break
+  sleep 1
+done
+docker exec cm-drill-postgres pg_isready -U postgres > /dev/null || cm_die 'drill database did not start'
+drill_sql() { docker exec -i -u postgres cm-drill-postgres psql -X -q -v ON_ERROR_STOP=1 --dbname "${1:-postgres}"; }
+printf '%s\n' "SET log_statement = 'none';" \
+  "CREATE ROLE cm_migrator NOLOGIN;" "CREATE ROLE cm_api NOLOGIN;" "CREATE ROLE cm_verifier NOLOGIN;" \
+  "CREATE ROLE cm_worker LOGIN PASSWORD '${drill_worker}';" \
+  "CREATE DATABASE ciphermesh OWNER cm_migrator ENCODING 'UTF8' TEMPLATE template0;" | drill_sql
+docker exec -i -u postgres cm-drill-postgres pg_restore --dbname ciphermesh --no-owner --role cm_migrator \
+  --exit-on-error < "${work}/db.dump"
+printf '%s\n' 'GRANT CONNECT ON DATABASE ciphermesh TO cm_worker;' | drill_sql
+drill_sql ciphermesh -At < "$(dirname "$0")/../lib/table-digests.sql" > "${work}/tables.restored.txt"
+
+tables_total="$(wc -l < "${work}/tables.txt")"
+if diff -q "${work}/tables.txt" "${work}/tables.restored.txt" > /dev/null; then
+  tables_result=pass
+  tables_matched="${tables_total}"
+else
+  tables_result=fail
+  tables_matched="$(comm -12 <(sort "${work}/tables.txt") <(sort "${work}/tables.restored.txt") | wc -l)"
+fi
+cm_info "tables: ${tables_matched}/${tables_total} identical (${tables_result})"
+
+cm_info 'drill storage: SeaweedFS with the restored data volume and identity file'
+docker volume create ciphermesh-drill-storage > /dev/null
+docker run --rm -i -v ciphermesh-drill-storage:/data --network none --entrypoint tar "${CM_POSTGRES_IMAGE}" \
+  -C /data -xf - < "${work}/object-storage.tar"
+storage_image="$(docker inspect --format '{{.Config.Image}}' "$(cm_compose ps -q object-storage)")"
+docker run -d --name cm-drill-storage --network "${net}" -v ciphermesh-drill-storage:/data \
+  -v "${secrets}/seaweedfs-identities.json:/etc/seaweedfs/identities.json:ro" --security-opt no-new-privileges:true \
+  --user 1000:1000 --cap-drop ALL "${storage_image}" server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/identities.json -s3.iam=false > /dev/null
+for _ in $(seq 1 60); do
+  docker exec cm-drill-storage nc -z 127.0.0.1 8333 > /dev/null 2>&1 && break
+  sleep 1
+done
+sleep 5
+
+cm_info 'verifying every stored file object against its recorded size and SHA-256'
+objects_json="$(docker run --rm --network "${net}" --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+  -v "$(cd "$(dirname "$0")/../lib" && pwd)/verify-objects.mjs:/opt/cm/verify-objects.mjs:ro" \
+  -e WORKER_DATABASE_URL="postgresql://cm_worker:${drill_worker}@cm-drill-postgres:5432/ciphermesh?sslmode=disable" \
+  -e STORAGE_ENDPOINT=http://cm-drill-storage:8333 -e STORAGE_BUCKET="${CM_STORAGE_BUCKET:-cm-files}" \
+  -e STORAGE_ACCESS_KEY_ID="$(cm_env_value "${secrets}/worker.env" STORAGE_ACCESS_KEY_ID)" \
+  -e STORAGE_SECRET_ACCESS_KEY="$(cm_env_value "${secrets}/worker.env" STORAGE_SECRET_ACCESS_KEY)" \
+  "${image}" /opt/cm/verify-objects.mjs || true)"
+cm_info "objects: ${objects_json}"
+objects_result=fail
+grep -q '"checked":\([0-9]*\),"matched":\1,' <<< "${objects_json}" && objects_result=pass
+
+verdict=fail
+[[ "${tables_result}" == pass && "${objects_result}" == pass ]] && verdict=pass
+mkdir -p "${CM_STATUS_DIR}"
+report="{\"schema\":1,\"startedAt\":\"${started}\",\"finishedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"archive\":\"$(basename "${archive}")\",\"backupRelease\":\"$(sed -E 's/.*"release":"([^"]*)".*/\1/' "${work}/meta.json")\",\"tables\":{\"total\":${tables_total},\"identical\":${tables_matched}},\"objects\":${objects_json:-null},\"result\":\"${verdict}\"}"
+printf '%s\n' "${report}" | cm_write_private "${CM_STATUS_DIR}/restore-drill.json"
+chmod 644 "${CM_STATUS_DIR}/restore-drill.json"
+printf '%s\n' "${report}"
+[[ "${verdict}" == pass ]] || cm_die 'restore drill FAILED'
+cm_info 'restore drill passed'

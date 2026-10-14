@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# cm-db-init: first initialization of the cloud database (ADR-014, CM-T067 adapted).
+#
+#   ssh <vm> sudo /srv/ciphermesh/release/infrastructure/deployment/bin/cm-db-init < migrator-password.txt
+#   cm-db-init --roles-only    roles and an empty database, no migrations (used by cm-restore)
+#
+# Standard input: one line, the cm_migrator (schema owner) password, which the operator keeps on
+# the workstation. It is used for this run only, in memory, and is never written to the VM.
+#
+# Steps (each is idempotent; a second run only re-applies role attributes and pending migrations):
+#   1. first start of PostgreSQL without a superuser password (data directory created once);
+#   2. the HBA file of the data directory is replaced by the deployment's (defence in depth);
+#   3. a random temporary superuser password, for the role bootstrap only;
+#   4. roles and database through scripts/db/bootstrap.mjs in the ops container, which reaches
+#      PostgreSQL on the container's own loopback (no database port exists);
+#   5. migrations as cm_migrator (scripts/db/prisma.mjs migrate deploy; destructive Prisma
+#      commands are refused by the wrapper);
+#   6. the superuser password is removed again (also on failure).
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker
+cm_load_config
+roles_only=false
+[[ "${1:-}" == --roles-only ]] && roles_only=true
+
+cm_read_line migrator_password
+[[ "${migrator_password}" =~ ^[A-Za-z0-9_-]{24,128}$ ]] \
+  || cm_die 'standard input must be one line: the migrator password (24 to 128 characters [A-Za-z0-9_-])'
+[[ -r "${CM_SECRETS_DIR}/api.env" && -r "${CM_SECRETS_DIR}/worker.env" ]] || cm_die 'run cm-secrets first'
+docker volume inspect ciphermesh-postgres-tls > /dev/null 2>&1 || cm_die 'run cm-pki first'
+
+# Loopback variants of the runtime role URLs: bootstrap.mjs only reads the role passwords from them.
+loopback_url() { sed -E 's#@postgres:5432/([a-z_]+)\?.*$#@127.0.0.1:5432/\1#' <<< "$1"; }
+api_url="$(loopback_url "$(cm_env_value "${CM_SECRETS_DIR}/api.env" DATABASE_URL)")"
+worker_url="$(loopback_url "$(cm_env_value "${CM_SECRETS_DIR}/worker.env" WORKER_DATABASE_URL)")"
+[[ "${api_url}" == postgresql://cm_api:*@127.0.0.1:5432/ciphermesh ]] || cm_die 'DATABASE_URL in api.env has an unexpected form'
+[[ "${worker_url}" == postgresql://cm_worker:*@127.0.0.1:5432/ciphermesh ]] || cm_die 'WORKER_DATABASE_URL has an unexpected form'
+
+if ! docker volume inspect ciphermesh-postgres-data > /dev/null 2>&1; then
+  cm_info 'step 1: first start of PostgreSQL (empty data directory)'
+  CM_PG_FIRST_START=trust cm_compose up --detach --wait postgres
+  cm_info 'step 2: replacing the data directory HBA file with the deployment HBA file'
+  cm_compose exec -T -u postgres postgres sh -c 'cp /etc/ciphermesh/pg_hba.conf "$PGDATA/pg_hba.conf"'
+fi
+# Always recreate without the first-start setting, so it never stays in the container definition.
+CM_PG_FIRST_START= cm_compose up --detach --wait --force-recreate postgres
+
+superuser_password="$(cm_random_hex 32)"
+remove_superuser_password() {
+  printf '%s\n' "SET log_statement = 'none';" 'ALTER ROLE postgres PASSWORD NULL;' | cm_psql_superuser \
+    && cm_info 'step 6: superuser password removed' \
+    || cm_info 'WARNING: could not remove the superuser password; run: ALTER ROLE postgres PASSWORD NULL'
+}
+trap remove_superuser_password EXIT
+cm_info 'step 3: temporary superuser password for the bootstrap'
+# Statement logging is off for this session, and failed statements are not logged with their text.
+printf '%s\n' "SET log_statement = 'none';" "SET log_min_error_statement = 'panic';" \
+  "ALTER ROLE postgres PASSWORD '${superuser_password}';" | cm_psql_superuser
+
+export POSTGRES_PORT=5432 POSTGRES_USER=postgres POSTGRES_DB=postgres POSTGRES_PASSWORD="${superuser_password}"
+export MIGRATION_DATABASE_URL="postgresql://cm_migrator:${migrator_password}@127.0.0.1:5432/ciphermesh"
+export DATABASE_URL="${api_url}" WORKER_DATABASE_URL="${worker_url}"
+export VERIFIER_DATABASE_URL="postgresql://cm_verifier:$(cm_random_hex 24)@127.0.0.1:5432/ciphermesh"
+ops_env=(-e POSTGRES_PORT -e POSTGRES_USER -e POSTGRES_DB -e POSTGRES_PASSWORD -e MIGRATION_DATABASE_URL
+  -e DATABASE_URL -e WORKER_DATABASE_URL -e VERIFIER_DATABASE_URL)
+
+cm_info 'step 4: roles and database (scripts/db/bootstrap.mjs)'
+cm_compose --profile ops run --rm --no-deps -T "${ops_env[@]}" ops node scripts/db/bootstrap.mjs
+if ${roles_only}; then
+  cm_info 'roles and empty database ready (no migrations: --roles-only)'
+  exit 0
+fi
+cm_info 'step 5: migrations as cm_migrator'
+cm_compose --profile ops run --rm --no-deps -T -e MIGRATION_DATABASE_URL ops node scripts/db/prisma.mjs migrate deploy
+cm_compose --profile ops run --rm --no-deps -T -e MIGRATION_DATABASE_URL ops node scripts/db/prisma.mjs migrate status
+cm_info 'database initialized'
