@@ -235,9 +235,10 @@
       "title": "Information security for use of cloud services",
       "theme": "Organizational",
       "status": "Implemented by design",
-      "implementation": "service-models.md, shared-responsibility.md",
-      "evidenceText": "EV-18-01, EV-18-03",
+      "implementation": "Cloud workstream (ADR-014): Oracle Cloud Always Free resources only, chosen against the criteria of service-models.md with the $0 constraint; responsibilities per component in shared-responsibility.md (IaaS VM operated by the team; PostgreSQL and SeaweedFS self-hosted on it, so their controls are the team's); provisioning gate with an explicit Always Free plan approved by the account owner (oracle-always-free.md)",
+      "evidenceText": "EV-17-01, EV-18-01, EV-18-03",
       "evidence": [
+        "EV-17-01",
         "EV-18-01",
         "EV-18-03"
       ]
@@ -421,9 +422,11 @@
       "title": "Configuration management",
       "theme": "Technological",
       "status": "Implemented by design",
-      "implementation": "Compose, Nginx and hardening configuration in Git; checklists",
-      "evidenceText": "EV-19-03",
+      "implementation": "Compose, Nginx, PostgreSQL, systemd and hardening configuration in Git (infrastructure/); images built only from a commit on the origin (cm-deploy), digest-pinned base images; the whole stack is built and checked on linux/arm64 in CI on every pull request",
+      "evidenceText": "EV-17-03, EV-17-06, EV-19-03",
       "evidence": [
+        "EV-17-03",
+        "EV-17-06",
         "EV-19-03"
       ]
     },
@@ -457,11 +460,12 @@
       "control": "8.13",
       "title": "Information backup",
       "theme": "Technological",
-      "status": "Provider and team",
-      "implementation": "Managed backups plus team-tested restore",
-      "evidenceText": "EV-19-07",
+      "status": "Implemented by design",
+      "implementation": "Cloud workstream: daily cm-backup of the database, the storage volume and the runtime secrets, encrypted with age to an offline operator key (CD-35); restore drill comparing every table digest and every file's ciphertext SHA-256 (cm-restore-drill); full restore onto an empty stack with browser decryption tested in CI (L-72)",
+      "evidenceText": "EV-19-07, EV-19-10",
       "evidence": [
-        "EV-19-07"
+        "EV-19-07",
+        "EV-19-10"
       ]
     },
     {
@@ -482,12 +486,13 @@
       "title": "Monitoring activities",
       "theme": "Technological",
       "status": "Partial",
-      "implementation": "Phase 14: the platform security dashboard (aggregates from the database, each with its definition, PA-01) and liveness and readiness probes; audit verification runs are deferred with Phase 12; no alerting before the cloud workstream",
-      "evidenceText": "EV-14-01, EV-14-02, EV-01-06",
+      "implementation": "Phase 14: the platform security dashboard (aggregates from the database, each with its definition, PA-01) and liveness and readiness probes. Cloud workstream: measured platform status (storage probe; host status every 5 minutes with container health, disk, memory, certificates, firewall and job outcomes), each state with its measurement time and freshness limits (T-44); the edge checker for external exposure. No alerting channel; audit verification runs are deferred with Phase 12 (L-78, L-79)",
+      "evidenceText": "EV-14-01, EV-14-02, EV-01-06, EV-19-11",
       "evidence": [
         "EV-01-06",
         "EV-14-01",
-        "EV-14-02"
+        "EV-14-02",
+        "EV-19-11"
       ]
     },
     {
@@ -495,7 +500,7 @@
       "title": "Clock synchronization",
       "theme": "Technological",
       "status": "Implemented by design",
-      "implementation": "NTP on the VM (needed for TOTP and audit)",
+      "implementation": "NTP synchronization on the VM checked by cm-host-setup, UTC everywhere (needed for TOTP, sessions and freshness limits)",
       "evidenceText": "EV-19-03",
       "evidence": [
         "EV-19-03"
@@ -506,10 +511,12 @@
       "title": "Network security",
       "theme": "Technological",
       "status": "Implemented by design",
-      "implementation": "Provider and host firewalls, TLS",
-      "evidenceText": "EV-17-02, EV-19-05",
+      "implementation": "OCI security list (22 from the operator's address, 80, 443) and host firewall (INPUT and DOCKER-USER, cm-firewall); TLS 1.2 and 1.3 at the edge (CP-21) and TLS 1.3 with verify-full on the database hop (CD-34)",
+      "evidenceText": "EV-17-02, EV-17-04, EV-19-02, EV-19-05",
       "evidence": [
         "EV-17-02",
+        "EV-17-04",
+        "EV-19-02",
         "EV-19-05"
       ]
     },
@@ -518,7 +525,7 @@
       "title": "Security of network services",
       "theme": "Technological",
       "status": "Implemented by design",
-      "implementation": "Database network restriction, bucket policies",
+      "implementation": "PostgreSQL: TLS-only runtime roles (hostssl), no superuser network login; object storage: signed object requests of one bucket only, cookies refused, IAM API off, one identity limited to that bucket",
       "evidenceText": "EV-18-02, EV-18-04",
       "evidence": [
         "EV-18-02",
@@ -530,10 +537,11 @@
       "title": "Segregation of networks",
       "theme": "Technological",
       "status": "Implemented by design",
-      "implementation": "Separate Docker networks; database reachable only from the VM",
-      "evidenceText": "EV-17-03",
+      "implementation": "Four Docker networks: edge (Nginx only), and internal app, data and storage networks without egress; the database and the storage are reachable only from the containers that need them",
+      "evidenceText": "EV-17-03, EV-17-06",
       "evidence": [
-        "EV-17-03"
+        "EV-17-03",
+        "EV-17-06"
       ]
     },
     {
@@ -623,7 +631,7 @@
       "title": "Separation of environments",
       "theme": "Technological",
       "status": "Implemented by design",
-      "implementation": "Local development versus production; no production credentials in development",
+      "implementation": "Local development, CI and the local rehearsal use their own throwaway credentials; the cloud's secrets are generated on the VM and never used elsewhere; synthetic data only",
       "evidenceText": "Report",
       "evidence": []
     },

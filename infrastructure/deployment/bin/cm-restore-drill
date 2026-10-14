@@ -67,7 +67,7 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 docker exec cm-drill-postgres pg_isready -U postgres > /dev/null || cm_die 'drill database did not start'
-drill_sql() { docker exec -i -u postgres cm-drill-postgres psql -X -q -v ON_ERROR_STOP=1 --dbname "${1:-postgres}"; }
+drill_sql() { docker exec -i -u postgres cm-drill-postgres psql -X -q -v ON_ERROR_STOP=1 --dbname "${1:-postgres}" "${@:2}"; }
 printf '%s\n' "SET log_statement = 'none';" \
   "CREATE ROLE cm_migrator NOLOGIN;" "CREATE ROLE cm_api NOLOGIN;" "CREATE ROLE cm_verifier NOLOGIN;" \
   "CREATE ROLE cm_worker LOGIN PASSWORD '${drill_worker}';" \
@@ -107,7 +107,7 @@ objects_json="$(docker run --rm --network "${net}" --read-only --cap-drop ALL --
   -e WORKER_DATABASE_URL="postgresql://cm_worker:${drill_worker}@cm-drill-postgres:5432/ciphermesh?sslmode=disable" \
   -e STORAGE_ENDPOINT=http://cm-drill-storage:8333 -e STORAGE_BUCKET="${CM_STORAGE_BUCKET:-cm-files}" \
   -e STORAGE_ACCESS_KEY_ID="$(cm_env_value "${secrets}/worker.env" STORAGE_ACCESS_KEY_ID)" \
-  -e STORAGE_SECRET_ACCESS_KEY="$(cm_env_value "${secrets}/worker.env" STORAGE_SECRET_ACCESS_KEY)" \
+  -e STORAGE_SECRET_ACCESS_KEY="$(head -n 1 "${secrets}/storage_secret_access_key")" \
   "${image}" /opt/cm/verify-objects.mjs || true)"
 cm_info "objects: ${objects_json}"
 objects_result=fail

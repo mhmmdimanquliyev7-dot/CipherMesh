@@ -781,6 +781,8 @@ Priority expresses impact, not order. Phases and dependency links set the order,
 
 ## CM-EPIC-13 Cloud Deployment
 
+> **Note (2026-10-14, ADR-014):** the project owner chose Oracle Cloud Always Free with PostgreSQL and SeaweedFS in containers on one VM ($0). CM-T063 is recorded as ADR-014 (the acceptance criterion's "ADR-012" is a typo for ADR-014). CM-T067 and CM-T068 are delivered as their self-hosted equivalents: TLS-only runtime roles with verify-full against a private CA, no superuser password, roles from CM-T014; one storage identity limited to the content bucket, signed object requests only, CORS for the application origin. Provider backups, point-in-time recovery, bucket versioning and the anchor bucket do not exist in this deployment (L-72, L-74); CM-T072 provides encrypted backups and a tested restore instead. Item fields are unchanged so that the Markdown and the CSV stay identical.
+
 #### CM-T063 Cloud provider selection ADR
 - **Epic:** CM-EPIC-13 | **Priority:** P1 | **Labels:** cloud, architecture | **Depends on:** CM-T082
 - **Plan:** Phase 17 | M7 Cloud Deployment | Security impact: Medium | Evidence: EV-17-01 | Initial status: Backlog

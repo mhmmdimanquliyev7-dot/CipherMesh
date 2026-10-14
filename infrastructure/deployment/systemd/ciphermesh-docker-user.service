@@ -1,0 +1,15 @@
+# Restricts forwarded traffic from outside to container ports 80 and 443 (cm-firewall
+# docker-user) every time Docker has started; Docker's own chains are not saved by iptables-persistent.
+[Unit]
+Description=CipherMesh DOCKER-USER firewall rules
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/srv/ciphermesh/release/infrastructure/deployment/bin/cm-firewall docker-user
+
+[Install]
+WantedBy=docker.service

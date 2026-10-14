@@ -1,0 +1,11 @@
+# CipherMesh host status collector (cm-status-collect, ADR-014). Writes measured, sanitized
+# status for the platform dashboard; never reads secrets or request data.
+[Unit]
+Description=CipherMesh host status collector
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/ciphermesh/release/infrastructure/deployment/bin/cm-status-collect
+Nice=10

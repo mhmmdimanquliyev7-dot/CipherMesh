@@ -32,11 +32,12 @@ done
 mkdir -p "${work}/restored" && tar -C "${work}/restored" -xf "${work}/secrets.tar"
 restored="$(find "${work}/restored" -name api.env -printf '%h\n' | head -n 1)"
 mkdir -p "${CM_SECRETS_DIR}" && chmod 700 "${CM_SECRETS_DIR}"
-for file in api.env worker.env seaweedfs-identities.json; do
+for file in api.env worker.env seaweedfs-identities.json api_database_url worker_database_url \
+  totp_encryption_key identifier_hmac_key storage_secret_access_key; do
   if [[ -e "${CM_SECRETS_DIR}/${file}" ]]; then
     cmp -s "${CM_SECRETS_DIR}/${file}" "${restored}/${file}" || cm_die "${file} differs from the backup; move it away first"
   else
-    cm_write_private "${CM_SECRETS_DIR}/${file}" < "${restored}/${file}"
+    cp -p "${restored}/${file}" "${CM_SECRETS_DIR}/${file}"   # keeps the owner (uid 10001 or 1000) and mode
   fi
 done
 cm_info 'runtime secrets restored'

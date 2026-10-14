@@ -1,0 +1,9 @@
+# CipherMesh retention worker (one-shot container run, CM-T017 to CM-T052).
+[Unit]
+Description=CipherMesh retention worker run
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/ciphermesh/release/infrastructure/deployment/bin/cm-worker-run

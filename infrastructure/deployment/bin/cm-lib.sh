@@ -87,6 +87,7 @@ cm_env_value() {
 }
 
 # Runs SQL from standard input as the superuser over the container socket (peer authentication).
+# Arguments: the database, then extra psql options (for example -At).
 cm_psql_superuser() {
-  cm_compose exec -T -u postgres postgres psql -X -q -v ON_ERROR_STOP=1 --dbname "${1:-postgres}"
+  cm_compose exec -T -u postgres postgres psql -X -q -v ON_ERROR_STOP=1 --dbname "${1:-postgres}" "${@:2}"
 }

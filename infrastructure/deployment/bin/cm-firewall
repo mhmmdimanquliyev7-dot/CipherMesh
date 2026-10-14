@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# cm-firewall: the host firewall layer (ADR-014, CM-T069), the second layer behind the OCI
+# security list. Explicit and reviewable; run as root:
+#
+#   sudo cm-firewall status                show INPUT, FORWARD, DOCKER-USER and listening sockets
+#   sudo cm-firewall apply <ssh-source>    inbound: established traffic, loopback, SSH from
+#                                          <ssh-source> (an IPv4 CIDR, or "any"), 80 and 443;
+#                                          everything else refused; rules saved for reboots
+#   sudo cm-firewall docker-user           forwarded traffic from outside may reach containers
+#                                          only on 80 and 443 (run at boot by
+#                                          ciphermesh-docker-user.service, after Docker)
+#
+# SSH source: the OCI security list is the primary SSH restriction (operator address only) and
+# can be changed in the console if the operator's address changes. Repeating the same address
+# here adds depth but risks a lockout that only the serial console can undo; "any" keeps the
+# host layer at keys-only SSH. The choice is recorded in cloud-security-hardening.md.
+#
+# Ubuntu images on OCI ship an iptables INPUT policy (iptables-persistent) that refuses everything
+# but SSH. This script keeps that mechanism (no ufw on top of it). Docker publishes ports through
+# the FORWARD chain; only Nginx publishes ports, and DOCKER-USER drops anything else from outside.
+# Docker's own chains are never saved: Docker recreates them when it starts.
+. "$(dirname "$0")/cm-lib.sh"
+[[ "$(id -u)" == 0 ]] || cm_die 'run as root (sudo)'
+cm_require iptables ip
+
+external() { ip route show default | awk '{print $5; exit}'; }
+
+case "${1:-status}" in
+  status)
+    echo '--- INPUT'
+    iptables -S INPUT
+    echo '--- FORWARD (first rules)'
+    iptables -S FORWARD | head -n 8
+    echo '--- DOCKER-USER'
+    iptables -S DOCKER-USER 2> /dev/null || echo '(no DOCKER-USER chain: Docker not running)'
+    echo '--- listening TCP sockets on the host'
+    ss -Hltn | awk '{print $4}' | sort -u
+    ;;
+  apply)
+    source="${2:-}"
+    if [[ "${source}" == any ]]; then
+      source=0.0.0.0/0
+    elif ! [[ "${source}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}/([0-9]|[12][0-9]|3[0-2])$ ]]; then
+      cm_die 'usage: cm-firewall apply <ssh source CIDR, for example 203.0.113.7/32, or any>'
+    fi
+    command -v netfilter-persistent > /dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iptables-persistent
+    ensure() { iptables -C "$@" 2> /dev/null || iptables -I "$@"; }
+    # Inserted at the top in reverse order, so the result reads: established, loopback, SSH,
+    # HTTP, HTTPS, then the image's existing rules ending in REJECT.
+    ensure INPUT 1 -p tcp --dport 443 -m conntrack --ctstate NEW -j ACCEPT
+    ensure INPUT 1 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
+    ensure INPUT 1 -p tcp -s "${source}" --dport 22 -m conntrack --ctstate NEW -j ACCEPT
+    ensure INPUT 1 -i lo -j ACCEPT
+    ensure INPUT 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+    # The image's general SSH rule is removed only now that the new SSH rule exists.
+    if [[ "${source}" != 0.0.0.0/0 ]]; then
+      while iptables -C INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT 2> /dev/null; do
+        iptables -D INPUT -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT
+      done
+    fi
+    iptables -S INPUT | grep -Eq -- '-j (REJECT|DROP)( |$)|^-P INPUT DROP' \
+      || iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited
+    # Save the host's rules without Docker's chains (Docker recreates those itself).
+    iptables-save -t filter | grep -Ev 'DOCKER|docker0|br-[0-9a-f]{12}' > /etc/iptables/rules.v4.new
+    mv /etc/iptables/rules.v4.new /etc/iptables/rules.v4
+    "$0" docker-user
+    cm_info 'host firewall applied; rules saved to /etc/iptables/rules.v4'
+    "$0" status
+    ;;
+  docker-user)
+    iptables -S DOCKER-USER > /dev/null 2>&1 || cm_die 'DOCKER-USER chain missing: start Docker first'
+    nic="$(external)"
+    [[ -n "${nic}" ]] || cm_die 'no default route interface'
+    iptables -F DOCKER-USER
+    iptables -A DOCKER-USER -i "${nic}" -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
+    iptables -A DOCKER-USER -i "${nic}" -p tcp -m conntrack --ctorigdstport 80 --ctdir ORIGINAL -j RETURN
+    iptables -A DOCKER-USER -i "${nic}" -p tcp -m conntrack --ctorigdstport 443 --ctdir ORIGINAL -j RETURN
+    iptables -A DOCKER-USER -i "${nic}" -j DROP
+    iptables -A DOCKER-USER -j RETURN
+    cm_info "DOCKER-USER: from ${nic} only ports 80 and 443 reach containers"
+    ;;
+  *) cm_die 'usage: cm-firewall status | apply <ssh-source> | docker-user' ;;
+esac

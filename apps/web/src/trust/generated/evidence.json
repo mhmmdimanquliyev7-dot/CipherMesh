@@ -2739,9 +2739,9 @@
     {
       "id": "EV-17-01",
       "phase": 17,
-      "evidence": "VM configuration in the cloud console",
-      "how": "Screenshot",
-      "demonstrates": "IaaS resource",
+      "evidence": "VM configuration in the cloud console: shape VM.Standard.A1.Flex with 2 OCPUs and 12 GB, the \"Always Free-eligible\" label, home region, boot volume",
+      "how": "Screenshot (identifiers redacted)",
+      "demonstrates": "IaaS resource within the Always Free allowance",
       "tags": [
         "CLD"
       ],
@@ -2754,8 +2754,8 @@
     {
       "id": "EV-17-02",
       "phase": 17,
-      "evidence": "Provider firewall rules",
-      "how": "Screenshot",
+      "evidence": "Provider firewall rules (security list or NSG)",
+      "how": "Screenshot (operator address redacted)",
       "demonstrates": "Network exposure minimized",
       "tags": [
         "CLD"
@@ -2769,7 +2769,7 @@
     {
       "id": "EV-17-03",
       "phase": 17,
-      "evidence": "Docker deployment: containers, users, read-only filesystems",
+      "evidence": "Docker deployment: containers, users, read-only filesystems, capabilities, networks",
       "how": "docker ps and docker inspect excerpts",
       "demonstrates": "Container hardening",
       "tags": [
@@ -2784,8 +2784,8 @@
     {
       "id": "EV-17-04",
       "phase": 17,
-      "evidence": "TLS scan result",
-      "how": "Report",
+      "evidence": "TLS and header check of the public origins",
+      "how": "scripts/cloud/edge-check.mjs output and the browser's certificate view",
       "demonstrates": "Transport security",
       "tags": [
         "CLD"
@@ -2813,11 +2813,58 @@
       "date": ""
     },
     {
+      "id": "EV-17-06",
+      "phase": 17,
+      "evidence": "The cloud stack built natively and run on linux/arm64 in CI: image architectures, container hardening, edge checks, smoke test in three engines",
+      "how": "CI artifact cloud-stack-arm64-evidence",
+      "demonstrates": "ARM64 compatibility before provisioning (rehearsal)",
+      "tags": [
+        "CLD"
+      ],
+      "status": "planned",
+      "files": [],
+      "locations": [],
+      "captions": [],
+      "date": ""
+    },
+    {
+      "id": "EV-17-07",
+      "phase": 17,
+      "evidence": "Cost classification: the account's Always Free resources and the billing or usage page showing no charges",
+      "how": "Console screenshots",
+      "demonstrates": "Zero-cost policy followed (not a guarantee of future charges)",
+      "tags": [
+        "CLD",
+        "ISMS"
+      ],
+      "status": "planned",
+      "files": [],
+      "locations": [],
+      "captions": [],
+      "date": ""
+    },
+    {
+      "id": "EV-17-08",
+      "phase": 17,
+      "evidence": "Deployment smoke test against the public origin (vault, room, encrypted note and file, no plaintext in requests)",
+      "how": "playwright.deployment.config.ts output",
+      "demonstrates": "Client-side encryption on the cloud deployment",
+      "tags": [
+        "CRY",
+        "CLD"
+      ],
+      "status": "planned",
+      "files": [],
+      "locations": [],
+      "captions": [],
+      "date": ""
+    },
+    {
       "id": "EV-18-01",
       "phase": 18,
-      "evidence": "Managed database settings (network, TLS, backups)",
-      "how": "Console screenshot",
-      "demonstrates": "PaaS configuration responsibility",
+      "evidence": "Database settings on the VM: TLS 1.3 only for runtime roles, HBA rules, roles without a superuser password, connection limits",
+      "how": "pg_hba.conf, pg_authid and pg_stat_ssl excerpts",
+      "demonstrates": "Self-hosted database configuration (ADR-014)",
       "tags": [
         "CLD"
       ],
@@ -2830,7 +2877,7 @@
     {
       "id": "EV-18-02",
       "phase": 18,
-      "evidence": "Failed connection without TLS or from another host",
+      "evidence": "Failed connection without TLS, superuser network login refused",
       "how": "Command output",
       "demonstrates": "Enforced database access controls",
       "tags": [
@@ -2845,8 +2892,8 @@
     {
       "id": "EV-18-03",
       "phase": 18,
-      "evidence": "Private bucket settings (public access blocked, CORS, versioning)",
-      "how": "Console screenshot",
+      "evidence": "Storage settings: one identity limited to one bucket, IAM API off, only signed object paths proxied, CORS for the application origin",
+      "how": "Identity file (keys redacted) and Nginx excerpt",
       "demonstrates": "Private object storage",
       "tags": [
         "CLD"
@@ -2860,8 +2907,8 @@
     {
       "id": "EV-18-04",
       "phase": 18,
-      "evidence": "Anonymous object access denied",
-      "how": "Command output",
+      "evidence": "Unsigned, listing, forged-signature and cookie-carrying requests to storage refused",
+      "how": "Edge checker output",
       "demonstrates": "Storage misconfiguration prevented",
       "tags": [
         "CLD"
@@ -2907,7 +2954,7 @@
       "id": "EV-19-02",
       "phase": 19,
       "evidence": "Host firewall status",
-      "how": "Command output",
+      "how": "cm-firewall status output",
       "demonstrates": "Host network hardening",
       "tags": [
         "CLD"
@@ -2951,8 +2998,8 @@
     {
       "id": "EV-19-05",
       "phase": 19,
-      "evidence": "External port scan",
-      "how": "nmap output",
+      "evidence": "External port and path check of the public IP",
+      "how": "Edge checker output (and nmap where available) from outside the VM",
       "demonstrates": "Minimal exposed services",
       "tags": [
         "CLD"
@@ -2982,8 +3029,8 @@
     {
       "id": "EV-19-07",
       "phase": 19,
-      "evidence": "Backup restore test",
-      "how": "Report",
+      "evidence": "Backup restore drill on the VM",
+      "how": "cm-restore-drill report",
       "demonstrates": "Recoverability",
       "tags": [
         "CLD",
@@ -3019,6 +3066,54 @@
       "tags": [
         "CLD",
         "CRY"
+      ],
+      "status": "planned",
+      "files": [],
+      "locations": [],
+      "captions": [],
+      "date": ""
+    },
+    {
+      "id": "EV-19-10",
+      "phase": 19,
+      "evidence": "Backup, isolated restore drill and full restore with browser decryption of the restored note and file (CI, linux/arm64)",
+      "how": "CI artifact cloud-stack-arm64-evidence",
+      "demonstrates": "Backup and restore procedure works end to end (rehearsal)",
+      "tags": [
+        "CLD",
+        "ISMS",
+        "CRY"
+      ],
+      "status": "planned",
+      "files": [],
+      "locations": [],
+      "captions": [],
+      "date": ""
+    },
+    {
+      "id": "EV-19-11",
+      "phase": 19,
+      "evidence": "Measured platform status of the deployment on the security dashboard",
+      "how": "Dashboard screenshot as a platform administrator",
+      "demonstrates": "Monitoring with freshness, no invented health",
+      "tags": [
+        "CLD",
+        "ISMS"
+      ],
+      "status": "planned",
+      "files": [],
+      "locations": [],
+      "captions": [],
+      "date": ""
+    },
+    {
+      "id": "EV-19-12",
+      "phase": 19,
+      "evidence": "Certificate renewal dry run and timer",
+      "how": "cm-tls renew-test output",
+      "demonstrates": "Automated certificate renewal",
+      "tags": [
+        "CLD"
       ],
       "status": "planned",
       "files": [],

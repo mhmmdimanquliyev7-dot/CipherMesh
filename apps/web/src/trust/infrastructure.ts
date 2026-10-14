@@ -314,7 +314,7 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
   },
 ];
 
-/** Components of the designed deployment (deployment-architecture.md section 1). */
+/** Components of the deployment (deployment-architecture.md section 1, ADR-014). */
 export interface Component {
   readonly id: string;
   readonly name: string;
@@ -341,16 +341,16 @@ export const COMPONENTS: readonly Component[] = [
     name: 'Nginx',
     icon: 'globe',
     exposure: 'public',
-    model: 'IaaS VM',
-    role: 'TLS, security headers, rate limits, static files, /api proxy.',
-    local: 'HTTPS test server (tests/e2e)',
+    model: 'IaaS VM (container)',
+    role: 'TLS for the application and storage host names, security headers, rate limits, static files, /api proxy, signed object requests to storage.',
+    local: 'The same image in the rehearsal (cm-rehearsal) and in CI on linux/arm64',
   },
   {
     id: 'api',
     name: 'API',
     icon: 'server',
     exposure: 'private',
-    model: 'IaaS VM',
+    model: 'IaaS VM (container)',
     role: 'Authentication, authorization, policies, presigned URLs. Holds no content keys.',
     local: 'Node.js process',
   },
@@ -359,7 +359,7 @@ export const COMPONENTS: readonly Component[] = [
     name: 'Worker',
     icon: 'rotate',
     exposure: 'none',
-    model: 'IaaS VM',
+    model: 'IaaS VM (container, timer)',
     role: 'Expiry cleanup, abandoned rekeys, cryptoperiods. No inbound traffic.',
     local: 'Node.js process',
   },
@@ -368,17 +368,17 @@ export const COMPONENTS: readonly Component[] = [
     name: 'PostgreSQL',
     icon: 'database',
     exposure: 'private',
-    model: 'PaaS',
-    role: 'Metadata, ciphertext of notes and secrets, wrapped keys.',
+    model: 'IaaS VM (container, ADR-014)',
+    role: 'Metadata, ciphertext of notes and secrets, wrapped keys. TLS 1.3 for the runtime roles; no superuser password.',
     local: 'PostgreSQL 17 container on 127.0.0.1',
   },
   {
     id: 'storage',
-    name: 'Object storage',
+    name: 'Object storage (SeaweedFS)',
     icon: 'bucket',
     exposure: 'private',
-    model: 'Provider-managed storage',
-    role: 'Encrypted file blobs in a private bucket, reached by presigned URLs.',
+    model: 'IaaS VM (container, ADR-014)',
+    role: 'Encrypted file blobs in a private bucket, reached by browsers with presigned URLs through Nginx on a second host name.',
     local: 'S3 emulator container on 127.0.0.1',
   },
 ];

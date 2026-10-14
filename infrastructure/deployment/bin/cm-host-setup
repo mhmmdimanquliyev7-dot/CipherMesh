@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# cm-host-setup: baseline of a fresh Ubuntu 24.04 LTS (aarch64) Always Free VM for CipherMesh
+# (ADR-014, CM-T064, CM-T069; checklist: docs/deployment/cloud-security-hardening.md).
+# Idempotent. Run once as root after the first SSH login, from a copy of this repository:
+#
+#   sudo infrastructure/deployment/bin/cm-host-setup --operator ubuntu
+#
+# What it changes (nothing else):
+#   packages     security updates; Docker Engine and the Compose plugin from Docker's apt
+#                repository; certbot, age, git, lynis, python3 (for the status collector)
+#   automatic    unattended-upgrades enabled for security updates; time synchronization checked
+#   docker       /etc/docker/daemon.json: log rotation, no-new-privileges by default, no userland
+#                proxy, live restore. The Docker socket stays root-only (the operator uses sudo).
+#   ssh          drop-in /etc/ssh/sshd_config.d/10-ciphermesh.conf: keys only, no root login,
+#                AllowUsers <operator>, no forwarding. Validated with "sshd -t" BEFORE the reload;
+#                the current session stays open, and an invalid file is removed again.
+#   firewall     nothing: the host firewall is a separate, explicit step (cm-firewall), because a
+#                mistake there can lock the operator out (prompt section 8).
+#   layout       /srv/ciphermesh (config, secrets 0700, src), /var/lib/ciphermesh/status,
+#                /var/backups/ciphermesh (0700), /etc/ciphermesh/tls, /var/www/acme
+#   timers       status collector (5 min), worker (15 min), backup (daily 03:30 UTC)
+. "$(dirname "$0")/cm-lib.sh"
+[[ "$(id -u)" == 0 ]] || cm_die 'run as root (sudo)'
+operator=''
+[[ "${1:-}" == --operator ]] && operator="${2:-}"
+[[ "${operator}" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || cm_die 'usage: cm-host-setup --operator <ssh user>'
+id "${operator}" > /dev/null 2>&1 || cm_die "user ${operator} does not exist"
+[[ -s "/home/${operator}/.ssh/authorized_keys" ]] || cm_die "${operator} has no authorized SSH key: refusing to restrict SSH"
+. /etc/os-release
+[[ "${ID}" == ubuntu ]] || cm_die "Ubuntu expected, found ${ID}"
+release_dir="$(cd "$(dirname "$0")/../../.." && pwd)"
+
+cm_info 'packages: security updates and tools'
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get -y -qq upgrade
+apt-get install -y -qq --no-install-recommends ca-certificates curl gnupg git certbot age lynis python3 unattended-upgrades openssl
+
+if ! command -v docker > /dev/null 2>&1; then
+  cm_info 'Docker Engine from the official Docker apt repository'
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
+  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
+    "$(dpkg --print-architecture)" "${VERSION_CODENAME}" > /etc/apt/sources.list.d/docker.list
+  apt-get update -qq
+  apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+fi
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json.new << 'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "10m", "max-file": "5" },
+  "no-new-privileges": true,
+  "userland-proxy": false,
+  "live-restore": true
+}
+EOF
+if ! cmp -s /etc/docker/daemon.json.new /etc/docker/daemon.json 2> /dev/null; then
+  mv /etc/docker/daemon.json.new /etc/docker/daemon.json
+  systemctl restart docker
+else
+  rm -f /etc/docker/daemon.json.new
+fi
+systemctl enable --now docker > /dev/null
+
+cm_info 'automatic security updates and time synchronization'
+cat > /etc/apt/apt.conf.d/20auto-upgrades << 'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+systemctl enable --now unattended-upgrades > /dev/null
+timedatectl set-timezone UTC
+timedatectl show --property=NTPSynchronized --value | grep -q yes || cm_info 'WARNING: the clock is not NTP-synchronized yet (TOTP depends on it)'
+
+cm_info 'SSH: keys only, no root login, AllowUsers, no forwarding'
+cat > /etc/ssh/sshd_config.d/10-ciphermesh.conf << EOF
+# CipherMesh SSH hardening (cm-host-setup). The provider security list allows port 22 only
+# from the operator's address (docs/deployment/oracle-always-free.md).
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+AllowUsers ${operator}
+MaxAuthTries 3
+LoginGraceTime 30
+X11Forwarding no
+AllowTcpForwarding no
+AllowAgentForwarding no
+PermitTunnel no
+ClientAliveInterval 300
+ClientAliveCountMax 2
+EOF
+if sshd -t; then
+  systemctl reload ssh
+else
+  rm -f /etc/ssh/sshd_config.d/10-ciphermesh.conf
+  cm_die 'sshd rejected the configuration; it was removed and SSH is unchanged'
+fi
+
+cm_info 'directories'
+install -d -m 0755 /srv/ciphermesh /srv/ciphermesh/config /var/lib/ciphermesh /var/www/acme /etc/ciphermesh /etc/ciphermesh/tls
+install -d -m 0700 /srv/ciphermesh/secrets /var/backups/ciphermesh
+install -d -m 0755 /var/lib/ciphermesh/status
+
+cm_info 'systemd timers'
+for unit in "${release_dir}"/infrastructure/deployment/systemd/*.{service,timer}; do
+  install -m 0644 "${unit}" "/etc/systemd/system/$(basename "${unit}")"
+done
+systemctl daemon-reload
+systemctl enable ciphermesh-status.timer ciphermesh-worker.timer ciphermesh-backup.timer ciphermesh-docker-user.service > /dev/null
+cm_info 'timers enabled (they start working once the stack and its configuration exist)'
+
+cm_info 'baseline complete. Next: cm-firewall, then the deployment (docs/deployment/oracle-always-free.md)'
+sshd -T 2> /dev/null | grep -E '^(passwordauthentication|permitrootlogin|allowusers|kbdinteractiveauthentication|maxauthtries|allowtcpforwarding) '

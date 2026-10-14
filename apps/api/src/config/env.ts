@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { SecretValue } from './secret';
 
@@ -336,10 +337,70 @@ export function loadWorkerConfig(env: Readonly<Record<string, string | undefined
   });
 }
 
+/**
+ * Secret variables that may instead be given as a file (`<NAME>_FILE`, an absolute path), as the
+ * cloud deployment does: the values are read from root-provisioned files mounted read-only under
+ * /run/secrets, so they never appear in the container's environment or in `docker inspect`
+ * (ADR-014, CM-T071).
+ */
+export const SECRET_FILE_VARIABLES = [
+  'DATABASE_URL',
+  'WORKER_DATABASE_URL',
+  'TOTP_ENCRYPTION_KEY',
+  'IDENTIFIER_HMAC_KEY',
+  'STORAGE_SECRET_ACCESS_KEY',
+] as const;
+
+const MAX_SECRET_FILE_BYTES = 4096;
+
+/**
+ * Replaces each `<NAME>_FILE` by `<NAME>` with the file's content (one trailing newline removed).
+ * Setting both forms, a relative path, an unreadable, empty or oversized file are configuration
+ * errors that name the variable, never the value or the file's content.
+ */
+export function resolveSecretFiles(
+  env: Readonly<Record<string, string | undefined>>,
+  read: (path: string) => string = (path) => readFileSync(path, 'utf8'),
+): Record<string, string | undefined> {
+  const fileVariables = new Set<string>(SECRET_FILE_VARIABLES.map((name) => `${name}_FILE`));
+  const resolved: Record<string, string | undefined> = Object.fromEntries(
+    Object.entries(env).filter(([key]) => !fileVariables.has(key)),
+  );
+  const problems: { variable: string; problem: string }[] = [];
+  for (const name of SECRET_FILE_VARIABLES) {
+    const fileVariable = `${name}_FILE`;
+    const path = env[fileVariable];
+    if (path === undefined || path === '') continue;
+    if (env[name] !== undefined && env[name] !== '') {
+      problems.push({ variable: fileVariable, problem: `set either ${name} or ${fileVariable}, not both` });
+      continue;
+    }
+    if (!path.startsWith('/') || path.split('/').includes('..')) {
+      problems.push({ variable: fileVariable, problem: 'must be an absolute path' });
+      continue;
+    }
+    let content: string;
+    try {
+      content = read(path);
+    } catch {
+      problems.push({ variable: fileVariable, problem: 'could not be read' });
+      continue;
+    }
+    const value = content.replace(/\r?\n$/, '');
+    if (value === '' || value.length > MAX_SECRET_FILE_BYTES || /[\r\n]/.test(value)) {
+      problems.push({ variable: fileVariable, problem: 'must contain one non-empty line' });
+      continue;
+    }
+    resolved[name] = value;
+  }
+  if (problems.length > 0) throw new ConfigError(problems);
+  return resolved;
+}
+
 export function loadWorkerConfigFromProcessEnv(): WorkerConfig {
-  return loadWorkerConfig(process.env);
+  return loadWorkerConfig(resolveSecretFiles(process.env));
 }
 
 export function loadConfigFromProcessEnv(): AppConfig {
-  return loadConfig(process.env);
+  return loadConfig(resolveSecretFiles(process.env));
 }

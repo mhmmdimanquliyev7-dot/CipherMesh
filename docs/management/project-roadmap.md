@@ -263,6 +263,10 @@ Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceabili
 | Documentation updates | Testing plan; traceability table |
 | Jira evidence | CI run summary; traceability table; scheduled scan results |
 
+### Cloud workstream note (2026-10-14, ADR-014)
+
+The project owner started Phases 17 to 19 as one workstream (Cloud Deployment + Cloud Security Hardening) and decided the deployment model in [ADR-014](../architecture/adr/ADR-014-cloud-provider-oci-always-free.md): Oracle Cloud Always Free, one Ampere A1 VM, PostgreSQL and SeaweedFS in containers on it, two DuckDNS names with Let's Encrypt, $0. Phase 18's managed-service deliverables are delivered as their self-hosted equivalents (database TLS and roles on the VM, the storage gateway limited to signed object requests); the anchor bucket and the Level 2 signing key stay with the deferred Phase 12. Work runs in two stages: Stage A in the repository (images, Compose, Nginx, operator scripts, measured platform status, rehearsal and the linux/arm64 CI stack check) and Stage B in the cloud after the account owner approves the resource plan ([oracle-always-free.md](../deployment/oracle-always-free.md)). After it come the ISMS evidence, the final report and the live demonstration (Phase 22 scope); Phases 20 and 21 are folded into the workstream's focused security checks and findings.
+
 ### Phase 17: IaaS Deployment (M7, CM-T063 to CM-T066)
 | Aspect | Details |
 |---|---|

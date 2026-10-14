@@ -99,13 +99,14 @@ export const JOURNEYS: readonly Journey[] = [
     icon: 'cloud',
     summary:
       'Explain the designed deployment, what is configured and verified today, and what the cloud workstream will add.',
-    prepare: 'The running application. The cloud deployment is not connected yet: say so.',
+    prepare:
+      'The running application. Say which environment it is: the Oracle VM (live status on the dashboard) or a local rehearsal.',
     steps: [
       {
         title: 'Architecture and trust boundaries',
         href: '/trust/infrastructure',
         action: 'Open Deployment & Infrastructure.',
-        show: 'Which components are public (Nginx on 443 and 80), private (API, database, object storage) or have no inbound traffic (worker), and the IaaS, PaaS and storage service models.',
+        show: 'Which components are public (Nginx on 443 and 80), private (API, database, object storage) or have no inbound traffic (worker); all run in containers on one IaaS VM (ADR-014), and the PaaS design is explained, not deployed.',
       },
       {
         title: 'Live checks from this browser',

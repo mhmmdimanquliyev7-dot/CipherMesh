@@ -25,15 +25,15 @@ roles_only=false
 cm_read_line migrator_password
 [[ "${migrator_password}" =~ ^[A-Za-z0-9_-]{24,128}$ ]] \
   || cm_die 'standard input must be one line: the migrator password (24 to 128 characters [A-Za-z0-9_-])'
-[[ -r "${CM_SECRETS_DIR}/api.env" && -r "${CM_SECRETS_DIR}/worker.env" ]] || cm_die 'run cm-secrets first'
+[[ -r "${CM_SECRETS_DIR}/api_database_url" && -r "${CM_SECRETS_DIR}/worker_database_url" ]] || cm_die 'run cm-secrets first'
 docker volume inspect ciphermesh-postgres-tls > /dev/null 2>&1 || cm_die 'run cm-pki first'
 
 # Loopback variants of the runtime role URLs: bootstrap.mjs only reads the role passwords from them.
 loopback_url() { sed -E 's#@postgres:5432/([a-z_]+)\?.*$#@127.0.0.1:5432/\1#' <<< "$1"; }
-api_url="$(loopback_url "$(cm_env_value "${CM_SECRETS_DIR}/api.env" DATABASE_URL)")"
-worker_url="$(loopback_url "$(cm_env_value "${CM_SECRETS_DIR}/worker.env" WORKER_DATABASE_URL)")"
-[[ "${api_url}" == postgresql://cm_api:*@127.0.0.1:5432/ciphermesh ]] || cm_die 'DATABASE_URL in api.env has an unexpected form'
-[[ "${worker_url}" == postgresql://cm_worker:*@127.0.0.1:5432/ciphermesh ]] || cm_die 'WORKER_DATABASE_URL has an unexpected form'
+api_url="$(loopback_url "$(head -n 1 "${CM_SECRETS_DIR}/api_database_url")")"
+worker_url="$(loopback_url "$(head -n 1 "${CM_SECRETS_DIR}/worker_database_url")")"
+[[ "${api_url}" == postgresql://cm_api:*@127.0.0.1:5432/ciphermesh ]] || cm_die 'api_database_url has an unexpected form'
+[[ "${worker_url}" == postgresql://cm_worker:*@127.0.0.1:5432/ciphermesh ]] || cm_die 'worker_database_url has an unexpected form'
 
 if ! docker volume inspect ciphermesh-postgres-data > /dev/null 2>&1; then
   cm_info 'step 1: first start of PostgreSQL (empty data directory)'

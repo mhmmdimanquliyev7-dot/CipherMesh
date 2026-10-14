@@ -32,7 +32,7 @@ import json, sys
 d = json.loads(sys.stdin.read())
 c = d.get("shapeConfig") or {}
 print(d.get("canonicalRegionName") or d.get("region") or "", d.get("shape") or "", c.get("ocpus") or "", c.get("memoryInGBs") or "")
-' <<< "${imds}" 2> /dev/null || true)
+' <<< "${imds}" 2> /dev/null || true) || true
   [[ -n "${shape}" ]] && provider=oci
 fi
 
@@ -54,9 +54,11 @@ docker_root="$(docker info --format '{{.DockerRootDir}}' 2> /dev/null || printf 
 docker_disk="$(df --output=pcent "${docker_root}" | tail -n 1 | tr -dc '0-9')"
 memory_used="$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{if(t>0) printf "%d", (t-a)*100/t}' /proc/meminfo)"
 load1="$(cut -d' ' -f1 /proc/loadavg)"
-firewall=unknown
-if command -v ufw > /dev/null 2>&1; then
-  ufw status 2> /dev/null | grep -q '^Status: active' && firewall=active || firewall=inactive
+# Active means: inbound traffic not explicitly allowed is refused (cm-firewall), and forwarded
+# traffic from outside reaches containers only on 80 and 443 (DOCKER-USER ends in DROP).
+firewall=inactive
+if iptables -S INPUT 2> /dev/null | grep -Eq -- '-j (REJECT|DROP)( |$)|^-P INPUT DROP'   && iptables -S DOCKER-USER 2> /dev/null | grep -q -- '-j DROP'; then
+  firewall=active
 fi
 upgrades=unknown
 systemctl is-active --quiet unattended-upgrades 2> /dev/null && upgrades=active || upgrades=inactive

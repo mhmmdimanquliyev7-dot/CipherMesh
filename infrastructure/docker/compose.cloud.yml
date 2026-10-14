@@ -71,10 +71,23 @@ services:
   api:
     <<: *hardening
     image: ciphermesh-api:${CM_RELEASE}
+    # A dedicated uid that no host account uses; it owns the secret files (cm-secrets).
+    user: '10001:10001'
+    # Non-secret identifiers only (TOTP key ID, storage access key ID). The secret values are
+    # files under /run/secrets, never environment variables (CM-T071, L-75 resolved).
     env_file:
       - ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/api.env
+    secrets:
+      - api_database_url
+      - totp_encryption_key
+      - identifier_hmac_key
+      - storage_secret_access_key
     environment:
       NODE_ENV: production
+      DATABASE_URL_FILE: /run/secrets/api_database_url
+      TOTP_ENCRYPTION_KEY_FILE: /run/secrets/totp_encryption_key
+      IDENTIFIER_HMAC_KEY_FILE: /run/secrets/identifier_hmac_key
+      STORAGE_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_secret_access_key
       API_HOST: 0.0.0.0
       API_PORT: '4100'
       APP_ORIGIN: ${CM_APP_ORIGIN}
@@ -108,10 +121,16 @@ services:
     command: ['dist/worker-retention.js']
     profiles: ['jobs']
     restart: 'no'
+    user: '10001:10001'
     env_file:
       - ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/worker.env
+    secrets:
+      - worker_database_url
+      - storage_secret_access_key
     environment:
       NODE_ENV: production
+      WORKER_DATABASE_URL_FILE: /run/secrets/worker_database_url
+      STORAGE_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_secret_access_key
       STORAGE_ENDPOINT: https://${CM_FILES_HOST}
       STORAGE_PUBLIC_ENDPOINT: ${CM_FILES_ORIGIN}
       STORAGE_BUCKET: ${CM_STORAGE_BUCKET:-cm-files}
@@ -220,6 +239,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+# Runtime secrets, generated on the VM by cm-secrets (owner uid 10001, mode 0400) and mounted
+# read-only under /run/secrets of the API and the worker only.
+secrets:
+  api_database_url:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/api_database_url
+  worker_database_url:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/worker_database_url
+  totp_encryption_key:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/totp_encryption_key
+  identifier_hmac_key:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/identifier_hmac_key
+  storage_secret_access_key:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/storage_secret_access_key
 
 networks:
   edge: {}

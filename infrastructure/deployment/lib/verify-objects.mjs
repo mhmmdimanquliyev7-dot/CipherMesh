@@ -9,6 +9,7 @@
 // is what the members' browsers decrypt. Output: counts only (no object keys, no URLs; INV-10).
 // Exit code 0 only when every object matched and at least one file was checked or none exist.
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 // Dependencies come from the API image's node_modules, not from this file's directory.
@@ -16,7 +17,12 @@ const require = createRequire('/app/package.json');
 const pg = require('pg');
 const { AwsClient } = await import(require.resolve('aws4fetch'));
 
-const env = process.env;
+// Secret values may come as files (<NAME>_FILE), as in the worker container (CM-T071).
+const env = { ...process.env };
+for (const name of ['WORKER_DATABASE_URL', 'STORAGE_SECRET_ACCESS_KEY']) {
+  const file = env[`${name}_FILE`];
+  if (!env[name] && file) env[name] = readFileSync(file, 'utf8').trim();
+}
 for (const name of [
   'WORKER_DATABASE_URL',
   'STORAGE_ENDPOINT',
