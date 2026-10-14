@@ -54,7 +54,7 @@ test('session cookies are HttpOnly, Secure, SameSite=Strict and invisible to pag
   expect(setCookie).toMatch(
     /__Host-cm_session=[A-Za-z0-9_-]{43}; Max-Age=43200; Path=\/; Secure; HttpOnly; SameSite=Strict/,
   );
-  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
 
   const cookies = await context.cookies();
   const session = cookies.find((c) => c.name === '__Host-cm_session');
@@ -96,6 +96,7 @@ test('MFA enrollment and login keep the secret and recovery codes out of storage
   const user = identity();
   await register(page, user);
   await login(page, user);
+  await page.getByRole('link', { name: 'Account', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
 
   // Enrollment needs a recent step-up; the server says so first.
@@ -134,7 +135,7 @@ test('MFA enrollment and login keep the secret and recovery codes out of storage
   await page.getByRole('button', { name: 'Use a recovery code' }).click();
   await page.getByLabel('Recovery code').fill(String(codes[0]));
   await page.getByRole('button', { name: 'Verify' }).click();
-  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   const after = await context.cookies();
   expect(after.find((c) => c.name === '__Host-cm_session')).toMatchObject({ httpOnly: true, secure: true });
   expect(after.some((c) => c.name === '__Host-cm_preauth')).toBe(false);

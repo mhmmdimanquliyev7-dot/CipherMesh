@@ -156,5 +156,5 @@ export async function loginWithMfa(page: Page, user: TestUser, secret: string): 
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByLabel('Authentication code').fill(await totp(secret));
   await page.getByRole('button', { name: 'Verify' }).click();
-  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
 }

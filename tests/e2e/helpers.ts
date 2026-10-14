@@ -43,7 +43,8 @@ export async function login(page: Page, user: TestUser): Promise<void> {
   await page.getByLabel('Email address').fill(user.email);
   await page.getByLabel('Account password').fill(user.password);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
+  // Signing in lands on the workspace overview (Phase 14 + Prompt 16.5).
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
 }
 
 /**

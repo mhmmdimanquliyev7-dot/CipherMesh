@@ -296,11 +296,12 @@ const CONTROLS = [
   {
     id: 'NC-04-16',
     defect: 'Submit buttons enabled before hydration (SF-04-01)',
-    file: 'apps/web/src/components/ui.tsx',
+    // Phase 14 + Prompt 16.5: the guard moved with the buttons from ui.tsx to buttons.tsx.
+    file: 'apps/web/src/components/buttons.tsx',
     edits: [
       [
-        '      disabled={disabled === true || !hydrated}\n      className="rounded bg-sky-600',
-        '      disabled={disabled === true}\n      className="rounded bg-sky-600',
+        '    <button {...props} disabled={disabled === true || !hydrated} className={buttonClass[tone]}>',
+        '    <button {...props} disabled={disabled === true} className={buttonClass[tone]}>',
       ],
     ],
     tests: [],
@@ -1523,6 +1524,69 @@ const CONTROLS = [
       ['  if (value.length > RSA_OAEP.wrappedValueBytes) {', '  if (value.length !== RSA_OAEP.wrappedValueBytes) {'],
     ],
     tests: ['packages/crypto/src/rsa-oaep.test.ts'],
+  },
+  // Phase 14 + Prompt 16.5 (CM-T061, CM-T062): the platform dashboard and the Trust Center.
+  {
+    id: 'NC-14-01',
+    defect: 'The security dashboard is reachable without the platform administrator gate (PA-01)',
+    file: 'apps/api/src/routes/admin.ts',
+    edits: [
+      [
+        "      access: { kind: 'authenticated', requires: { platformAdmin: true } },",
+        "      access: { kind: 'authenticated' },",
+      ],
+    ],
+    tests: ['tests/dashboard/security-dashboard.test.ts'],
+  },
+  {
+    id: 'NC-14-02',
+    defect: 'Metrics that need the deferred audit ledger are reported as available (an invented zero)',
+    file: 'apps/api/src/routes/admin.ts',
+    edits: [
+      [
+        "                return { id: metric.id, status: 'NOT_IMPLEMENTED' as const, values: [] };",
+        "                return { id: metric.id, status: 'AVAILABLE' as const, values: [] };",
+      ],
+    ],
+    tests: ['tests/dashboard/security-dashboard.test.ts'],
+  },
+  {
+    id: 'NC-14-03',
+    defect: 'SD-06 counts members who have MFA as blocked by PC-01',
+    file: 'apps/api/src/db/dashboard-store.ts',
+    edits: [['            mfaEnabled: false,\n', '']],
+    tests: ['tests/dashboard/security-dashboard.test.ts'],
+  },
+  {
+    id: 'NC-14-04',
+    defect: 'A control status changes in the ISMS mapping but the Trust Center keeps showing the old one',
+    file: 'docs/security/isms-control-mapping.md',
+    edits: [['| 5.33 | Protection of records | Partial |', '| 5.33 | Protection of records | Implemented by design |']],
+    tests: ['apps/web/scripts/trust-data.test.ts'],
+  },
+  {
+    id: 'NC-14-05',
+    defect: 'The Trust Center claims a control verified in the cloud before any cloud resource exists',
+    file: 'apps/web/src/trust/infrastructure.ts',
+    edits: [
+      [
+        "      scope: 'local',\n      text: 'Listening sockets",
+        "      scope: 'cloud',\n      text: 'Listening sockets",
+      ],
+    ],
+    tests: ['apps/web/src/trust/trust-content.test.ts'],
+  },
+  {
+    id: 'NC-14-06',
+    defect: 'A Trust Center claim uses forbidden marketing wording (CLAUDE.md section 7)',
+    file: 'apps/web/src/trust/claims.ts',
+    edits: [
+      [
+        "claim: 'Files, notes and secrets are encrypted in the browser before they are uploaded.',",
+        "claim: 'Files, notes and secrets get military-grade encryption in the browser before they are uploaded.',",
+      ],
+    ],
+    tests: ['apps/web/src/trust/trust-content.test.ts'],
   },
 ];
 
