@@ -29,7 +29,7 @@ export interface AuthTestApi extends TestApi {
 
 /** `routes`: test-only routes, mounted through the registry like production routes (never in production). */
 export async function startAuthApi(
-  options: { routes?: readonly AnyRoute[]; storage?: ObjectStore } = {},
+  options: { routes?: readonly AnyRoute[]; storage?: ObjectStore; env?: Readonly<Record<string, string>> } = {},
 ): Promise<AuthTestApi> {
   loadDatabaseTestEnv();
   const clock = new TestClock();
@@ -37,7 +37,7 @@ export async function startAuthApi(
   const api = await startTestApi({
     databaseUrl: testDatabase(inject('databaseName')).url('api'),
     // Object storage when the environment configures it (Phase 7; required by the files suites).
-    env: storageTestEnv(),
+    env: { ...storageTestEnv(), ...options.env },
     testing: {
       clock: clock.now,
       events: { record: (event) => events.push(event) },

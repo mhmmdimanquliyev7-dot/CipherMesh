@@ -20,39 +20,63 @@ import { connect as netConnect } from 'node:net';
 import { connect as tlsConnect, rootCertificates } from 'node:tls';
 
 const args = process.argv.slice(2);
-const option = (name, fallback) => {
+/** @param {string} name @returns {string | undefined} */
+const option = (name) => {
   const index = args.indexOf(`--${name}`);
-  return index === -1 ? fallback : args[index + 1];
+  return index === -1 ? undefined : args[index + 1];
 };
-const app = new URL(option('app', ''));
-const files = new URL(option('files', ''));
+/** @param {string | undefined} value */
+const urlOf = (value) => {
+  try {
+    return new URL(value ?? '');
+  } catch {
+    return new URL('invalid:');
+  }
+};
+const app = urlOf(option('app'));
+const files = urlOf(option('files'));
 if (app.protocol !== 'https:' || files.protocol !== 'https:') {
   console.error('usage: edge-check.mjs --app https://<app host> --files https://<storage host> [options]');
   process.exit(2);
 }
-const connectAddress = option('connect', undefined);
-const caFile = option('ca', undefined);
+const connectAddress = option('connect');
+const caFile = option('ca');
 const ca = caFile === undefined ? undefined : [...rootCertificates, readFileSync(caFile, 'utf8')];
-const httpPort = Number(option('http-port', '80'));
-const bucket = option('bucket', 'cm-files');
-const portsOption = option('ports', '5432,8333,9333,8888,8080,18080,4100,2375,2376,9090,3000');
+const httpPort = Number(option('http-port') ?? '80');
+const bucket = option('bucket') ?? 'cm-files';
+const portsOption = option('ports') ?? '5432,8333,9333,8888,8080,18080,4100,2375,2376,9090,3000';
 const ports = portsOption === 'none' ? [] : portsOption.split(',').map(Number);
-const jsonFile = option('json', undefined);
+const jsonFile = option('json');
 
+/** @type {{ id: string, name: string, result: 'PASS' | 'FAIL', detail: string | undefined }[]} */
 const results = [];
+/** @param {string} id @param {string} name @param {boolean} pass @param {string} [detail] */
 function record(id, name, pass, detail) {
   results.push({ id, name, result: pass ? 'PASS' : 'FAIL', detail });
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${id.padEnd(22)} ${name}${detail ? `  (${detail})` : ''}`);
 }
 
-const lookup = connectAddress
-  ? (_host, options, callback) =>
-      options && options.all
-        ? callback(null, [{ address: connectAddress, family: 4 }])
-        : callback(null, connectAddress, 4)
-  : undefined;
+/** @type {import('node:net').LookupFunction | undefined} */
+const lookup =
+  connectAddress === undefined
+    ? undefined
+    : (_host, options, callback) => {
+        if (options.all) callback(null, [{ address: connectAddress, family: 4 }]);
+        else callback(null, connectAddress, 4);
+      };
 
-/** One HTTP(S) request; resolves with status and headers, body discarded. */
+/** @param {unknown} error */
+const errorCode = (error) => {
+  if (!(error instanceof Error)) return 'error';
+  return 'code' in error && typeof error.code === 'string' ? error.code : error.message;
+};
+
+/**
+ * One HTTP(S) request; resolves with status and headers, body discarded.
+ * @param {string} url
+ * @param {{ method?: string, headers?: Record<string, string>, servername?: string }} [options]
+ * @returns {Promise<{ status: number, headers: import('node:http').IncomingHttpHeaders, error?: string }>}
+ */
 function call(url, { method = 'GET', headers = {}, servername } = {}) {
   const target = new URL(url);
   const isHttps = target.protocol === 'https:';
@@ -73,11 +97,20 @@ function call(url, { method = 'GET', headers = {}, servername } = {}) {
       },
     );
     req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', (error) => resolve({ status: 0, error: error.code ?? error.message, headers: {} }));
+    req.on('error', (error) => resolve({ status: 0, error: errorCode(error), headers: {} }));
     req.end();
   });
 }
 
+/**
+ * @typedef {{ ok: true, protocol: string | null, cipher: string | undefined, authorized: boolean,
+ *   subject: string | undefined, issuer: string, validTo: string | undefined } | { ok: false, error: string }} TlsResult
+ */
+/**
+ * @param {string} url
+ * @param {{ minVersion?: import('node:tls').SecureVersion, maxVersion?: import('node:tls').SecureVersion, servername?: string }} [options]
+ * @returns {Promise<TlsResult>}
+ */
 function tlsProbe(url, { minVersion, maxVersion, servername } = {}) {
   const target = new URL(url);
   return new Promise((resolve) => {
@@ -98,18 +131,18 @@ function tlsProbe(url, { minVersion, maxVersion, servername } = {}) {
         protocol: socket.getProtocol(),
         cipher: socket.getCipher()?.name,
         authorized: socket.authorized,
-        subject: cert?.subject?.CN,
+        subject: String(cert?.subject?.CN ?? ''),
         issuer: [cert?.issuer?.O, cert?.issuer?.CN].filter(Boolean).join(' / '),
         validTo: cert?.valid_to,
-        altNames: cert?.subjectaltname,
       });
       socket.end();
     });
     socket.on('timeout', () => socket.destroy(new Error('timeout')));
-    socket.on('error', (error) => resolve({ ok: false, error: error.code ?? error.message }));
+    socket.on('error', (error) => resolve({ ok: false, error: errorCode(error) }));
   });
 }
 
+/** @param {string} host @param {number} port @returns {Promise<'open' | 'refused' | 'filtered'>} */
 function tcpOpen(host, port) {
   return new Promise((resolve) => {
     const socket = netConnect({ host, port, timeout: 3_000 });
@@ -121,7 +154,7 @@ function tcpOpen(host, port) {
       socket.destroy();
       resolve('filtered');
     });
-    socket.on('error', (error) => resolve(error.code === 'ECONNREFUSED' ? 'refused' : 'filtered'));
+    socket.on('error', (error) => resolve(errorCode(error) === 'ECONNREFUSED' ? 'refused' : 'filtered'));
   });
 }
 
@@ -132,10 +165,12 @@ const forged =
   `&X-Amz-Date=20261014T000000Z&X-Amz-Expires=60&X-Amz-SignedHeaders=host&X-Amz-Signature=${zeros}`;
 
 // ------------------------------------------------------------------------------ transport
-for (const [label, origin] of [
+/** @type {[string, URL][]} */
+const origins = [
   ['app', app],
   ['files', files],
-]) {
+];
+for (const [label, origin] of origins) {
   const tls = await tlsProbe(origin.href);
   record(
     `TLS-${label}-trusted`,
@@ -148,7 +183,7 @@ for (const [label, origin] of [
     `TLS-${label}-no-legacy`,
     `${label} host: TLS 1.0 and 1.1 refused`,
     !old.ok,
-    old.ok ? old.protocol : 'refused',
+    old.ok ? String(old.protocol) : 'refused',
   );
   const v12 = await tlsProbe(origin.href, { minVersion: 'TLSv1.2', maxVersion: 'TLSv1.2' });
   record(
@@ -180,6 +215,7 @@ record(
   csp.includes("default-src 'none'") && !/'unsafe-inline'|'unsafe-eval'/.test(csp) && csp.includes(files.origin),
   `${csp.length} characters`,
 );
+/** @type {Record<string, (value: string) => boolean>} */
 const expect = {
   'x-content-type-options': (v) => v === 'nosniff',
   'x-frame-options': (v) => v === 'DENY',
@@ -233,6 +269,7 @@ record(
 );
 
 // ------------------------------------------------------------------------------ storage host
+/** @type {[string, string, string, { method?: string, headers?: Record<string, string> }, number[]][]} */
 const storage = [
   ['STO-unsigned', 'unsigned object request refused', `/${bucket}/${fakeKey}`, {}, [403]],
   ['STO-list', 'bucket listing refused', `/${bucket}/?list-type=2`, {}, [403]],

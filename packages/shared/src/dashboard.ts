@@ -230,17 +230,81 @@ export const PLATFORM_COMPONENTS: Readonly<
   },
   'object-storage': {
     name: 'Object storage',
-    basis: { NOT_VERIFIED: 'The API does not probe object storage for this report.' },
+    basis: {
+      HEALTHY: 'The API reached the bucket with its runtime credential for this report (authenticated probe).',
+      DEGRADED: 'Storage answered, but refused the runtime credential.',
+      UNAVAILABLE: 'Storage did not answer the probe of this report.',
+      NOT_CONFIGURED: 'No object storage is configured for this API.',
+    },
   },
   worker: {
     name: 'Worker',
-    basis: { NOT_VERIFIED: 'The worker reports no heartbeat; its jobs are verified by tests.' },
+    basis: {
+      HEALTHY: 'The last scheduled worker run finished successfully within the allowed age.',
+      DEGRADED: 'The last scheduled worker run failed.',
+      NOT_VERIFIED: 'No recent worker run is recorded; its jobs are verified by tests.',
+    },
   },
   cloud: {
     name: 'Cloud deployment',
     basis: {
-      NOT_CONNECTED:
-        'No cloud provider is connected. The deployment workstream will report the provider’s resources here.',
+      HEALTHY:
+        'The host status collected on the cloud VM within the allowed age shows every service healthy and no host warning.',
+      DEGRADED: 'The host status collected on the cloud VM is recent but shows a warning (see the reasons).',
+      NOT_VERIFIED: 'The host status is missing, unreadable or older than allowed, so nothing is claimed.',
+      NOT_CONNECTED: 'This API does not run on a cloud host that reported its instance metadata.',
     },
   },
 });
+
+/**
+ * Why a platform component has its state (Cloud Deployment workstream, ADR-014). Fixed codes only:
+ * the API never forwards text from the host, so nothing it reads can reach the browser as words.
+ */
+export const PLATFORM_REASONS = [
+  'STATUS_STALE',
+  'STATUS_UNREADABLE',
+  'NOT_A_CLOUD_HOST',
+  'SERVICE_UNHEALTHY',
+  'DISK_PRESSURE',
+  'MEMORY_PRESSURE',
+  'CERTIFICATE_EXPIRING',
+  'HOST_FIREWALL_INACTIVE',
+  'WORKER_NO_RUN',
+  'WORKER_STALE',
+  'WORKER_FAILED',
+  'PROBE_DENIED',
+  'PROBE_FAILED',
+] as const;
+export type PlatformReason = (typeof PLATFORM_REASONS)[number];
+
+export const PLATFORM_REASON_TEXT: Readonly<Record<PlatformReason, string>> = Object.freeze({
+  STATUS_STALE: 'The last host status is older than allowed.',
+  STATUS_UNREADABLE: 'The host status file is missing or not in the expected format.',
+  NOT_A_CLOUD_HOST: 'The host reported no cloud instance metadata (a local rehearsal, not a cloud VM).',
+  SERVICE_UNHEALTHY: 'A container is not running or not healthy.',
+  DISK_PRESSURE: 'A file system is more than 85 % full.',
+  MEMORY_PRESSURE: 'Memory use is above 95 %.',
+  CERTIFICATE_EXPIRING: 'A TLS certificate is missing or expires within 14 days.',
+  HOST_FIREWALL_INACTIVE: 'The host firewall is not active.',
+  WORKER_NO_RUN: 'No worker run is recorded.',
+  WORKER_STALE: 'The last worker run is older than allowed.',
+  WORKER_FAILED: 'The last worker run failed.',
+  PROBE_DENIED: 'Storage refused the runtime credential.',
+  PROBE_FAILED: 'Storage did not answer.',
+});
+
+/** Freshness and thresholds of the measured platform status (docs/deployment/operational-runbook.md). */
+export const PLATFORM_LIMITS = Object.freeze({
+  /** The collector runs every 5 minutes; three missed runs make the status stale. */
+  hostStatusMaxAgeMs: 15 * 60_000,
+  /** The worker timer runs every 15 minutes; four missed runs make the worker stale. */
+  workerMaxAgeMs: 60 * 60_000,
+  certificateMinDays: 14,
+  diskMaxPercent: 85,
+  memoryMaxPercent: 95,
+});
+
+/** Containers whose state the host collector reports (compose.cloud.yml service names). */
+export const PLATFORM_SERVICES = ['nginx', 'api', 'postgres', 'object-storage'] as const;
+export type PlatformService = (typeof PLATFORM_SERVICES)[number];

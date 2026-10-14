@@ -1,15 +1,27 @@
 'use client';
 
-import { PLATFORM_COMPONENTS } from '@ciphermesh/shared';
+import { PLATFORM_COMPONENTS, PLATFORM_REASON_TEXT } from '@ciphermesh/shared';
+import { securityDashboardResponseSchema, type SecurityDashboardResponse } from '@ciphermesh/validation';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { Icon } from '../../../components/icons';
 import { Badge } from '../../../components/ui';
 import { publicEnv } from '../../../config/public-env';
+import { api, ApiError } from '../../../lib/api';
+import { STATE } from '../../../trust/platform-status';
 
 /**
- * The deployment status card. The cloud deployment is not connected: the label comes from the
- * shared platform contract (PLATFORM_COMPONENTS.cloud), which the cloud workstream will connect to
- * the provider. The environment shown is the build-time label, stated as such.
+ * The deployment status card (Cloud Deployment workstream, ADR-014). The live cloud state is
+ * measured on the VM and reported by the API to platform administrators only (PA-01): a visitor
+ * without that role is told so, and nothing is claimed for them. The environment shown is the
+ * build-time label, stated as such.
  */
+type Live =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'restricted' }
+  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'ready'; readonly data: SecurityDashboardResponse };
+
 export function DeploymentStatus({
   controls,
   configured,
@@ -19,17 +31,69 @@ export function DeploymentStatus({
   readonly configured: number;
   readonly verified: number;
 }) {
+  const [live, setLive] = useState<Live>({ kind: 'loading' });
+  useEffect(() => {
+    let active = true;
+    api('GET', '/admin/security-dashboard', securityDashboardResponseSchema).then(
+      (data) => {
+        if (active) setLive({ kind: 'ready', data });
+      },
+      (error: unknown) => {
+        if (!active) return;
+        const restricted = error instanceof ApiError && (error.status === 401 || error.status === 404);
+        setLive({ kind: restricted ? 'restricted' : 'unavailable' });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const environment =
     publicEnv.deploymentEnvironment === 'development' ? 'Development build' : 'Cloud demonstration build';
+  const cloud = live.kind === 'ready' ? live.data.platform.find((c) => c.id === 'cloud') : undefined;
+  const deployment = live.kind === 'ready' ? live.data.deployment : null;
   return (
     <section aria-label="Deployment status" className="grid gap-4 md:grid-cols-3" data-testid="deployment-status">
-      <div className="space-y-2 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
-        <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-amber-200/90">
+      <div className="space-y-2 rounded-2xl border border-line bg-surface/90 p-5" data-testid="deployment-live">
+        <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-400">
           <Icon name="cloud" className="size-4" />
-          Cloud deployment
+          Cloud deployment (live)
         </p>
-        <p className="text-lg font-semibold text-white">Not connected</p>
-        <p className="text-sm text-slate-400">{PLATFORM_COMPONENTS.cloud.basis.NOT_CONNECTED}</p>
+        {cloud === undefined ? (
+          <>
+            <p className="text-lg font-semibold text-white">
+              {live.kind === 'loading'
+                ? 'Checking…'
+                : live.kind === 'unavailable'
+                  ? 'Status unavailable'
+                  : 'Administrators only'}
+            </p>
+            <p className="text-sm text-slate-400">
+              The measured status of the cloud host is shown to platform administrators (
+              <Link className="underline" href="/trust/dashboard">
+                security dashboard
+              </Link>
+              ). Everyone can run the live checks below, which observe this deployment from the browser.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="flex flex-wrap items-center gap-2 text-lg font-semibold text-white">
+              <Badge tone={STATE[cloud.state].tone}>{STATE[cloud.state].label}</Badge>
+              {deployment?.provider === 'oci' ? `${deployment.shape ?? ''} ${deployment.region ?? ''}` : null}
+            </p>
+            <p className="text-sm text-slate-400">{PLATFORM_COMPONENTS.cloud.basis[cloud.state]}</p>
+            {cloud.reasons.map((reason) => (
+              <p key={reason} className="text-xs text-amber-200/90">
+                {PLATFORM_REASON_TEXT[reason]}
+              </p>
+            ))}
+            <p className="text-[11px] text-slate-500">
+              Measured: {cloud.checkedAt === null ? 'not measured' : new Date(cloud.checkedAt).toLocaleString()}
+            </p>
+          </>
+        )}
       </div>
       <div className="space-y-2 rounded-2xl border border-line bg-surface/90 p-5">
         <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-400">
@@ -49,7 +113,9 @@ export function DeploymentStatus({
           <Badge tone="accent">{configured} configured</Badge>
           <Badge tone="success">{verified} verified</Badge>
         </p>
-        <p className="text-sm text-slate-400">Configured and verified locally or in CI only; none in the cloud yet.</p>
+        <p className="text-sm text-slate-400">
+          Each control names the environment its configuration and evidence come from (local, CI or cloud).
+        </p>
       </div>
     </section>
   );

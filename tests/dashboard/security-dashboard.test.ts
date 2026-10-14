@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { FILE_TAG_BYTES, SECURITY_METRICS } from '@ciphermesh/shared';
 import { securityDashboardResponseSchema, type SecurityDashboardResponse } from '@ciphermesh/validation';
 import type pg from 'pg';
@@ -86,13 +88,17 @@ describe('security dashboard (PA-01)', () => {
       const metric = result.metrics.find((m) => m.id === id);
       expect(metric, id).toEqual({ id, status: 'NOT_IMPLEMENTED', values: [] });
     }
+    // Measured now (ADR-014): the API and its queries, and an authenticated probe of the local
+    // storage. Without a host status file nothing is claimed about the worker or a cloud host.
+    const now = result.computedAt;
     expect(result.platform).toEqual([
-      { id: 'api', state: 'HEALTHY' },
-      { id: 'database', state: 'HEALTHY' },
-      { id: 'object-storage', state: 'NOT_VERIFIED' },
-      { id: 'worker', state: 'NOT_VERIFIED' },
-      { id: 'cloud', state: 'NOT_CONNECTED' },
+      { id: 'api', state: 'HEALTHY', checkedAt: now, reasons: [] },
+      { id: 'database', state: 'HEALTHY', checkedAt: now, reasons: [] },
+      { id: 'object-storage', state: 'HEALTHY', checkedAt: now, reasons: [] },
+      { id: 'worker', state: 'NOT_VERIFIED', checkedAt: null, reasons: [] },
+      { id: 'cloud', state: 'NOT_CONNECTED', checkedAt: null, reasons: [] },
     ]);
+    expect(result.deployment).toBeNull();
   });
 
   it('computes exact aggregates for a scenario built through the real API', async () => {
@@ -185,5 +191,106 @@ describe('security dashboard (PA-01)', () => {
     expect(errorOf(denied)).toEqual(NOT_FOUND_BODY);
     const anonymous = await new Browser(api).request('GET', '/admin/security-dashboard');
     expect(anonymous.status).toBe(401);
+  });
+});
+
+describe('platform status from the cloud host (ADR-014)', () => {
+  // The status file as cm-status-collect writes it on the VM. An absolute POSIX path, as the
+  // configuration requires (on Windows it resolves on the current drive).
+  const directory = resolve('test-results', 'dashboard-status');
+  const file = `${directory.replace(/^[A-Za-z]:/, '').replace(/\\/g, '/')}/host-status.json`;
+  let cloudApi: AuthTestApi;
+  let cloudAdmin: Person;
+
+  const hostStatus = (checkedAt: Date, overrides: Record<string, unknown> = {}) => ({
+    schema: 1,
+    checkedAt: checkedAt.toISOString(),
+    cloud: {
+      provider: 'oci',
+      region: 'eu-frankfurt-1',
+      shape: 'VM.Standard.A1.Flex',
+      ocpus: 2,
+      memoryGb: 12,
+      architecture: 'aarch64',
+      os: 'ubuntu-24.04',
+    },
+    deployment: { schema: 1, release: '0123456789ab', commit: '0'.repeat(40), deployedAt: checkedAt.toISOString() },
+    services: ['nginx', 'api', 'postgres', 'object-storage'].map((name) => ({
+      name,
+      state: 'running',
+      health: 'healthy',
+    })),
+    host: {
+      diskUsedPercent: 21,
+      dockerDiskUsedPercent: 21,
+      memoryUsedPercent: 38,
+      load1: 0.2,
+      hostFirewall: 'active',
+      unattendedUpgrades: 'active',
+    },
+    certificates: ['app', 'files'].map((name) => ({
+      name,
+      notAfter: new Date(checkedAt.getTime() + 80 * DAY).toISOString(),
+      issuer: 'Let-s-Encrypt',
+    })),
+    worker: { schema: 1, lastRunAt: checkedAt.toISOString(), finishedAt: checkedAt.toISOString(), result: 'success' },
+    backup: { schema: 1, lastBackupAt: checkedAt.toISOString(), archive: 'synthetic.tar.age', sha256: 'ab' },
+    restoreDrill: { schema: 1, finishedAt: checkedAt.toISOString(), result: 'pass', archive: 'synthetic.tar.age' },
+    ...overrides,
+  });
+
+  beforeAll(async () => {
+    mkdirSync(directory, { recursive: true });
+    cloudApi = await startAuthApi({ env: { PLATFORM_STATUS_FILE: file } });
+    cloudAdmin = await platformAdministrator(cloudApi, database);
+  });
+  afterAll(async () => {
+    await cloudApi.close();
+  });
+
+  it('reports a fresh, clean host status as a healthy cloud deployment with its measured details', async () => {
+    writeFileSync(file, JSON.stringify(hostStatus(cloudApi.clock.now())));
+    const result = await dashboard(cloudAdmin);
+    const byId = Object.fromEntries(result.platform.map((c) => [c.id, c]));
+    expect(byId['cloud']).toMatchObject({ state: 'HEALTHY', reasons: [] });
+    expect(byId['worker']).toMatchObject({ state: 'HEALTHY', reasons: [] });
+    expect(result.deployment).toMatchObject({
+      provider: 'oci',
+      shape: 'VM.Standard.A1.Flex',
+      ocpus: 2,
+      memoryGb: 12,
+      architecture: 'aarch64',
+      release: '0123456789ab',
+      lastRestoreDrill: { result: 'pass' },
+    });
+    // Only the projected fields leave the API: no archive names or digests from the host.
+    expect(JSON.stringify(result)).not.toContain('synthetic.tar.age');
+  });
+
+  it('never presents an old measurement as current health', async () => {
+    writeFileSync(file, JSON.stringify(hostStatus(new Date(cloudApi.clock.now().getTime() - 20 * 60_000))));
+    const result = await dashboard(cloudAdmin);
+    expect(result.platform.find((c) => c.id === 'cloud')).toEqual({
+      id: 'cloud',
+      state: 'NOT_VERIFIED',
+      checkedAt: null,
+      reasons: ['STATUS_STALE'],
+    });
+  });
+
+  it('reports warnings as DEGRADED, and an unreadable file as NOT_VERIFIED', async () => {
+    const now = cloudApi.clock.now();
+    writeFileSync(
+      file,
+      JSON.stringify(hostStatus(now, { host: { ...hostStatus(now).host, hostFirewall: 'inactive' } })),
+    );
+    expect((await dashboard(cloudAdmin)).platform.find((c) => c.id === 'cloud')).toMatchObject({
+      state: 'DEGRADED',
+      reasons: ['HOST_FIREWALL_INACTIVE'],
+    });
+    writeFileSync(file, '{"schema":1,"checkedAt":"<script>"}');
+    const unreadable = await dashboard(cloudAdmin);
+    expect(unreadable.platform.find((c) => c.id === 'cloud')?.reasons).toEqual(['STATUS_UNREADABLE']);
+    expect(unreadable.deployment).toBeNull();
   });
 });

@@ -10,7 +10,7 @@
 # Chromium, Firefox and WebKit with recorded synthetic accounts; worker run; status collection;
 # encrypted backup; isolated restore drill; full restore onto empty volumes; browser decryption of
 # the restored note and file; resource use.
-set -euo pipefail
+set -Eeuo pipefail
 repo="$(cd "$(dirname "$0")/../../.." && pwd)"
 out="${1:?evidence directory}"
 mkdir -p "${out}"
@@ -21,6 +21,14 @@ bin=infrastructure/deployment/bin
 pg_image='postgres:17.11-alpine3.24@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24'
 
 step() { printf '\n==== %s\n' "$*" | tee -a "${out}/stack-check.log"; }
+# On failure: container states and the last log lines of each (synthetic data, no secrets logged).
+diagnose() {
+  docker ps -a --format '{{.Names}}  {{.Status}}' | grep 'ciphermesh-' > "${out}/failure-containers.txt" || true
+  for name in $(docker ps -a --format '{{.Names}}' | grep '^ciphermesh-'); do
+    docker logs --tail 40 "${name}" > "${out}/failure-log-${name}.txt" 2>&1 || true
+  done
+}
+trap 'diagnose' ERR
 # The operator scripts with the rehearsal's paths (cm-rehearsal sets the same for itself).
 rehearse() {
   CM_CONFIG="${CM_REHEARSAL_DIR}/cloud.env" CM_RELEASE_DIR="${repo}" CM_SECRETS_DIR="${CM_REHEARSAL_DIR}/secrets" \

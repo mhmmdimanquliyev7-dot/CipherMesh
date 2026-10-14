@@ -265,6 +265,22 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('platform status file (ADR-014)', () => {
+    it('is absent unless configured, and accepts an absolute path to a JSON file', () => {
+      expect(loadConfig(valid).platformStatusFile).toBeNull();
+      expect(
+        loadConfig({ ...production, PLATFORM_STATUS_FILE: '/run/ciphermesh/status/host-status.json' })
+          .platformStatusFile,
+      ).toBe('/run/ciphermesh/status/host-status.json');
+    });
+
+    it('refuses relative paths, parent references and other file types', () => {
+      for (const value of ['status.json', '/run/../etc/passwd.json', '/etc/shadow', '/run/a b.json', 'C:/x.json']) {
+        expect(problemsOf({ ...valid, PLATFORM_STATUS_FILE: value }), value).toEqual(['PLATFORM_STATUS_FILE']);
+      }
+    });
+  });
+
   it('treats empty values as missing', () => {
     expect(loadConfig({ ...valid, API_PORT: '' }).api.port).toBe(4100);
   });

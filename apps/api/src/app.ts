@@ -133,11 +133,13 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
     events,
     clock,
   });
-  // Encrypted files (Phase 7): ciphertext in object storage, presigned URLs for browsers.
+  // Encrypted files (Phase 7): ciphertext in object storage, presigned URLs for browsers. The
+  // dashboard probes the same store for the platform status (ADR-014).
+  const storage = testing?.storage ?? createObjectStore(config.storage);
   const files = createFileService({
     store: roomData.store,
     transaction: roomData.transaction,
-    storage: testing?.storage ?? createObjectStore(config.storage),
+    storage,
     events,
     clock,
   });
@@ -177,7 +179,10 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
       ...secretRoutes(secrets, roomData.store),
       ...rekeyRoutes(rekey),
       // Platform security dashboard (Phase 14, PA-01): aggregates for platform administrators.
-      ...adminRoutes(createDashboardStore(database.prisma), clock, config.nodeEnv),
+      ...adminRoutes(createDashboardStore(database.prisma), clock, config.nodeEnv, {
+        statusFile: config.platformStatusFile,
+        storage,
+      }),
       ...(testing?.routes ?? []),
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],

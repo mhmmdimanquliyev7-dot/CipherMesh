@@ -38,6 +38,11 @@ export interface AppConfig {
    * when it is not configured: the file routes then answer STORAGE_UNAVAILABLE.
    */
   readonly storage: StorageConfig | null;
+  /**
+   * The host status file of the cloud deployment (cm-status-collect, ADR-014), mounted read-only;
+   * null when the API does not run on the cloud VM. The dashboard reads it, never writes it.
+   */
+  readonly platformStatusFile: string | null;
 }
 
 /**
@@ -73,6 +78,11 @@ const envSchema = z.object({
   TOTP_ENCRYPTION_KEY_ID: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/),
   IDENTIFIER_HMAC_KEY: z.string().refine(isKey32, { message: 'must be 32 random bytes, base64url encoded' }),
   TRUST_PROXY_HOPS: z.enum(['0', '1']).default('0'),
+  PLATFORM_STATUS_FILE: z
+    .string()
+    .regex(/^\/[A-Za-z0-9._/-]{1,200}\.json$/, { message: 'must be an absolute path to a .json file' })
+    .refine((value) => !value.split('/').includes('..'), { message: 'must not contain ..' })
+    .optional(),
   ...storageFields(),
 });
 
@@ -276,6 +286,7 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): A
     }),
     trustProxyHops: e.TRUST_PROXY_HOPS === '1' ? 1 : 0,
     storage: storageConfigOf(e),
+    platformStatusFile: e.PLATFORM_STATUS_FILE ?? null,
   });
 }
 

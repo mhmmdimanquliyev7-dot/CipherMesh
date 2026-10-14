@@ -39,7 +39,10 @@ test('the live checks report what this browser observes, including what is not c
   await expect(checks.getByTestId('live-check-x-frame-options')).toHaveAttribute('data-outcome', 'pass');
   // HSTS belongs to the TLS edge of the cloud workstream; the test server does not send it.
   await expect(checks.getByTestId('live-check-hsts')).toHaveAttribute('data-outcome', 'absent');
-  await expect(page.getByTestId('deployment-status')).toContainText('Not connected');
+  // The live cloud status is for platform administrators (PA-01): a signed-out visitor is told so,
+  // and no state is claimed for them (ADR-014).
+  await expect(page.getByTestId('deployment-live')).toContainText('Administrators only');
+  await expect(page.getByTestId('deployment-live')).not.toContainText(/Healthy|Degraded|Not connected/);
   // No cloud-side control is claimed: every verified control names a local or CI scope.
   const verified = page.getByTestId('cloud-control').filter({ hasText: /Verified \(/ });
   await expect(verified.first()).toBeVisible();

@@ -78,6 +78,10 @@ if [[ ! -s "${work}/tls/app/fullchain.pem" ]]; then
       -CAcreateserial -days 30 -extfile "${tmp}/${name}.ext" -out "${work}/tls/${name}/fullchain.pem" 2> /dev/null
   done
   cp "${work}/rehearsal-ca.crt" "${work}/extra-ca/rehearsal-ca.crt"
+  # Nginx (uid 101) and the API (uid 1000) read these throwaway files; on the VM, cm-tls gives
+  # the real key to uid 101 with mode 0600 instead.
+  chmod 755 "${work}/tls" "${work}/tls/app" "${work}/tls/files" "${work}/extra-ca"
+  chmod 644 "${work}"/tls/*/*.pem "${work}/extra-ca/rehearsal-ca.crt"
   rm -rf "${tmp}"
 fi
 
