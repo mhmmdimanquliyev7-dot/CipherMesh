@@ -18,7 +18,9 @@ jobs:
   quality:
     name: Lint, types, tests, build, E2E
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Phase 14 + Prompt 16.5 added 42 browser tests (186 per run in three engines); the E2E step
+    # alone takes about 22 minutes on the hosted runner, so 30 minutes no longer covered the job.
+    timeout-minutes: 45
     # Throwaway PostgreSQL for the database suite and the smoke test (CM-T013, CM-T014). Same
     # pinned image as local development. The administrator password exists only for the life of
     # this runner; it is not a secret of any real system. Role passwords are random per run.
