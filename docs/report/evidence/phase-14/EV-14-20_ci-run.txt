@@ -1,0 +1,20 @@
+EV-14-20  CI run of the Phase 14 + Prompt 16.5 pull request (CM-T061, CM-T062)
+Pull request #35, branch feature/CM-T061-trust-center-redesign, merged 2026-10-14 into main as merge
+commit df542be049acba3018b186964faa1fd2c1a3fa77 (parents 42474ac and 10c5e41).
+
+Run 38514040289 (head 69cc592): CANCELLED
+  The quality job reached its 30-minute timeout while the E2E step was still running; every step before
+  E2E (format, lint, typecheck, database checks, pnpm test, both coverage gates, build, smoke, SBOM)
+  passed. One Firefox test (vault.spec.ts, "negative control: the leak checks detect a passphrase that
+  was stored or sent") was reported failed at 30.9 s without a report, because the job was cancelled
+  before Playwright printed it; it passed 5 of 5 times locally (--repeat-each 5) and in the next run.
+  Fix: commit 10c5e41 raised the job timeout to 45 minutes (the E2E suite grew by 42 tests).
+  Dependency audit, GitGuardian and the gitleaks scan passed.
+
+Run 38531891531 (head 10c5e41): SUCCESS, first attempt
+  Lint, types, tests, build, E2E   pass  27m16s
+    Vitest: Test Files 91 passed (91), plus the coverage runs (crypto and authorization)
+    Playwright (Chromium, Firefox, WebKit): 169 passed, 20 skipped, 0 failed (18.5 min)
+  Dependency audit                 pass  16s
+  Secret scan (gitleaks, full history)  pass  13s
+  GitGuardian Security Checks      pass  22s

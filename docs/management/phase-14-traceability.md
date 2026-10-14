@@ -1,6 +1,6 @@
 # Phase 14 + Prompt 16.5 Traceability: Security Dashboard, UI/UX Redesign and Security & Trust Center
 
-Status: implemented on branch `feature/CM-T061-trust-center-redesign` (2026-10-13 and 2026-10-14). Jira: CM-T061, CM-T062 (Phase 14) and the Prompt 16.5 redesign recorded under CM-T061. Related: [project-roadmap.md](project-roadmap.md), [current-state.md](current-state.md), [../architecture/security-dashboard.md](../architecture/security-dashboard.md), [../report/live-demo-guide.md](../report/live-demo-guide.md).
+Status: implemented on branch `feature/CM-T061-trust-center-redesign` (2026-10-13 and 2026-10-14) and merged into `main` through pull request #35, merge commit `df542be` (`df542be049acba3018b186964faa1fd2c1a3fa77`; parents `42474ac` and `10c5e41`). CI run 38531891531 passed every job on its first attempt after the job timeout was raised from 30 to 45 minutes (the earlier run was cancelled at the limit, EV-14-20). Jira: CM-T061, CM-T062 (Phase 14) and the Prompt 16.5 redesign recorded under CM-T061. Related: [project-roadmap.md](project-roadmap.md), [current-state.md](current-state.md), [../architecture/security-dashboard.md](../architecture/security-dashboard.md), [../report/live-demo-guide.md](../report/live-demo-guide.md).
 
 ## 1. Approval and scope
 
