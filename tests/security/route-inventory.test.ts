@@ -192,6 +192,18 @@ describe('route inventory', () => {
       // Phase 11: the key state is a read; an expired lease is closed by the next start or the
       // worker, never by this GET. Start, finalize, cancel, leave and re-share are POSTs.
       '/rooms/:roomId/rekey-operations/current',
+      // Phase 14: the platform security dashboard computes aggregates on request and writes nothing.
+      '/admin/security-dashboard',
+    ]);
+  });
+
+  it('the platform administrator routes exist only as reviewed, all behind the administrator gate (Phase 14)', () => {
+    const { routes } = productionApp();
+    const platform = routes.filter((r) => /^PA-/.test(r.action)).map((r) => `${r.method} ${r.path} ${r.action}`);
+    expect(platform).toEqual([
+      'POST /admin/users/disable PA-03-DISABLE',
+      'POST /admin/users/enable PA-03-ENABLE',
+      'GET /admin/security-dashboard PA-01-DASHBOARD',
     ]);
   });
 

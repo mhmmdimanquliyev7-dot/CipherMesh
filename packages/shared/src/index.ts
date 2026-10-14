@@ -1,5 +1,6 @@
 export * from './auth';
 export * from './authorization';
+export * from './dashboard';
 export * from './errors';
 export * from './files';
 export * from './http';

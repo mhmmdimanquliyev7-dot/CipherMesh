@@ -12,6 +12,7 @@ import { TotpSecretBox } from './auth/totp-secret-box';
 import { createRoomAuthorizer } from './authorization/rooms';
 import type { AppConfig } from './config/env';
 import { authDataAccess } from './db/auth-store';
+import { createDashboardStore } from './db/dashboard-store';
 import { createRoomAccessStore } from './db/room-access-store';
 import { accountDataAccess, roomDataAccess } from './db/room-store';
 import { vaultDataAccess } from './db/vault-store';
@@ -24,6 +25,7 @@ import { sameOriginGate } from './http/same-origin';
 import { securityHeaders } from './http/security-headers';
 import type { Lifecycle } from './lifecycle';
 import type { Logger } from './logging/logger';
+import { adminRoutes } from './routes/admin';
 import { AUTH_PUBLIC_ROUTES, authRoutes } from './routes/auth';
 import {
   buildRouter,
@@ -174,6 +176,8 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
       ...noteRoutes(notes, roomData.store),
       ...secretRoutes(secrets, roomData.store),
       ...rekeyRoutes(rekey),
+      // Platform security dashboard (Phase 14, PA-01): aggregates for platform administrators.
+      ...adminRoutes(createDashboardStore(database.prisma), clock, config.nodeEnv),
       ...(testing?.routes ?? []),
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],
