@@ -1,6 +1,6 @@
 # Current State (engineering handoff)
 
-Snapshot: 2026-10-13, end of Prompt 13 (Phase 11 implemented, verified and merged into `main`: CM-T050 to CM-T053). Phases 1 to 11 are on `main`. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
+Snapshot: 2026-10-14, end of the combined Phase 14 + Prompt 16.5 (security dashboard, complete UI/UX redesign and the Security & Trust Center, CM-T061 and CM-T062) on branch `feature/CM-T061-trust-center-redesign`. Phases 1 to 11 are on `main`; the project owner deferred Phases 12, 13, 15 and 16 on 2026-10-13. The source of truth is the repository: CLAUDE.md, the ADRs, the normative docs and the code. This file is a starting point for a new session, not a project report. It contains no secrets; local values live only in the git-ignored `.env`.
 
 ## 1. Where the project stands
 
@@ -12,9 +12,10 @@ Snapshot: 2026-10-13, end of Prompt 13 (Phase 11 implemented, verified and merge
 | Phase 9 | Burn Secrets (CM-T043, CM-T044): one AES-256-GCM message under a fresh SEK, only the 32-byte SEK RSA-OAEP-wrapped to a recipient key the sender's browser authenticated against the room's signed statements; POST-only reveal in a locking transaction that returns and, with burn-after-reading, destroys the ciphertext in one statement; AZ-23 to AZ-25 and the new AZ-32 (section 6d). CM-T045 (external links, stretch) not built. Traceability: [phase-09-traceability.md](phase-09-traceability.md) |
 | Phase 10 | Security Policies (CM-T046 to CM-T049): the versioned, frozen policy catalogue `packages/shared/src/policy.ts` (version 1), PC-01 and PC-02 on every room request and again on the locked room row, PC-03 for every sensitive operation that exists, PC-13 FULL events, profile changes with expiry clamping and revocation (AZ-03), the `policy` test matrix (section 6e). Traceability: [phase-10-traceability.md](phase-10-traceability.md) |
 | Phase 11 | Key Rotation (CM-T050 to CM-T053): the rekey state machine and operation API (ADR-013), rekeyed versions made and reviewed in the browser, leaving a room, retirement, destruction, the wrap bound and the PC-14 cryptoperiod through the worker, the vault-reset procedure with the `identityCompromised` flag, re-sharing and reinstatement (AZ-14) and the append-only grant history (section 6f). Engine finding SF-11-01 fixed in `unwrap32` (CD-33). Account deletion does not exist, so R4 has no trigger (L-67). Traceability: [phase-11-traceability.md](phase-11-traceability.md); runbook: [../security/runbook-compromised-identity-key.md](../security/runbook-compromised-identity-key.md) |
-| Branch | `feature/CM-T050-key-rotation` (head `7874614`) is merged and takes no further commits |
-| Next | **Prompt 14: Phase 12, Tamper-Evident Audit** (CM-T054 to CM-T058), after this Phase 11 handoff is merged. Do not start without explicit approval. **Prompt 16.5 (complete UI/UX redesign and visual polish) is an accepted roadmap addition and is not to be started before its turn**; the Security profile panel only follows the current style |
-| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 11. After this handoff is merged it is the baseline for Prompt 14 |
+| Phase 14 + Prompt 16.5 | Approved by the project owner on 2026-10-13 as a combined phase. `GET /admin/security-dashboard` (PA-01, aggregates only; SD-10, SD-11, SD-12, SD-15 NOT_IMPLEMENTED), a design system and application shell, the Overview, encryption receipts, the Security & Trust Center `/trust` generated from the normative documents, the guided walkthrough and the demonstration guide (section 6g). Traceability: [phase-14-traceability.md](phase-14-traceability.md) |
+| Branch | `feature/CM-T061-trust-center-redesign`, from `main` at `42474ac` (Phase 11 handoff, pull request #33). `feature/CM-T050-key-rotation` is merged and takes no further commits |
+| Next | **Cloud Deployment + Cloud Security Hardening** (Phases 17 to 19), after the Phase 14 + Prompt 16.5 pull request and its handoff are merged, and only with explicit approval: no cloud resource may be created or paid for without it. Then ISMS evidence, the final report and the live demonstration. Phases 12, 13, 15 and 16 are deferred (owner decision 2026-10-13) and need a new approval |
+| Baseline branch | `main` on GitHub (`mhmmdimanquliyev7-dot/CipherMesh`) holds Phases 0 to 11 and, after the merge, Phase 14 + Prompt 16.5 |
 
 ## 2. Architecture implemented so far
 
@@ -201,6 +202,14 @@ Behaviour to know:
 - **Trust.** The server checks the set, the signature and the order of versions; members verify the version in the browser. The starter chooses the key (L-63).
 - **Line endings.** Scripted edits must keep LF (open files with `newline=''`).
 
+## 6g. Security dashboard, redesign and Trust Center (Phase 14 + Prompt 16.5)
+
+- **Dashboard.** `GET /admin/security-dashboard` (`apps/api/src/routes/admin.ts`, `apps/api/src/db/dashboard-store.ts`, catalogue `packages/shared/src/dashboard.ts`): PLATFORM_ADMIN only (404 otherwise), aggregates only, computed on request. SD-10, SD-11, SD-12 and SD-15 are NOT_IMPLEMENTED until the ledger exists; a value the store did not compute fails the request. The response carries the provider-neutral platform status (`api` and `database` HEALTHY, `object-storage` and `worker` NOT_VERIFIED, `cloud` NOT_CONNECTED), which the cloud workstream connects. Tests: Vitest project `dashboard` (own database).
+- **Client.** Design tokens in `globals.css` (`slate` retuned, `accent` teal), `components/` (ui, styles, buttons with the SF-04-01 guard, icons, app-shell, auth-layout), `/overview`, room section navigation, encryption receipts (`rooms/receipts.tsx`), a header Sign out. Sign-in lands on `/overview`.
+- **Trust Center.** `/trust`, `/trust/cryptography`, `/trust/infrastructure`, `/trust/governance`, `/trust/evidence`, `/trust/walkthrough`, `/trust/dashboard`. Data in `apps/web/src/trust/generated/` comes from `pnpm trust:generate`; the web build runs `trust:check` and fails on drift, so regenerate after editing the threat model, limitations, ISMS mapping, evidence plan or index, the parameter register, the cloud documents, or after committing evidence files. Curated text in `apps/web/src/trust/*.ts` is checked by `trust-content.test.ts`.
+- **Evidence.** EV-14-01 to EV-14-18 in `docs/report/evidence/phase-14/`, captured on demand by `CM_CAPTURE_EVIDENCE=1 pnpm exec playwright test evidence-capture --project chromium` (rebuild and regenerate the Trust Center data afterwards).
+- **Demonstration.** [../report/live-demo-guide.md](../report/live-demo-guide.md): Cryptography, then Cloud, then ISMS.
+
 ## 7. Invariants every session must preserve
 
 All of CLAUDE.md section 6 (INV-01 to INV-19). For Phases 5 and 6 especially:
@@ -212,13 +221,29 @@ All of CLAUDE.md section 6 (INV-01 to INV-19). For Phases 5 and 6 especially:
 - **INV-09:** no unchained rows in `audit_events`.
 - Never weaken tests, grants, cookies or authorization to make something pass.
 
-## 8. Documents Prompt 14 must read
+## 8. Documents the cloud workstream must read
 
-- CLAUDE.md; this file; `docs/management/project-roadmap.md` (Phase 12, CM-T054 to CM-T058); `docs/management/jira-backlog.md` (CM-EPIC-11); [phase-11-traceability.md](phase-11-traceability.md).
-- ADR-009 (audit trust model), `docs/security/limitations.md` L-26 and L-33 (events are in the redacted log, not the ledger), INV-09, the event catalogue in `apps/api/src/auth/security-events.ts` (the Phase 11 rekey events are in it), `docs/architecture/data-flow.md` DF-11.
-- The PC-16 scope question for AZ-26 stays open with CM-T045 (not built).
+- CLAUDE.md; this file; [phase-14-traceability.md](phase-14-traceability.md) section 12; `docs/management/project-roadmap.md` (Phases 17 to 19); `docs/cloud/` (service models, shared responsibility, deployment architecture with the VM hardening checklist); ADR-006 and the provider-selection ADR to write (ADR-014).
+- `apps/web/src/trust/infrastructure.ts` (move controls from Designed to Configured and Verified with scope `cloud` only with captured EV-17 to EV-19 evidence), `packages/shared/src/dashboard.ts` (`PLATFORM_COMPONENTS`, the contract for the provider adapter), `apps/web/src/config/public-env.ts` (`NEXT_PUBLIC_CM_ENVIRONMENT=cloud-demonstration` for the cloud build), `apps/web/scripts/csp-lib.mjs` (the header set Nginx must serve; `CM_STORAGE_ORIGIN`).
+- Deferred and still open: ADR-009 and Phase 12 (the ledger), the PC-16 scope question for AZ-26 with CM-T045 (not built).
 
 ## 9. Test counts
+
+Gates of Phase 14 + Prompt 16.5 on the final code (2026-10-14, local PostgreSQL and storage):
+
+| Gate | Result |
+|---|---|
+| `pnpm format:check`, `pnpm lint`, `pnpm typecheck` | Pass |
+| `pnpm test` | 2326 tests in 91 files (Phase 11: 2302 in 88). New: `tests/dashboard` (4), `apps/web/scripts/trust-data.test.ts` (9), `apps/web/src/trust/trust-content.test.ts` (10), route-inventory additions |
+| `pnpm test:e2e` (three engines) | 169 passed, 0 failed, 20 skipped (16 by design, the on-demand evidence capture in each engine, the skip-link check in WebKit). An earlier full run had two Firefox `page.goto` hangs in second tabs (the known navigation-hang item, section 12); both passed on rerun |
+| `pnpm security:negative-controls` | NC-14-01 to NC-14-06: 6 of 6 caught; the older controls on files this phase changed (NC-03-06, NC-04-16 retargeted to `buttons.tsx`, NC-06-10, NC-08-09): 4 of 4 caught; baselines pass; all 121 anchors intact |
+| `pnpm test:coverage:crypto` | 98.36% statements, 93.85% branches (gate 90%) |
+| `pnpm test:coverage:authz` | 96.92% statements, 97.24% branches |
+| `pnpm build`, `pnpm smoke:api`, `db:validate`, `db:check-schema`, `db:drift`, `trust:check` | Pass; CSP for 18 pages, no inline style |
+| `pnpm audit:deps` | No known vulnerabilities; no dependency added |
+| Secret scan (gitleaks) | 76 commits and the staged changes: no leaks found |
+
+Local note from this phase: a full `pnpm test` run that spans a sleep of the machine reports absurd durations (one test "21720049 ms") and hook timeouts; it is invalid, not a defect. Rerun it awake.
 
 Gates of Prompt 13 on the final Phase 11 code (2026-10-13, local PostgreSQL and storage), recorded in EV-11-09 and phase-11-traceability.md section 5:
 
@@ -247,6 +272,7 @@ Local notes: `.gitignore` anchors `/secrets/`; if Docker Desktop restarts and th
 - Phase 9: secret metadata is visible to the server and to OWNER and ADMIN (L-55); the sender of a secret is the server's statement (L-56); burn-after-reading is at most once and proves release, not reading (L-57); revealed text is dropped, not wiped (L-58); with L-03 and L-12.
 - Phase 10: reads are judged by the profile at the request's start (L-59); profiles are per room, not per device, and the room list still shows a room to a member who fails its profile (L-60); profile changes do not take back what members obtained (L-61); PC-11 and PC-14 wait for later phases (L-62). L-42 is resolved. Rooms from before Phase 6 stay keyless (L-43); a room that loses a member stays REKEY_REQUIRED until the rekey exists, and neither a re-enabled account nor a reset identity gets rooms back until CM-T053 (L-44); a reused room ID is refused with 409, and there is no room quota (L-45).
 - Phase 11: a rekeyed version is trusted to the browser that made it (L-63); the compromise flag is declared, not detected (L-64); re-share and rekey for a reset member rely on a fingerprint check through another channel in STANDARD and CONFIDENTIAL rooms (L-65); cryptoperiods run on the worker's schedule and destruction leaves backups (L-66); account deletion does not exist (L-67). L-44 is resolved; PC-14 is enforced.
+- Phase 14: the Trust Center is compiled from the documents and can be only as right as they are (L-68); the live checks observe the serving origin from one browser, not monitoring (L-69); the dashboard has no ledger metrics and a partial platform view (L-70). L-13 now says the ledger is designed, not implemented; ISMS controls 5.33, 8.15 and 8.16 are Partial.
 - Full list: `docs/security/limitations.md`.
 
 ## 11. Deferred decisions
@@ -262,6 +288,8 @@ Local notes: `.gitignore` anchors `/secrets/`; if Docker Desktop restarts and th
 
 ## 12. Outstanding work outside the repository
 
+- **Evidence index gap (found in Phase 14).** `docs/report/evidence/index.md` has prose for Phase 6 and no rows for Phases 8 to 10, although their files are committed. The Trust Center counts the committed files, so the statuses are right, but the index should get rows with captions in the ISMS workstream. EV-10-05 and EV-10-07 are still missing.
+
 - **E2E flakiness (found in Prompt 12, not caused by Phase 10).** The browser E2E step of CI fails intermittently on a different Phase 5 to 9 test every run, mostly WebKit and Firefox (see section 1 for the runs); the Vitest jobs are green. Unresolved: find the mechanism (a hang under load is suspected, unproven) before a later prompt relies on a green E2E. The Phase 11 local runs (three engines, default workers) had no intermittent failure: one deterministic failure was a stale assertion (fixed) and the final full run passed 128 of 128, and never loosen assertions or drop an engine. The same section's required-checks item below matters here: until the CI jobs are required checks, a red E2E does not block a merge.
 - Branch protection (CM-T012): the `main` ruleset still lists no required status checks; add the CI jobs (now including both coverage steps) as required checks, then capture EV-01-01 to EV-01-03.
 - Dependabot pull requests remain open (#2 PostgreSQL 18 needs an ADR; #6 `@types/node` 26 is ahead of Node 24; the `next` update is covered by Phase 6, which pins 16.3.8).
@@ -272,7 +300,8 @@ Local notes: `.gitignore` anchors `/secrets/`; if Docker Desktop restarts and th
 
 - External one-time secret links (CM-T045, stretch). Files (Phase 7), notes (Phase 8) and recipient-bound secrets (Phase 9, section 6d) are implemented. Note version history, collaborative editing and Markdown are not planned for any phase. Secrets are not signed by their sender (L-56).
 - Account deletion (key-lifecycle R4, L-67).
-- The audit hash chain (Phase 12), the Crypto Inspector or the Security Dashboard (Phases 13 and 14).
+- The audit hash chain (Phase 12) and the standalone Crypto Inspector (Phase 13): deferred by the project owner. The Security Dashboard exists (Phase 14) without the ledger metrics.
+- API hardening (Phase 15) and the consolidated test automation (Phase 16): deferred.
 - Deployment, Nginx or cloud resources (Phase 17 onward).
 - Any server-side handling of the Vault Passphrase, private keys or room key material, ever.
 

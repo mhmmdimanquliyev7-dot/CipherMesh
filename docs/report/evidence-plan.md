@@ -192,13 +192,31 @@ Captured in Phase 11 (Prompt 13), with synthetic data only and no key material, 
 | EV-12-05 | Offline signature verification | Terminal output | Digital signatures in practice | CRY |
 | EV-12-06 | Trust-model scenarios A to D simulated on a copy (edited anchored event, edited tail, forged checkpoint, revoked key) | Verifier output | What signed checkpoints can and cannot prove | CRY, ISMS |
 
-### Phase 13 and 14: Inspector and Dashboard
+### Phase 13 and 14: Inspector and Dashboard (Phase 13 deferred; Phase 14 combined with Prompt 16.5)
 | ID | Evidence | How to capture | Demonstrates | Tags |
 |---|---|---|---|---|
 | EV-13-01 | Crypto Inspector for a file in a RESTRICTED room | Screenshot | Explainable protection without key exposure | CRY |
 | EV-13-02 | Crypto Inspector room view with key versions | Screenshot | Key lifecycle transparency | CRY |
 | EV-14-01 | Security Dashboard after a scripted scenario | Screenshot | Monitoring with real data | ISMS |
 | EV-14-02 | Metric definitions | Screenshot | No invented scores | ISMS |
+| EV-14-03 | Public start page stating what is built | Screenshot (`tests/e2e/evidence-capture.spec.ts`) | Honest product claims | APP |
+| EV-14-04 | Workspace overview from real data | Screenshot | Product dashboard without invented metrics | APP |
+| EV-14-05 | Room page with profile, role, key state and section navigation | Screenshot | Secure workspace UI | APP, ISMS |
+| EV-14-06 | File list with an expanded encryption receipt | Screenshot | Explainable file encryption without key exposure | CRY |
+| EV-14-07 | Note with an expanded encryption receipt | Screenshot | Explainable note encryption and integrity check | CRY |
+| EV-14-08 | Secrets section after sending a secret | Screenshot | Recipient-bound, one-time secret exchange | CRY |
+| EV-14-09 | Vault status and key-protection flow | Screenshot | Vault Passphrase, Argon2id and non-extractable keys explained | CRY |
+| EV-14-10 | Key rotation review and completion in the browser | Screenshots | Rekey after a removal | CRY, ISMS |
+| EV-14-11 | Trust Center summary: claims, proof and what is not implemented | Screenshot | Claim, mechanism, verification, evidence, limitation | ISMS, CRY |
+| EV-14-12 | Data Protection & Key Management | Screenshot | Encryption flow, mechanisms, key hierarchy | CRY |
+| EV-14-13 | Deployment & Infrastructure with live checks and the control register | Screenshot | Designed, configured and verified kept apart; cloud not connected | CLD |
+| EV-14-14 | Governance & Risk with a risk opened | Screenshot | Risk register with treatment and residual risk | ISMS |
+| EV-14-15 | An Annex A control with its evidence coverage | Screenshot | Control to evidence traceability | ISMS |
+| EV-14-16 | Evidence register with missing and deferred items | Screenshot | Missing evidence is visible | ISMS |
+| EV-14-17 | Guided walkthrough | Screenshot | Live demonstration of the three subjects | ISMS, CRY, CLD |
+| EV-14-18 | Overview on a phone-sized screen | Screenshot | Responsive layout | APP |
+| EV-14-19 | Gate results of the combined phase | Command output | Verified build, tests, negative controls and scans | ISMS |
+| EV-14-20 | CI run of the Phase 14 + Prompt 16.5 pull request | CI summary | Continuous verification | ISMS |
 
 ### Phase 15 and 16: Hardening and Test Automation
 | ID | Evidence | How to capture | Demonstrates | Tags |

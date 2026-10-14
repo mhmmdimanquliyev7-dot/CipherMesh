@@ -1,6 +1,6 @@
 # Project Roadmap
 
-Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)); Phase 4 implemented (2026-10-05, [phase-04-traceability.md](phase-04-traceability.md)), approved and merged into `main` through pull request #10. Phase 5 implemented (2026-10-06, CM-T029 to CM-T032, [phase-05-traceability.md](phase-05-traceability.md)), approved and merged into `main` through pull request #13. Phase 6 merged through pull request #22. Phase 7 implemented (2026-10-11, CM-T037 to CM-T041, [phase-07-traceability.md](phase-07-traceability.md)) and merged into `main` through pull request #24. Phase 8 implemented (2026-10-11, CM-T042, [phase-08-traceability.md](phase-08-traceability.md)) and merged into `main` through pull request #26; Phase 9 implemented (2026-10-12, CM-T043 and CM-T044, [phase-09-traceability.md](phase-09-traceability.md)) and merged into `main` through pull request #28. Phase 10 implemented (2026-10-12, CM-T046 to CM-T049, [phase-10-traceability.md](phase-10-traceability.md)) and merged into `main` through pull request #30. Phase 11 implemented (2026-10-13, CM-T050 to CM-T053, [phase-11-traceability.md](phase-11-traceability.md)); merged into `main` through pull request #32. Accepted roadmap addition: **Prompt 16.5, complete UI/UX redesign and visual polish**, which is reserved and not part of any earlier phase. Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
+Status: Phase 0.5 baseline. Progress: Phase 1 implemented (2026-10-02, [phase-01-traceability.md](phase-01-traceability.md)); Phase 2 implemented (2026-10-04, [phase-02-traceability.md](phase-02-traceability.md)); Phase 3 implemented (2026-10-04, [phase-03-traceability.md](phase-03-traceability.md)); Phase 4 implemented (2026-10-05, [phase-04-traceability.md](phase-04-traceability.md)), approved and merged into `main` through pull request #10. Phase 5 implemented (2026-10-06, CM-T029 to CM-T032, [phase-05-traceability.md](phase-05-traceability.md)), approved and merged into `main` through pull request #13. Phase 6 merged through pull request #22. Phase 7 implemented (2026-10-11, CM-T037 to CM-T041, [phase-07-traceability.md](phase-07-traceability.md)) and merged into `main` through pull request #24. Phase 8 implemented (2026-10-11, CM-T042, [phase-08-traceability.md](phase-08-traceability.md)) and merged into `main` through pull request #26; Phase 9 implemented (2026-10-12, CM-T043 and CM-T044, [phase-09-traceability.md](phase-09-traceability.md)) and merged into `main` through pull request #28. Phase 10 implemented (2026-10-12, CM-T046 to CM-T049, [phase-10-traceability.md](phase-10-traceability.md)) and merged into `main` through pull request #30. Phase 11 implemented (2026-10-13, CM-T050 to CM-T053, [phase-11-traceability.md](phase-11-traceability.md)); merged into `main` through pull request #32. Accepted roadmap addition: **Prompt 16.5, complete UI/UX redesign and visual polish**. **Roadmap change approved by the project owner on 2026-10-13:** Phase 14 and Prompt 16.5 are delivered together before the university deadline of 2026-10-18 (implemented 2026-10-14, [phase-14-traceability.md](phase-14-traceability.md)); Phases 12, 13, 15 and 16 are deferred until after the university delivery; the order is now Phase 14 + Prompt 16.5, then Cloud Deployment + Cloud Security Hardening (Phases 17 to 19), then ISMS evidence, the final report and the live demonstration (Phases 20 to 22). A scheduling change only: no control, test, gate or invariant is weakened. Related: [jira-backlog.md](jira-backlog.md), [jira-workflow.md](jira-workflow.md), [../report/evidence-plan.md](../report/evidence-plan.md).
 
 ## 1. Principles
 
@@ -197,6 +197,9 @@ Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceabili
 | Jira evidence | Key-version history after a removal; write lock, recovery and replay evidence (EV-11-04 to EV-11-07); demonstration of L-04 |
 
 ### Phase 12: Tamper-Evident Audit (M4, CM-T054 to CM-T058)
+
+**Deferred by the project owner on 2026-10-13** until after the university delivery; needs a new approval before it starts.
+
 | Aspect | Details |
 |---|---|
 | Goal | Hash-chained audit ledger with signed, anchored checkpoints and an offline verifier |
@@ -208,6 +211,9 @@ Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceabili
 | Jira evidence | Verifier output pinpointing a tampered event; checkpoint object in the anchor bucket |
 
 ### Phase 13: Crypto Inspector (M5, CM-T059 to CM-T060)
+
+**Deferred by the project owner on 2026-10-13** until after the university delivery; needs a new approval before it starts.
+
 | Aspect | Details |
 |---|---|
 | Goal | Explain the protection of each item without exposing keys |
@@ -222,14 +228,17 @@ Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceabili
 | Aspect | Details |
 |---|---|
 | Goal | Monitoring view based only on real data |
-| Dependencies | Phases 3, 11 and 12 |
-| Deliverables | Metrics API with documented queries; dashboard UI |
+| Dependencies | Phases 3 and 11 (Phase 12 deferred: the ledger metrics SD-10, SD-11, SD-12 and SD-15 are reported NOT_IMPLEMENTED) |
+| Deliverables | Metrics API with documented queries; dashboard UI. **Delivered 2026-10-14 together with Prompt 16.5** (design system, application shell, Overview, encryption receipts, Security & Trust Center): [phase-14-traceability.md](phase-14-traceability.md) |
 | Security checkpoint | PLATFORM_ADMIN only; aggregates only; no invented scores; every metric shows its definition and timestamp |
 | Tests | Seeded-data tests with exact expected values; empty-state tests; authorization tests |
 | Documentation updates | `security-dashboard.md` if metrics change |
 | Jira evidence | Dashboard screenshot after a scripted scenario (failed logins, a rekey, a downgrade, a Safety Code mismatch report) |
 
 ### Phase 15: API Hardening (M6, CM-T073)
+
+**Deferred by the project owner on 2026-10-13** until after the university delivery; needs a new approval before it starts.
+
 | Aspect | Details |
 |---|---|
 | Goal | Systematic hardening pass over the whole API |
@@ -241,6 +250,9 @@ Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceabili
 | Jira evidence | ZAP report summary; findings tracked as Security Findings |
 
 ### Phase 16: Automated Testing (M6, CM-T074 to CM-T076)
+
+**Deferred by the project owner on 2026-10-13** until after the university delivery; needs a new approval before it starts.
+
 | Aspect | Details |
 |---|---|
 | Goal | Complete, traceable automation of all security tests |
@@ -255,7 +267,7 @@ Status: implemented in Prompt 08 (2026-10); traceability in [phase-06-traceabili
 | Aspect | Details |
 |---|---|
 | Goal | The VM stack running securely in the chosen cloud |
-| Dependencies | Phase 16; project owner approval to create cloud resources |
+| Dependencies | Phase 14 + Prompt 16.5 (Phase 16 deferred, owner decision 2026-10-13); project owner approval to create cloud resources |
 | Deliverables | Provider selection ADR (ADR-014); VM with baseline configuration; production images and Compose stack; Nginx with TLS and headers |
 | Security checkpoint | Only 80 and 443 public, SSH restricted; containers non-root without published API port; TLS configuration verified; deployed asset hashes match the release |
 | Tests | External port scan; TLS scan; header checks; smoke tests |

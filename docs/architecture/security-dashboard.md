@@ -1,6 +1,6 @@
 # Security Dashboard (design)
 
-Status: Phase 0.5 design. Implementation: Phase 14 (CM-T061, CM-T062). Related: [../security/authorization-model.md](../security/authorization-model.md) (PA-01), [data-model.md](data-model.md).
+Status: Phase 0.5 design, **implemented in Phase 14 + Prompt 16.5 (2026-10-14, CM-T061, CM-T062)** with the deviations in section 6. Implementation: `GET /admin/security-dashboard` (`apps/api/src/routes/admin.ts`, `apps/api/src/db/dashboard-store.ts`), the shared catalogue `packages/shared/src/dashboard.ts`, the page `/trust/dashboard`. Related: [../security/authorization-model.md](../security/authorization-model.md) (PA-01), [data-model.md](data-model.md).
 
 ## 1. Purpose and audience
 
@@ -47,3 +47,15 @@ The Security Dashboard gives the PLATFORM_ADMIN (acting as security officer) a f
 - Empty database produces empty states.
 - Non-admin users receive 404 from the metrics API.
 - Responses contain no room names, content or keys (projection test).
+
+## 6. Implementation (Phase 14 + Prompt 16.5)
+
+| Metric | State | Note |
+|---|---|---|
+| SD-01 to SD-09, SD-13, SD-14 | Implemented | Counted on request from the metadata columns listed in section 3; `tests/dashboard` checks exact values for an empty database and for a scenario built through the API (invitations, a removal, a rekey, an upload, secrets, failed logins), and compares sessions, throttling, distinct sources and abandoned operations with independent SQL counts |
+| SD-06 | Implemented | "Blocked for missing MFA" counts ACTIVE users without MFA who hold an ACTIVE membership in an ACTIVE CONFIDENTIAL or RESTRICTED room |
+| SD-07 | Implemented | Versions created in the last 30 days whose reasons do not include INITIAL, with one count per reason (a version can carry several reasons) |
+| SD-08 | Implemented | The oldest lock is reported in whole hours; abandoned operations are those with status ABANDONED closed in the last 7 days |
+| SD-10, SD-11, SD-12, SD-15 | **Not implemented** | They need the hash-chained audit ledger (Phase 12), which the project owner deferred on 2026-10-13. The API returns status NOT_IMPLEMENTED with no value, never zero; the page says why (L-70) |
+
+Deviations from section 4: there is no cache (the design allows at most 60 seconds; computing on request is within it). The response also carries a provider-neutral platform status (`PLATFORM_COMPONENTS`): the API and the database are HEALTHY because the response was computed, object storage and the worker are NOT_VERIFIED (not probed), and the cloud is NOT_CONNECTED until the cloud workstream connects it. Section 5 tests: exact values (`tests/dashboard/security-dashboard.test.ts`), empty states (same file), 404 for non-administrators and 401 without a session (same file), the projection canary (same file), the route inventory (`tests/security/route-inventory.test.ts`).

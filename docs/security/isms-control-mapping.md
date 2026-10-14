@@ -1,6 +1,6 @@
 # ISMS Control Mapping (ISO/IEC 27001:2022)
 
-Status: Phase 0 baseline, with implementation notes for Phases 2 to 4 and Phase 11 (controls 5.18, 5.24 to 5.27 and 8.24). This is a **learning-oriented, project-level mapping** in the style of a Statement of Applicability. It is not a certified ISMS and makes no claim of conformity. Evidence IDs refer to [../report/evidence-plan.md](../report/evidence-plan.md).
+Status: Phase 0 baseline, with implementation notes for Phases 2 to 4 and Phase 11 (controls 5.18, 5.24 to 5.27 and 8.24), and Phase 14 + Prompt 16.5 (controls 5.28, 5.33, 8.15, 8.16, clause 9.1; the audit ledger of Phase 12 was deferred by the project owner on 2026-10-13, so 5.33 and 8.15 are Partial). This is a **learning-oriented, project-level mapping** in the style of a Statement of Applicability. It is not a certified ISMS and makes no claim of conformity. Evidence IDs refer to [../report/evidence-plan.md](../report/evidence-plan.md).
 
 ## 1. Scope statement
 
@@ -19,7 +19,7 @@ The scope covers the design, development, deployment and demonstration operation
 | 7.5 | Documented information | `docs/`, ADRs, Jira history, Git history |
 | 8.1 | Operational planning and control | Jira workflow with SECURITY REVIEW and TESTING gates |
 | 8.2, 8.3 | Performing risk assessment and treatment | Threat model review at the end of every phase |
-| 9.1 | Monitoring and measurement | Security Dashboard, CI security suites, audit verification runs |
+| 9.1 | Monitoring and measurement | Security Dashboard (Phase 14: aggregates for the platform administrator, PA-01), CI security suites; audit verification runs are deferred with Phase 12 |
 | 9.2 | Internal audit | Phase 20 security assessment |
 | 9.3 | Management review | Project owner approval at each phase gate |
 | 10.1, 10.2 | Continual improvement, corrective action | Security Finding workflow with regression tests; residual risk re-rating |
@@ -45,8 +45,8 @@ Status values: **Implemented by design** (designed in Phase 0, built in the list
 | 5.19 to 5.22 | Supplier relationships | Partial | Provider selection ADR; Jira and GitHub treated as suppliers; shared-responsibility matrix. ICT supply chain (5.21): security libraries are selected against written criteria and reviewed (Phase 4: LIB-03 with a comparison, a code review finding and checksummed WebAssembly; LIB-05 kept in the repository) | EV-17-01, EV-04-03, EV-04-12 |
 | 5.23 | Information security for use of cloud services | Implemented by design | [service-models.md](../cloud/service-models.md), [shared-responsibility.md](../cloud/shared-responsibility.md) | EV-18-01, EV-18-03 |
 | 5.24 to 5.27 | Incident management | Partial | Compromise response table in the key lifecycle; Phase 11 adds the runbook for a lost or compromised identity key ([../security/runbook-compromised-identity-key.md](runbook-compromised-identity-key.md): user, administrator and operator steps, Jira `security-finding` record, verification table). The general incident procedure remains CM-T080 | EV-11-04, EV-11-05, Report |
-| 5.28 | Collection of evidence | Implemented by design | Evidence plan; tamper-evident audit ledger | EV-12-03 |
-| 5.33 | Protection of records | Implemented by design | Append-only, hash-chained, anchored audit records | EV-12-01, EV-12-04 |
+| 5.28 | Collection of evidence | Implemented by design | Evidence plan and redacted evidence files. **Phase 14:** the Trust Center evidence register lists every planned item with its status derived from the committed files and the index, missing items included. The tamper-evident audit ledger is deferred with Phase 12 | EV-14-16, EV-12-03 |
+| 5.33 | Protection of records | Partial | Append-only audit table (grants and trigger, Phase 2). The hash chain and anchored checkpoints are designed (ADR-009) but deferred with Phase 12 | EV-02-02, EV-12-01, EV-12-04 |
 | 5.34 | Privacy and protection of PII | Partial | Metadata minimization, retention limits, no IP addresses in audit; metadata still visible (L-05) | EV-03-06 |
 | 5.35 | Independent review | Partial | Phase 20 assessment; independence limited in a student team | EV-20-01 |
 | 5.37 | Documented operating procedures | Implemented by design | Runbooks in `infrastructure/deployment` | EV-19-07 |
@@ -63,8 +63,8 @@ Status values: **Implemented by design** (designed in Phase 0, built in the list
 | 8.10 | Information deletion | Implemented by design | Expiry, burn-after-reading, crypto-shredding of live data; backup caveat (L-12) | EV-09-01 |
 | 8.12 | Data leakage prevention | Implemented by design | Client-side encryption, log redaction, encrypted filenames. **Phase 7:** a canary scan finds no file name or content (in four encodings) in any table, the bucket or the log, and browser tests find none in any request or browser storage (`tests/files`, `tests/e2e/files.spec.ts`). Phase 4: browser tests inspect every vault request for the passphrase in five encodings and for private-key structures, and a log test searches for every secret and ciphertext used. **Phase 8:** a note canary scan finds no title or body (five encodings) in any table or the log, and browser tests find none in any request or browser storage (`tests/notes`, `tests/e2e/notes.spec.ts`). **Phase 9:** a secret canary scan finds no text (five encodings) in any table, the log or the events, and browser tests find none in any request or browser storage (`tests/secrets`, `tests/e2e/secrets.spec.ts`) | EV-09-05, EV-08-03, EV-07-05, EV-04-01, EV-04-08 |
 | 8.13 | Information backup | Provider and team | Managed backups plus team-tested restore | EV-19-07 |
-| 8.15 | Logging | Implemented by design | Audit ledger (append-only table protection built in Phase 2, hash chain in Phase 12) and redacted application logs | EV-02-02, EV-12-01 |
-| 8.16 | Monitoring activities | Implemented by design | Security Dashboard, verification runs, health checks | EV-14-01 |
+| 8.15 | Logging | Partial | Redacted structured application logs with the security-event catalogue; append-only audit table protection built in Phase 2; the hash chain (Phase 12) is deferred | EV-01-09, EV-02-02, EV-12-01 |
+| 8.16 | Monitoring activities | Partial | **Phase 14:** the platform security dashboard (aggregates from the database, each with its definition, PA-01) and liveness and readiness probes; audit verification runs are deferred with Phase 12; no alerting before the cloud workstream | EV-14-01, EV-14-02, EV-01-06 |
 | 8.17 | Clock synchronization | Implemented by design | NTP on the VM (needed for TOTP and audit) | EV-19-03 |
 | 8.20 | Network security | Implemented by design | Provider and host firewalls, TLS | EV-17-02, EV-19-05 |
 | 8.21 | Security of network services | Implemented by design | Database network restriction, bucket policies | EV-18-02, EV-18-04 |

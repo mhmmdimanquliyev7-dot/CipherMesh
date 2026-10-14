@@ -128,3 +128,30 @@ Captured on branch `feature/CM-T050-key-rotation` against the local PostgreSQL c
 | EV-11-08 | [phase-11/EV-11-08_negative-controls.txt](phase-11/EV-11-08_negative-controls.txt) | 2026-10-13 | CM-T050 to CM-T053 | 13 of 13 new negative controls caught; baseline passes; sources restored byte for byte |
 | EV-11-09 | [phase-11/EV-11-09_gates.txt](phase-11/EV-11-09_gates.txt) | 2026-10-13 | CM-T050 to CM-T053 | Gate results of the final Phase 11 code |
 | EV-11-10 | [phase-11/EV-11-10_ci-run.txt](phase-11/EV-11-10_ci-run.txt) | 2026-10-13 | CM-T050 to CM-T053 | CI run 38392960689 of pull request #32: every job passed on the first attempt |
+
+## Phase 14 + Prompt 16.5
+
+Captured on branch `feature/CM-T061-trust-center-redesign` by `tests/e2e/evidence-capture.spec.ts` (`CM_CAPTURE_EVIDENCE=1`, Chromium, 1440 x 900) from the built application on the local HTTPS test server and the local PostgreSQL, synthetic accounts and content only. The dashboard counts include the synthetic rows earlier test runs left in the development database. No screenshot shows a password, passphrase, TOTP secret, recovery code, key or Room Safety Code; fingerprints are public values. Cloud views show the not-connected state.
+
+| ID | File | Date | Jira | Caption |
+|---|---|---|---|---|
+| EV-14-01 | [phase-14/EV-14-01_security-dashboard.png](phase-14/EV-14-01_security-dashboard.png) | 2026-10-14 | CM-T061, CM-T062 | Platform security dashboard after the capture scenario; four ledger metrics marked not implemented |
+| EV-14-02 | [phase-14/EV-14-02_metric-definition.png](phase-14/EV-14-02_metric-definition.png) | 2026-10-14 | CM-T061, CM-T062 | SD-07 with its definition: no composite score |
+| EV-14-03 | [phase-14/EV-14-03_landing.png](phase-14/EV-14-03_landing.png) | 2026-10-14 | CM-T061 | Public start page stating what is built and its limits |
+| EV-14-04 | [phase-14/EV-14-04_overview.png](phase-14/EV-14-04_overview.png) | 2026-10-14 | CM-T061 | Workspace overview from the user's own rooms, invitations and session |
+| EV-14-05 | [phase-14/EV-14-05_room.png](phase-14/EV-14-05_room.png) | 2026-10-14 | CM-T061 | Room header, badges and section navigation (clipped above the Room Safety Code) |
+| EV-14-06 | [phase-14/EV-14-06_files-receipt.png](phase-14/EV-14-06_files-receipt.png) | 2026-10-14 | CM-T061 | File with an expanded encryption receipt |
+| EV-14-07 | [phase-14/EV-14-07_notes-receipt.png](phase-14/EV-14-07_notes-receipt.png) | 2026-10-14 | CM-T061 | Note with an expanded encryption receipt |
+| EV-14-08 | [phase-14/EV-14-08_secrets.png](phase-14/EV-14-08_secrets.png) | 2026-10-14 | CM-T061 | Secrets section after sending a recipient-bound secret |
+| EV-14-09 | [phase-14/EV-14-09_vault.png](phase-14/EV-14-09_vault.png) | 2026-10-14 | CM-T061 | Vault status and the key-protection flow |
+| EV-14-10 | [phase-14/EV-14-10a_rekey-review.png](phase-14/EV-14-10a_rekey-review.png), [phase-14/EV-14-10b_rekey-done.png](phase-14/EV-14-10b_rekey-done.png) | 2026-10-14 | CM-T061 | Key rotation after a removal: recipient review, then version 2 current |
+| EV-14-11 | [phase-14/EV-14-11_trust-summary.png](phase-14/EV-14-11_trust-summary.png) | 2026-10-14 | CM-T061 | Trust Center summary: claims with mechanism, verification, evidence and limitation; not implemented items |
+| EV-14-12 | [phase-14/EV-14-12_data-protection.png](phase-14/EV-14-12_data-protection.png) | 2026-10-14 | CM-T061 | Data Protection & Key Management |
+| EV-14-13 | [phase-14/EV-14-13_infrastructure.png](phase-14/EV-14-13_infrastructure.png) | 2026-10-14 | CM-T061 | Deployment & Infrastructure: cloud not connected, live checks, control register |
+| EV-14-14 | [phase-14/EV-14-14_governance-risk.png](phase-14/EV-14-14_governance-risk.png) | 2026-10-14 | CM-T061 | Governance & Risk with T-06 opened |
+| EV-14-15 | [phase-14/EV-14-15_control-evidence.png](phase-14/EV-14-15_control-evidence.png) | 2026-10-14 | CM-T061 | Annex A control 8.3 with its evidence coverage |
+| EV-14-16 | [phase-14/EV-14-16_evidence-register.png](phase-14/EV-14-16_evidence-register.png) | 2026-10-14 | CM-T061 | Evidence register with missing and deferred items |
+| EV-14-17 | [phase-14/EV-14-17_walkthrough.png](phase-14/EV-14-17_walkthrough.png) | 2026-10-14 | CM-T061 | Guided walkthrough |
+| EV-14-18 | [phase-14/EV-14-18_mobile-overview.png](phase-14/EV-14-18_mobile-overview.png) | 2026-10-14 | CM-T061 | Overview at 390 px width |
+| EV-14-19 | [phase-14/EV-14-19_gates.txt](phase-14/EV-14-19_gates.txt) | 2026-10-14 | CM-T061, CM-T062 | Gate results: 2326 Vitest tests, 169 E2E passed in three engines, 10 negative controls caught, coverage, build, audit, secret scan |
+| EV-14-20 | Pending | | CM-T061, CM-T062 | CI run of the pull request: recorded in the handoff |
