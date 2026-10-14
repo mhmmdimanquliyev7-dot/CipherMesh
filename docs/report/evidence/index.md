@@ -154,4 +154,4 @@ Captured on branch `feature/CM-T061-trust-center-redesign` by `tests/e2e/evidenc
 | EV-14-17 | [phase-14/EV-14-17_walkthrough.png](phase-14/EV-14-17_walkthrough.png) | 2026-10-14 | CM-T061 | Guided walkthrough |
 | EV-14-18 | [phase-14/EV-14-18_mobile-overview.png](phase-14/EV-14-18_mobile-overview.png) | 2026-10-14 | CM-T061 | Overview at 390 px width |
 | EV-14-19 | [phase-14/EV-14-19_gates.txt](phase-14/EV-14-19_gates.txt) | 2026-10-14 | CM-T061, CM-T062 | Gate results: 2326 Vitest tests, 169 E2E passed in three engines, 10 negative controls caught, coverage, build, audit, secret scan |
-| EV-14-20 | Pending | | CM-T061, CM-T062 | CI run of the pull request: recorded in the handoff |
+| EV-14-20 | [phase-14/EV-14-20_ci-run.txt](phase-14/EV-14-20_ci-run.txt) | 2026-10-14 | CM-T061, CM-T062 | CI run 38531891531 of pull request #35: every job passed (169 E2E passed); the first run was cancelled at the 30-minute job limit, raised to 45 minutes |

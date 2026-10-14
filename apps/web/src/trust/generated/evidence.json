@@ -2646,13 +2646,18 @@
       "tags": [
         "ISMS"
       ],
-      "status": "pending",
-      "files": [],
+      "status": "captured",
+      "files": [
+        {
+          "label": "phase-14/EV-14-20_ci-run.txt",
+          "path": "docs/report/evidence/phase-14/EV-14-20_ci-run.txt"
+        }
+      ],
       "locations": [],
       "captions": [
-        "CI run of the pull request: recorded in the handoff"
+        "CI run 38531891531 of pull request #35: every job passed (169 E2E passed); the first run was cancelled at the 30-minute job limit, raised to 45 minutes"
       ],
-      "date": ""
+      "date": "2026-10-14"
     },
     {
       "id": "EV-15-01",
