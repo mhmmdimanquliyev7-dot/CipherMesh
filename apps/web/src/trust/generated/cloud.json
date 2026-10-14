@@ -1,0 +1,235 @@
+{
+  "source": [
+    "docs/cloud/shared-responsibility.md",
+    "docs/cloud/deployment-architecture.md"
+  ],
+  "services": [
+    "IaaS: VM",
+    "PaaS: managed PostgreSQL",
+    "Provider-managed object storage",
+    "SaaS: Jira Cloud",
+    "GitHub (development collaboration)"
+  ],
+  "layers": [
+    {
+      "layer": "Physical data centre, hardware",
+      "owners": [
+        "P",
+        "P",
+        "P",
+        "P",
+        "P"
+      ]
+    },
+    {
+      "layer": "Provider network and hypervisor",
+      "owners": [
+        "P",
+        "P",
+        "P",
+        "P",
+        "P"
+      ]
+    },
+    {
+      "layer": "Operating system patching",
+      "owners": [
+        "C",
+        "P",
+        "P",
+        "P",
+        "P"
+      ]
+    },
+    {
+      "layer": "Service software patching",
+      "owners": [
+        "C (Nginx, Docker, Node.js, app)",
+        "P (engine); C schedules major version upgrades",
+        "P",
+        "P",
+        "P"
+      ]
+    },
+    {
+      "layer": "Network exposure (firewall rules, allowlists, private networking)",
+      "owners": [
+        "C",
+        "S",
+        "S",
+        "P",
+        "P"
+      ]
+    },
+    {
+      "layer": "TLS configuration",
+      "owners": [
+        "C (Nginx)",
+        "S (service enforces; C verifies the certificate)",
+        "P (endpoint); C uses HTTPS only",
+        "P",
+        "P"
+      ]
+    },
+    {
+      "layer": "Identity and access management",
+      "owners": [
+        "C (SSH users, keys)",
+        "C (database roles, grants)",
+        "C (credentials, bucket policies)",
+        "S (Atlassian identity; C manages users and permissions)",
+        "S (GitHub identity; C manages access, branch protection)"
+      ]
+    },
+    {
+      "layer": "MFA on accounts",
+      "owners": [
+        "C (cloud console)",
+        "C (cloud console)",
+        "C (cloud console)",
+        "C (enable and enforce)",
+        "C (enable and enforce)"
+      ]
+    },
+    {
+      "layer": "Encryption at rest (provider)",
+      "owners": [
+        "S (disk encryption option)",
+        "S (usually on by default; C verifies)",
+        "S (server-side encryption option; C enables)",
+        "P",
+        "P"
+      ]
+    },
+    {
+      "layer": "Client-side encryption of room content",
+      "owners": [
+        "C",
+        "C",
+        "C",
+        "Not applicable",
+        "Not applicable"
+      ]
+    },
+    {
+      "layer": "Durability and backups",
+      "owners": [
+        "C (VM needs little state; configuration in Git)",
+        "S (P runs backups; C sets retention and tests restores)",
+        "S (P provides durability; C enables versioning)",
+        "P",
+        "P (C may export)"
+      ]
+    },
+    {
+      "layer": "Retention locks (anchor bucket)",
+      "owners": [
+        "Not applicable",
+        "Not applicable",
+        "S (P provides the lock feature; C chooses compliance mode and retention period and verifies deletion is refused)",
+        "Not applicable",
+        "Not applicable"
+      ]
+    },
+    {
+      "layer": "Logging and monitoring",
+      "owners": [
+        "C",
+        "S (P offers logs; C reviews)",
+        "S (P offers access logs; C enables)",
+        "S",
+        "S"
+      ]
+    },
+    {
+      "layer": "Secrets management",
+      "owners": [
+        "C",
+        "C (credentials)",
+        "C (credentials)",
+        "C (no secrets in tickets)",
+        "C (repository and CI secrets)"
+      ]
+    },
+    {
+      "layer": "Application security (authentication, authorization, validation)",
+      "owners": [
+        "C",
+        "C (schema, queries)",
+        "C (presigned URL issuance)",
+        "Not applicable",
+        "C (code)"
+      ]
+    },
+    {
+      "layer": "Incident response",
+      "owners": [
+        "C",
+        "S",
+        "S",
+        "S",
+        "S"
+      ]
+    },
+    {
+      "layer": "Data classification and handling",
+      "owners": [
+        "C",
+        "C",
+        "C",
+        "C",
+        "C"
+      ]
+    }
+  ],
+  "exposure": [
+    {
+      "endpoint": "Nginx HTTPS",
+      "exposedTo": "Internet",
+      "port": "443",
+      "notes": "TLS 1.2 and 1.3 only"
+    },
+    {
+      "endpoint": "Nginx HTTP",
+      "exposedTo": "Internet",
+      "port": "80",
+      "notes": "Redirect to HTTPS and ACME challenges only"
+    },
+    {
+      "endpoint": "SSH",
+      "exposedTo": "Allowlisted operator addresses",
+      "port": "22",
+      "notes": "Key authentication only"
+    },
+    {
+      "endpoint": "API",
+      "exposedTo": "Nginx only, internal Docker network",
+      "port": "none published",
+      "notes": ""
+    },
+    {
+      "endpoint": "Worker",
+      "exposedTo": "No inbound",
+      "port": "none",
+      "notes": "Outbound to database and storage only"
+    },
+    {
+      "endpoint": "PostgreSQL",
+      "exposedTo": "The VM only",
+      "port": "provider port",
+      "notes": "Private networking or IP allowlist"
+    },
+    {
+      "endpoint": "Object storage",
+      "exposedTo": "Browsers through presigned URLs; API and worker with credentials",
+      "port": "443",
+      "notes": "Bucket private"
+    },
+    {
+      "endpoint": "Docker socket",
+      "exposedTo": "Nobody",
+      "port": "not applicable",
+      "notes": "Never mounted into containers"
+    }
+  ]
+}
