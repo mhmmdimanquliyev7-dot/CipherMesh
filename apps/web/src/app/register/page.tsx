@@ -4,7 +4,8 @@ import { PASSWORD_POLICY } from '@ciphermesh/shared';
 import { registerResponseSchema } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useState, type SyntheticEvent } from 'react';
-import { Alert, Button, Card, Field } from '../../components/ui';
+import { AuthLayout } from '../../components/auth-layout';
+import { Alert, Button, buttonClass, Field } from '../../components/ui';
 import { api, describeError, formText } from '../../lib/api';
 
 export default function RegisterPage() {
@@ -41,18 +42,32 @@ export default function RegisterPage() {
 
   if (done) {
     return (
-      <Card title="Account created">
-        <Alert kind="info">Your account exists. Sign in to continue.</Alert>
-        <Link className="text-sky-400 underline" href="/login">
+      <AuthLayout
+        title="Account created"
+        description="Next, sign in and set up your vault."
+        footer="Set up two-step sign-in from your account settings after signing in."
+      >
+        <Alert kind="success">Your account exists. Sign in to continue.</Alert>
+        <Link className={buttonClass.primary} href="/login">
           Sign in
         </Link>
-      </Card>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-6">
-      <h1 className="text-2xl font-semibold">Create an account</h1>
+    <AuthLayout
+      title="Create an account"
+      description="Synthetic data only: this is a development build of a university security project."
+      footer={
+        <>
+          Already registered?{' '}
+          <Link className="font-medium text-accent-300 hover:text-accent-200" href="/login">
+            Sign in
+          </Link>
+        </>
+      }
+    >
       <form className="space-y-4" onSubmit={(e) => void onSubmit(e)} noValidate>
         <Field label="Email address" name="email" type="email" autoComplete="email" required />
         <Field label="Display name" name="displayName" autoComplete="nickname" maxLength={80} required />
@@ -67,7 +82,7 @@ export default function RegisterPage() {
           required
         />
         <Field label="Repeat the password" name="confirm" type="password" autoComplete="new-password" required />
-        <p className="text-xs text-slate-400">
+        <p className="rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-xs leading-relaxed text-slate-400">
           This password signs you in to CipherMesh. Your Vault Passphrase, which protects your encryption keys, is a
           separate secret you will create later; never reuse this password for it.
         </p>
@@ -76,12 +91,6 @@ export default function RegisterPage() {
           Create account
         </Button>
       </form>
-      <p className="text-sm text-slate-400">
-        Already registered?{' '}
-        <Link className="text-sky-400 underline" href="/login">
-          Sign in
-        </Link>
-      </p>
-    </div>
+    </AuthLayout>
   );
 }

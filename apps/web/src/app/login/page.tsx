@@ -4,6 +4,7 @@ import { loginResponseSchema, z } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type SyntheticEvent } from 'react';
+import { AuthLayout } from '../../components/auth-layout';
 import { Alert, Button, Field, SecondaryButton } from '../../components/ui';
 import { api, describeError, formText } from '../../lib/api';
 
@@ -44,7 +45,7 @@ export default function LoginPage() {
       });
       target.reset();
       if (result.status === 'mfa_required') setStep('totp');
-      else router.push('/account');
+      else router.push('/overview');
     });
   }
 
@@ -57,21 +58,37 @@ export default function LoginPage() {
       } else {
         await api('POST', '/auth/mfa/recovery', recoverySchema, { recoveryCode: value });
       }
-      router.push('/account');
+      router.push('/overview');
     });
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-6">
-      <h1 className="text-2xl font-semibold">Sign in</h1>
+    <AuthLayout
+      title="Sign in"
+      description={
+        step === 'password'
+          ? 'Use your email address and account password.'
+          : 'Your account is protected with two-step sign-in.'
+      }
+      footer={
+        <>
+          No account?{' '}
+          <Link className="font-medium text-accent-300 hover:text-accent-200" href="/register">
+            Create one
+          </Link>
+        </>
+      }
+    >
       {step === 'password' ? (
         <form className="space-y-4" onSubmit={onPassword} noValidate>
           <Field label="Email address" name="email" type="email" autoComplete="username" required />
           <Field label="Account password" name="password" type="password" autoComplete="current-password" required />
           {error === undefined ? null : <Alert kind="error">{error}</Alert>}
-          <Button type="submit" disabled={busy}>
-            Continue
-          </Button>
+          <div className="pt-1">
+            <Button type="submit" disabled={busy}>
+              Continue
+            </Button>
+          </div>
         </form>
       ) : (
         <form className="space-y-4" onSubmit={onSecondFactor} noValidate>
@@ -89,7 +106,7 @@ export default function LoginPage() {
             required
           />
           {error === undefined ? null : <Alert kind="error">{error}</Alert>}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={busy}>
               Verify
             </Button>
@@ -104,12 +121,6 @@ export default function LoginPage() {
           </div>
         </form>
       )}
-      <p className="text-sm text-slate-400">
-        No account?{' '}
-        <Link className="text-sky-400 underline" href="/register">
-          Create one
-        </Link>
-      </p>
-    </div>
+    </AuthLayout>
   );
 }

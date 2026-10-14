@@ -11,7 +11,7 @@ import {
 } from '@ciphermesh/shared';
 import { profileChangedResponseSchema } from '@ciphermesh/validation';
 import { useState, type SyntheticEvent } from 'react';
-import { Alert, Button, Card } from '../components/ui';
+import { Alert, Button, Card, controlClass } from '../components/ui';
 import { api } from '../lib/api';
 import { mayAttempt } from './permissions';
 
@@ -166,18 +166,24 @@ export function ProfilePanel({
   }
 
   return (
-    <Card title="Security profile">
+    <Card
+      title="Security profile"
+      icon="trust"
+      description="The room’s information classification. It governs access, handling and lifetime; the encryption is the same in every profile."
+    >
       <p className="text-sm" data-testid="profile-current">
         <span className="font-medium">{LABEL[policy.profile]}</span>
         <span className="text-xs text-slate-400"> · policy version {policy.version}</span>
       </p>
       <p className="text-xs text-slate-500">
-        The server enforces these rules for every member, whatever this page shows. Profiles govern access, handling and
-        lifetime; the encryption is the same in every profile.
+        The server enforces these rules for every member, whatever this page shows.
       </p>
-      <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300" aria-label="Enforced rules">
+      <ul className="grid gap-2 text-sm text-slate-300 md:grid-cols-2" aria-label="Enforced rules">
         {describePolicy(policy).map((rule) => (
-          <li key={rule.id}>{rule.text}</li>
+          <li key={rule.id} className="flex gap-2.5 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2">
+            <span className="mt-0.5 shrink-0 font-mono text-[11px] text-accent-300">{rule.id}</span>
+            <span>{rule.text}</span>
+          </li>
         ))}
       </ul>
       {policy.cryptoperiodMs === null ? null : (
@@ -192,7 +198,7 @@ export function ProfilePanel({
             <span>Change the profile to</span>
             <select
               name="securityProfile"
-              className="block rounded border border-slate-700 bg-slate-900 px-2 py-1"
+              className={`${controlClass} sm:w-auto`}
               value={target}
               onChange={(event) => {
                 setTarget(event.target.value as SecurityProfile);

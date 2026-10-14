@@ -3,13 +3,26 @@
 import { ROOM_NAME_MAX_LENGTH, SECURITY_PROFILES } from '@ciphermesh/shared';
 import { roomListResponseSchema, type RoomSummary } from '@ciphermesh/validation';
 import Link from 'next/link';
+import { Icon } from '../../components/icons';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type SyntheticEvent } from 'react';
-import { Alert, Button, Card, Field, SecondaryButton } from '../../components/ui';
+import {
+  Alert,
+  Button,
+  Card,
+  controlClass,
+  EmptyState,
+  Field,
+  labelClass,
+  Loading,
+  PageHeader,
+  SecondaryButton,
+} from '../../components/ui';
+import { KeyStateBadge, ProfileBadge, RoleBadge } from '../../rooms/badges';
 import { api, ApiError, formText } from '../../lib/api';
 import { roomKeys } from '../../rooms/keys';
-import { describeRoomError, REKEY_NOTICE, ROOM_NAME_WARNING } from '../../rooms/messages';
-import { PROFILE_DESCRIPTION, ROLE_LABEL } from '../../rooms/permissions';
+import { describeRoomError, ROOM_NAME_WARNING } from '../../rooms/messages';
+import { PROFILE_DESCRIPTION } from '../../rooms/permissions';
 import { useVault } from '../../vault/use-vault';
 
 /**
@@ -47,59 +60,71 @@ export default function RoomsPage() {
   }, [load]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Rooms</h1>
-      <p className="max-w-3xl text-sm text-slate-400">
-        A room groups people with roles and has its own room key, created in your browser and shared with each member as
-        an envelope that only their identity can open. Its security profile records how sensitive the room is: a
-        CONFIDENTIAL or RESTRICTED room needs a session verified with an authentication code. Members join through
-        invitations. Client-side encrypted files, notes and secrets arrive in later phases.
-      </p>
-      {error === undefined ? null : <Alert kind="error">{error}</Alert>}
-      <CreateRoom
-        onCreated={(roomId) => {
-          router.push(`/rooms/room?id=${roomId}`);
-        }}
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Rooms"
+        description="A room groups people with roles and has its own room key, created in a browser and shared with each member as an envelope only their identity can open. Files, notes and secrets in a room are encrypted on members' devices. Its security profile classifies how sensitive the room is."
       />
-      <Card title="Your rooms">
-        {rooms === undefined ? (
-          <p className="text-slate-400">Loading…</p>
-        ) : rooms.length === 0 ? (
-          <p className="text-sm text-slate-400">You are not a member of any room yet.</p>
-        ) : (
-          <ul className="divide-y divide-slate-800 rounded border border-slate-800" aria-label="Your rooms">
-            {rooms.map((room) => (
-              <li key={room.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                <Link className="font-medium text-sky-300 underline" href={`/rooms/room?id=${room.id}`}>
-                  {room.name}
-                </Link>
-                <span className="flex flex-wrap gap-2 text-xs">
-                  <span className="rounded bg-slate-800 px-2 py-0.5">{room.securityProfile}</span>
-                  <span className="rounded bg-slate-800 px-2 py-0.5">{ROLE_LABEL[room.role]}</span>
-                  {room.keyState === 'ACTIVE' ? null : (
+      {error === undefined ? null : <Alert kind="error">{error}</Alert>}
+      <div className="grid items-start gap-6 xl:grid-cols-[1.5fr_1fr]">
+        <Card title="Your rooms" icon="rooms">
+          {rooms === undefined ? (
+            <Loading />
+          ) : rooms.length === 0 ? (
+            <EmptyState icon="rooms" title="You are not a member of any room yet.">
+              Create one with your unlocked vault, or accept an invitation.
+            </EmptyState>
+          ) : (
+            <ul
+              className="divide-y divide-slate-800 overflow-hidden rounded-lg border border-slate-800"
+              aria-label="Your rooms"
+            >
+              {rooms.map((room) => (
+                <li
+                  key={room.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-slate-800/30"
+                >
+                  <span className="flex min-w-0 items-center gap-3">
                     <span
-                      className="rounded border border-amber-500/40 px-2 py-0.5 text-amber-300"
-                      title={REKEY_NOTICE}
+                      className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-800/80 text-accent-300"
+                      aria-hidden="true"
                     >
-                      Key rotation required
+                      <Icon name="rooms" className="size-4" />
                     </span>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {nextCursor === null ? null : (
-          <SecondaryButton
-            type="button"
-            onClick={() => {
-              void load(nextCursor);
-            }}
-          >
-            Show more rooms
-          </SecondaryButton>
-        )}
-      </Card>
+                    <Link
+                      className="min-w-0 break-words font-medium text-white hover:text-accent-200"
+                      href={`/rooms/room?id=${room.id}`}
+                    >
+                      {room.name}
+                    </Link>
+                  </span>
+                  <span className="flex flex-wrap gap-1.5">
+                    <ProfileBadge profile={room.securityProfile} />
+                    <RoleBadge role={room.role} />
+                    <KeyStateBadge keyState={room.keyState} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {nextCursor === null ? null : (
+            <SecondaryButton
+              type="button"
+              onClick={() => {
+                void load(nextCursor);
+              }}
+            >
+              Show more rooms
+            </SecondaryButton>
+          )}
+        </Card>
+        <CreateRoom
+          onCreated={(roomId) => {
+            router.push(`/rooms/room?id=${roomId}`);
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -128,16 +153,17 @@ function CreateRoom({ onCreated }: { readonly onCreated: (roomId: string) => voi
   }
 
   return (
-    <Card title="Create a room">
+    <Card
+      title="Create a room"
+      id="create-room"
+      icon="plus"
+      description="Its first room key is created and signed in this browser."
+    >
       <form className="space-y-4" onSubmit={(e) => void onSubmit(e)} noValidate>
         <Field label="Room name" name="name" maxLength={ROOM_NAME_MAX_LENGTH} required hint={ROOM_NAME_WARNING} />
-        <label className="block space-y-1">
-          <span className="text-sm text-slate-300">Security profile</span>
-          <select
-            name="securityProfile"
-            defaultValue="STANDARD"
-            className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-sky-500 focus:outline-none"
-          >
+        <label className="block space-y-1.5">
+          <span className={labelClass}>Security profile</span>
+          <select name="securityProfile" defaultValue="STANDARD" className={controlClass}>
             {SECURITY_PROFILES.map((profile) => (
               <option key={profile} value={profile}>
                 {profile}
@@ -145,10 +171,10 @@ function CreateRoom({ onCreated }: { readonly onCreated: (roomId: string) => voi
             ))}
           </select>
         </label>
-        <ul className="space-y-1 text-xs text-slate-500">
+        <ul className="space-y-2 rounded-lg border border-slate-800 bg-slate-950/40 p-3 text-xs leading-relaxed text-slate-400">
           {SECURITY_PROFILES.map((profile) => (
             <li key={profile}>
-              <span className="font-medium text-slate-400">{profile}:</span> {PROFILE_DESCRIPTION[profile]}
+              <span className="font-semibold text-slate-200">{profile}:</span> {PROFILE_DESCRIPTION[profile]}
             </li>
           ))}
         </ul>

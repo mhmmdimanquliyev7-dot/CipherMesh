@@ -5,7 +5,8 @@ import { FILE_TAG_BYTES, roomRuleFor, type ProfilePolicy, type RoomRole } from '
 import type { RoomMember } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type SyntheticEvent } from 'react';
-import { Alert, Button, Card, SecondaryButton } from '../components/ui';
+import { Icon } from '../components/icons';
+import { Alert, Button, Card, controlClass, EmptyState, labelClass, SecondaryButton } from '../components/ui';
 import { ApiError } from '../lib/api';
 import { useVault } from '../vault/use-vault';
 import {
@@ -24,6 +25,7 @@ import {
 import { roomKeys } from './keys';
 import { describeRoomError, FILES_EXPLANATION } from './messages';
 import { mayAttempt } from './permissions';
+import { FileReceipt } from './receipts';
 
 /**
  * The Files section of a room (Phase 7, CM-T038 to CM-T041). Names, types and contents exist only
@@ -219,8 +221,7 @@ export function FilePanel({
   }
 
   return (
-    <Card title="Files">
-      <p className="text-xs text-slate-500">{FILES_EXPLANATION}</p>
+    <Card title="Files" icon="file" description={FILES_EXPLANATION}>
       {message === undefined ? null : <Alert kind={message.kind}>{message.text}</Alert>}
 
       {!canUpload ? null : keyState !== 'ACTIVE' ? (
@@ -228,29 +229,29 @@ export function FilePanel({
       ) : !unlocked ? (
         <p className="text-sm text-slate-400">
           Files are encrypted on this device before upload.{' '}
-          <Link className="text-sky-400 underline" href="/vault">
+          <Link className="text-accent-400 underline" href="/vault">
             Unlock your vault
           </Link>{' '}
           to upload, and to see file names.
         </p>
       ) : (
-        <form className="flex flex-wrap items-end gap-3" onSubmit={(e) => void onUpload(e)} noValidate>
-          <label className="block space-y-1">
-            <span className="text-sm text-slate-300">File (at most 50 MiB)</span>
+        <form
+          className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-slate-700 bg-slate-950/40 p-4"
+          onSubmit={(e) => void onUpload(e)}
+          noValidate
+        >
+          <label className="block min-w-0 flex-1 space-y-1.5">
+            <span className={labelClass}>File (at most 50 MiB)</span>
             <input
               name="file"
               type="file"
               data-testid="file-input"
-              className="block text-sm text-slate-300 file:mr-3 file:rounded file:border file:border-slate-600 file:bg-slate-900 file:px-3 file:py-1 file:text-slate-200"
+              className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border file:border-slate-600 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-100 hover:file:border-slate-400"
             />
           </label>
-          <label className="block space-y-1">
-            <span className="text-sm text-slate-300">Expires</span>
-            <select
-              name="expiry"
-              data-testid="file-expiry"
-              className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-            >
+          <label className="block space-y-1.5">
+            <span className={labelClass}>Expires</span>
+            <select name="expiry" data-testid="file-expiry" className={`${controlClass} sm:w-auto`}>
               {expiryChoices(policy).map((choice) => (
                 <option key={choice.label} value={choice.days === null ? '' : String(choice.days)}>
                   {choice.label}
@@ -259,12 +260,21 @@ export function FilePanel({
             </select>
           </label>
           <Button type="submit" disabled={stage !== undefined} data-testid="file-upload">
+            <Icon name="upload" className="size-4" />
             Encrypt and upload
           </Button>
         </form>
       )}
       {stage === undefined ? null : (
-        <p role="status" className="text-sm text-sky-200" data-testid="file-upload-status">
+        <p
+          role="status"
+          className="flex items-center gap-2 rounded-lg border border-accent-500/30 bg-accent-500/10 px-3 py-2 text-sm text-accent-100"
+          data-testid="file-upload-status"
+        >
+          <span
+            className="size-2 animate-pulse rounded-full bg-accent-300 motion-reduce:animate-none"
+            aria-hidden="true"
+          />
           {STAGE_TEXT[stage.stage]}
           {stage.progress === undefined ? '' : ` ${String(Math.round(stage.progress * 100))}%`}
         </p>
@@ -277,11 +287,11 @@ export function FilePanel({
       ) : null}
 
       {entries.length === 0 ? (
-        <p className="text-sm text-slate-400" data-testid="files-empty">
-          No files yet.
-        </p>
+        <EmptyState icon="file" title="No files yet." testId="files-empty">
+          Files are encrypted on the uploader&apos;s device and stored as ciphertext.
+        </EmptyState>
       ) : (
-        <ul className="divide-y divide-slate-800 rounded border border-slate-800" aria-label="Files">
+        <ul className="divide-y divide-slate-800 overflow-hidden rounded-lg border border-slate-800" aria-label="Files">
           {entries.map((entry) => {
             const { view, opened } = entry;
             const label =
@@ -295,14 +305,27 @@ export function FilePanel({
             return (
               <li key={view.id} className="space-y-2 px-4 py-3" data-testid="file-row">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="min-w-0 space-y-1">
-                    <span className="block break-all font-medium" data-testid="file-name">
-                      {label}
+                  <span className="flex min-w-0 items-start gap-3">
+                    <span
+                      className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg ${
+                        entry.damaged === true ? 'bg-rose-500/15 text-rose-300' : 'bg-slate-800/80 text-accent-300'
+                      }`}
+                      aria-hidden="true"
+                    >
+                      <Icon
+                        name={entry.damaged === true ? 'alert' : opened === undefined ? 'lock' : 'file'}
+                        className="size-4"
+                      />
                     </span>
-                    <span className="block text-xs text-slate-400">
-                      {formatBytes(size)} · {nameOfUploader(view.uploaderId)} · {formatDate(view.uploadedAt)}
-                      {view.expiresAt === null ? '' : ` · expires ${formatDate(view.expiresAt)}`}
-                      {view.keyVersion > 1 ? ` · key version ${String(view.keyVersion)}` : ''}
+                    <span className="min-w-0 space-y-1">
+                      <span className="block break-all font-medium text-white" data-testid="file-name">
+                        {label}
+                      </span>
+                      <span className="block text-xs text-slate-400">
+                        {formatBytes(size)} · {nameOfUploader(view.uploaderId)} · {formatDate(view.uploadedAt)}
+                        {view.expiresAt === null ? '' : ` · expires ${formatDate(view.expiresAt)}`}
+                        {view.keyVersion > 1 ? ` · key version ${String(view.keyVersion)}` : ''}
+                      </span>
                     </span>
                   </span>
                   <span className="flex flex-wrap items-center gap-2">
@@ -325,6 +348,7 @@ export function FilePanel({
                     ) : null}
                   </span>
                 </div>
+                <FileReceipt entry={entry} />
                 {confirmRisky === view.id ? (
                   <Alert kind="error">
                     Files of this type can run code or show active content when you open them. Download only if you
@@ -347,7 +371,7 @@ export function FilePanel({
           <img
             src={preview.url}
             alt={`Preview of ${preview.name}`}
-            className="max-h-96 rounded border border-slate-800"
+            className="max-h-96 rounded-lg border border-slate-800"
           />
           <figcaption className="flex items-center gap-3 text-xs text-slate-400">
             <span className="break-all">{preview.name}</span>

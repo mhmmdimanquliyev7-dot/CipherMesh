@@ -4,7 +4,8 @@ import { checkVaultPassphrase, VAULT_PASSPHRASE_POLICY } from '@ciphermesh/crypt
 import Link from 'next/link';
 import { useState, type ReactNode, type SyntheticEvent } from 'react';
 import { StepUpForm } from '../../components/step-up-form';
-import { Alert, Button, Card, Field, SecondaryButton } from '../../components/ui';
+import { Icon, type IconName } from '../../components/icons';
+import { Alert, Badge, Button, Card, Field, Loading, PageHeader, SecondaryButton } from '../../components/ui';
 import { formText } from '../../lib/api';
 import {
   vaultController,
@@ -29,17 +30,91 @@ import { useVault } from '../../vault/use-vault';
 export default function VaultPage() {
   const view = useVault();
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Vault</h1>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Security"
+        title="Vault"
+        description="Your cryptographic identity: an encryption key pair and a signing key pair whose private halves are encrypted in this browser under your Vault Passphrase."
+      />
+      {view.kind === 'locked' || view.kind === 'unlocked' || view.kind === 'not-configured' ? (
+        <VaultStatus kind={view.kind} />
+      ) : null}
       <VaultContent view={view} />
     </div>
+  );
+}
+
+const STATUS: Readonly<
+  Record<'locked' | 'unlocked' | 'not-configured', { icon: IconName; title: string; text: string; tone: string }>
+> = {
+  unlocked: {
+    icon: 'unlock',
+    title: 'Unlocked in this tab',
+    text: 'Your private keys are in memory as non-extractable keys. Room keys and content can be opened here.',
+    tone: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-300',
+  },
+  locked: {
+    icon: 'lock',
+    title: 'Locked',
+    text: 'Your private keys exist on the server only in encrypted form. Unlock to open room keys in this tab.',
+    tone: 'border-slate-700 bg-slate-900/50 text-slate-300',
+  },
+  'not-configured': {
+    icon: 'key',
+    title: 'Not set up',
+    text: 'Create your vault to get a cryptographic identity. Rooms, files, notes and secrets need it.',
+    tone: 'border-amber-500/30 bg-amber-500/5 text-amber-300',
+  },
+};
+
+/** How the vault protects the private keys (CP-04, CP-27). Fixed facts, not live measurements. */
+const VAULT_FLOW: readonly { readonly label: string; readonly detail: string }[] = [
+  { label: 'Vault Passphrase', detail: 'Typed here, never sent' },
+  { label: 'Argon2id', detail: 'Memory-hard, in a Web Worker' },
+  { label: 'HKDF-SHA-256', detail: 'One wrapping key per private key' },
+  { label: 'AES-256-GCM', detail: 'Unwraps your private keys' },
+  { label: 'Non-extractable keys', detail: 'Usable, never readable' },
+];
+
+function VaultStatus({ kind }: { readonly kind: 'locked' | 'unlocked' | 'not-configured' }) {
+  const status = STATUS[kind];
+  return (
+    <section
+      aria-label="Vault status"
+      className="grid gap-6 rounded-2xl border border-line bg-surface/90 p-5 sm:p-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]"
+    >
+      <div className={`flex items-start gap-4 rounded-xl border p-4 ${status.tone}`}>
+        <Icon name={status.icon} className="size-7" />
+        <div className="space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Vault status</p>
+          <p className="text-lg font-semibold text-white">{status.title}</p>
+          <p className="text-sm leading-relaxed text-slate-300">{status.text}</p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">How your keys are protected</p>
+        <ol className="grid gap-2 sm:grid-cols-5">
+          {VAULT_FLOW.map((step, index) => (
+            <li key={step.label} className="relative rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+              <p className="font-mono text-[11px] text-accent-300">{String(index + 1).padStart(2, '0')}</p>
+              <p className="mt-1 text-sm font-medium text-white">{step.label}</p>
+              <p className="text-xs text-slate-400">{step.detail}</p>
+            </li>
+          ))}
+        </ol>
+        <p className="text-xs text-slate-500">
+          Nobody can recover a lost Vault Passphrase. A compromised device or browser can still read what you decrypt
+          (L-01).
+        </p>
+      </div>
+    </section>
   );
 }
 
 function VaultContent({ view }: { readonly view: VaultView }) {
   switch (view.kind) {
     case 'loading':
-      return <p className="text-slate-400">Loading…</p>;
+      return <Loading />;
     case 'signed-out':
       return (
         <Alert kind="info">
@@ -63,15 +138,15 @@ function VaultContent({ view }: { readonly view: VaultView }) {
 /** The two secrets, side by side (CD-01, security-ui section 2.8). */
 function TwoSecrets() {
   return (
-    <Card title="Two different secrets">
+    <Card title="Two different secrets" icon="layers">
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        <div>
+        <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
           <dt className="font-medium text-slate-200">Account password</dt>
           <dd className="text-slate-400">
             Proves to the CipherMesh server who you are. You type it when you sign in and when you confirm your account.
           </dd>
         </div>
-        <div>
+        <div className="rounded-lg border border-accent-500/30 bg-accent-500/5 p-3">
           <dt className="font-medium text-slate-200">Vault Passphrase</dt>
           <dd className="text-slate-400">
             Protects your private keys. It never leaves this browser: the server never receives it, cannot check it and
@@ -137,7 +212,11 @@ function policyProblems(passphrase: string, repeat: string, account: AccountView
 
 function Progress({ children }: { readonly children: ReactNode }) {
   return (
-    <p role="status" className="text-sm text-sky-200">
+    <p
+      role="status"
+      className="flex items-center gap-2 rounded-lg border border-accent-500/30 bg-accent-500/10 px-3 py-2 text-sm text-accent-100"
+    >
+      <span className="size-2 animate-pulse rounded-full bg-accent-300 motion-reduce:animate-none" aria-hidden="true" />
       {children}
     </p>
   );
@@ -165,8 +244,8 @@ function Setup({ account }: { readonly account: AccountView }) {
   return (
     <div className="space-y-6">
       <TwoSecrets />
-      <Card title="Set up your vault">
-        <ul className="list-disc space-y-1 pl-5 text-sm text-slate-300">
+      <Card title="Set up your vault" icon="vault">
+        <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-300 marker:text-accent-400">
           <li>
             This browser creates your cryptographic identity: an encryption key pair and a signing key pair. Their
             private halves are encrypted here, with a key derived from your Vault Passphrase (Argon2id), before anything
@@ -193,7 +272,7 @@ function Setup({ account }: { readonly account: AccountView }) {
           }}
         />
       ) : (
-        <Card title="Choose a Vault Passphrase">
+        <Card title="Choose a Vault Passphrase" icon="key">
           <form className="space-y-3" onSubmit={onSubmit} noValidate>
             <PassphraseField
               label="Vault Passphrase (not your account password)"
@@ -250,7 +329,7 @@ function Locked({
   return (
     <div className="space-y-6">
       {lockReason === undefined ? null : <Alert kind="info">{LOCK_REASONS[lockReason]}</Alert>}
-      <Card title="Unlock your vault">
+      <Card title="Unlock your vault" icon="unlock">
         <p className="text-sm text-slate-400">
           The Vault Passphrase is checked only in this browser. The server does not learn whether you typed it
           correctly.
@@ -275,7 +354,15 @@ function Locked({
 function Unlocked({ account, identity }: { readonly account: AccountView; readonly identity: IdentityView }) {
   return (
     <div className="space-y-6">
-      <Card title="Vault unlocked">
+      <Card
+        title="Vault unlocked"
+        icon="unlock"
+        actions={
+          <Badge tone="success" icon="checkCircle">
+            Pair checks passed
+          </Badge>
+        }
+      >
         <p className="text-sm text-slate-300">
           Your private keys are available in this tab only, as keys the page can use but cannot read or export. The
           vault locks after 15 minutes without activity, when you sign out, when your session ends and when you close
@@ -300,13 +387,16 @@ function Unlocked({ account, identity }: { readonly account: AccountView; readon
 
 function Fingerprint({ identity }: { readonly identity: IdentityView }) {
   return (
-    <Card title="Your identity fingerprint">
+    <Card title="Your identity fingerprint" icon="fingerprint">
       <p className="text-sm text-slate-400">
         Computed in this browser from your public keys after checking their signature. It is public, not a secret. When
         someone needs to confirm that they have your real keys, compare all 64 characters with them in person or by
         voice.
       </p>
-      <p className="grid grid-cols-4 gap-x-4 gap-y-1 font-mono text-base sm:grid-cols-8" data-testid="own-fingerprint">
+      <p
+        className="grid grid-cols-4 gap-x-4 gap-y-1.5 rounded-xl border border-slate-800 bg-slate-950/60 p-4 font-mono text-base text-white sm:grid-cols-8"
+        data-testid="own-fingerprint"
+      >
         {identity.fingerprintGroups.map((group, index) => (
           <span key={`${String(index)}-${group}`}>{group}</span>
         ))}
@@ -363,7 +453,7 @@ function ChangePassphrase({ account }: { readonly account: AccountView }) {
     );
   }
   return (
-    <Card title="Change the Vault Passphrase">
+    <Card title="Change the Vault Passphrase" icon="key">
       <p className="text-sm text-slate-400">
         Your keys and fingerprint stay the same; only their encrypted copy changes. This does not help if someone
         already has an old copy of your vault and your old passphrase: in that case replace your identity instead.
@@ -404,7 +494,7 @@ function Upgrade({ account, identity }: { readonly account: AccountView; readonl
     void action.run(target, () => vaultController.upgradeProtection(passphrase));
   }
   return (
-    <Card title="Upgrade the vault protection">
+    <Card title="Upgrade the vault protection" icon="trust" tone="warning">
       <p className="text-sm text-slate-400">
         Your vault uses Argon2id with {String(identity.kdf.memoryKiB / 1024)} MiB and {String(identity.kdf.iterations)}{' '}
         passes, below the current setting. Re-enter your Vault Passphrase to re-encrypt your keys with the stronger
@@ -436,7 +526,7 @@ function Directory() {
     }
   }
   return (
-    <Card title="Look up a user's public identity">
+    <Card title="Look up a user's public identity" icon="members">
       <form className="space-y-3" onSubmit={(e) => void onSubmit(e)} noValidate>
         <Field label="Exact email address" name="email" type="email" autoComplete="off" />
         <Button type="submit">Look up</Button>
@@ -449,7 +539,7 @@ function Directory() {
             <span className="text-amber-300">{result.email} (email not verified)</span> · account created{' '}
             {new Date(result.entry.accountCreatedAt).toLocaleDateString()}
           </p>
-          <p className="grid grid-cols-4 gap-x-4 gap-y-1 font-mono sm:grid-cols-8">
+          <p className="grid grid-cols-4 gap-x-4 gap-y-1 rounded-lg border border-slate-800 bg-slate-950/60 p-3 font-mono sm:grid-cols-8">
             {result.entry.fingerprintGroups.map((group, index) => (
               <span key={`${String(index)}-${group}`}>{group}</span>
             ))}
@@ -470,7 +560,7 @@ function Reset({ account }: { readonly account: AccountView }) {
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
-      <Card title="Lost your Vault Passphrase?">
+      <Card title="Lost your Vault Passphrase?" icon="alert">
         <p className="text-sm text-slate-400">
           It cannot be recovered. You can replace your identity with a new one instead.
         </p>
@@ -511,7 +601,7 @@ function Reset({ account }: { readonly account: AccountView }) {
     void action.run(target, () => vaultController.reset(passphrase, compromised));
   }
   return (
-    <Card title="Replace my identity">
+    <Card title="Replace my identity" icon="alert" tone="danger">
       <Alert kind="error">
         A new identity with a new fingerprint replaces the current one. The encrypted copy of your current private keys
         is deleted from the server, so anything encrypted only for them can no longer be opened. Your other sessions are
@@ -534,7 +624,7 @@ function Reset({ account }: { readonly account: AccountView }) {
         {action.error === undefined ? null : <Alert kind="error">{action.error}</Alert>}
         {action.busy ? <Progress>Creating a new identity in this browser…</Progress> : null}
         <div className="flex gap-3">
-          <Button type="submit" disabled={action.busy}>
+          <Button type="submit" tone="danger" disabled={action.busy}>
             Replace identity
           </Button>
           <SecondaryButton

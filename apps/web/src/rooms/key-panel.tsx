@@ -5,7 +5,8 @@ import type { SecurityProfile } from '@ciphermesh/shared';
 import { recordedResponseSchema, type RoomMember } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { Alert, Card, SecondaryButton } from '../components/ui';
+import { Icon } from '../components/icons';
+import { Alert, Badge, Card, SecondaryButton } from '../components/ui';
 import { api } from '../lib/api';
 import { useVault } from '../vault/use-vault';
 import { roomKeys } from './keys';
@@ -70,10 +71,10 @@ export function RoomKeyPanel({
 
   if (vault.kind !== 'unlocked' || state.kind === 'locked' || (state.kind === 'open' && !held)) {
     return (
-      <Card title="Room key">
+      <Card title="Room key" icon="key">
         <p className="text-sm text-slate-400">
           The room key is opened only on this device, with your unlocked vault.{' '}
-          <Link className="text-sky-400 underline" href="/vault">
+          <Link className="text-accent-400 underline" href="/vault">
             Unlock your vault
           </Link>{' '}
           to open it.
@@ -83,14 +84,16 @@ export function RoomKeyPanel({
   }
   if (state.kind === 'opening') {
     return (
-      <Card title="Room key">
-        <p className="text-sm text-slate-400">Verifying the room key on this device…</p>
+      <Card title="Room key" icon="key">
+        <p className="text-sm text-slate-400" role="status">
+          Verifying the room key on this device…
+        </p>
       </Card>
     );
   }
   if (state.kind === 'failed') {
     return (
-      <Card title="Room key">
+      <Card title="Room key" icon="key" tone="danger">
         <Alert kind="error">{state.message}</Alert>
       </Card>
     );
@@ -98,14 +101,26 @@ export function RoomKeyPanel({
   const creatorName = members.find((m) => m.userId === state.key.creator.userId)?.displayName ?? 'a former member';
   return (
     <>
-      <Card title="Room key">
-        <p className="text-sm text-slate-300" data-testid="room-key-status">
+      <Card
+        title="Room key"
+        icon="key"
+        actions={
+          <Badge tone="success" icon="checkCircle">
+            Signature verified
+          </Badge>
+        }
+      >
+        <p className="flex items-center gap-2 text-sm text-slate-200" data-testid="room-key-status">
+          <Icon name="checkCircle" className="size-4 text-emerald-300" />
           Room key version {state.key.keyVersion} verified on this device.
         </p>
         <p className="text-xs text-slate-400">
           Signed by {creatorName}. Their fingerprint, to compare out of band if you have not:
         </p>
-        <p className="font-mono text-xs text-slate-300" data-testid="room-key-creator-fingerprint">
+        <p
+          className="break-all rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 font-mono text-xs leading-relaxed text-slate-200"
+          data-testid="room-key-creator-fingerprint"
+        >
           {formatFingerprint(state.key.creator.fingerprint).join(' ')}
         </p>
         <p className="text-xs text-slate-500">
@@ -152,9 +167,13 @@ function SafetyCodePanel({
   const rows = [code.words.slice(0, 3), code.words.slice(3, 6)];
   const groups = code.digits.match(/.{1,4}/g) ?? [];
   return (
-    <Card title="Room Safety Code">
+    <Card
+      title="Room Safety Code"
+      icon="fingerprint"
+      description="Computed in this browser from the verified room key. It is never sent to the server, stored or logged."
+    >
       {profile === 'CONFIDENTIAL' ? (
-        <p className="w-fit rounded border border-amber-500/40 px-2 py-0.5 text-xs text-amber-300">
+        <p className="w-fit rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">
           Reminder: compare the Safety Code for this key version
         </p>
       ) : null}
@@ -162,9 +181,9 @@ function SafetyCodePanel({
         <div
           role="dialog"
           aria-label="Compare the Safety Code"
-          className="space-y-2 rounded border border-sky-500/40 p-3"
+          className="space-y-2 rounded-lg border border-sky-500/40 bg-sky-500/10 p-3"
         >
-          <p className="text-sm text-sky-200">
+          <p className="text-sm text-sky-100">
             This RESTRICTED room asks members to compare the Safety Code for every key version. This is advice:
             CipherMesh cannot check that you did.
           </p>
@@ -180,13 +199,21 @@ function SafetyCodePanel({
       ) : null}
       <p className="text-sm text-slate-300">Key version {code.keyVersion}</p>
       {numeric ? (
-        <p className="font-mono text-lg tracking-wider" data-testid="safety-code-digits">
+        <p
+          className="tabular rounded-xl border border-accent-500/30 bg-slate-950/70 px-4 py-3 font-mono text-xl tracking-[0.2em] text-white"
+          data-testid="safety-code-digits"
+        >
           {groups.join(' ')}
         </p>
       ) : (
-        <div className="space-y-1 font-mono text-lg" data-testid="safety-code-words">
+        <div
+          className="space-y-1 rounded-xl border border-accent-500/30 bg-slate-950/70 px-4 py-3 font-mono text-xl text-white"
+          data-testid="safety-code-words"
+        >
           {rows.map((row) => (
-            <p key={row.join('-')}>{row.join(' ')}</p>
+            <p key={row.join('-')} className="tracking-wide">
+              {row.join(' ')}
+            </p>
           ))}
         </div>
       )}
