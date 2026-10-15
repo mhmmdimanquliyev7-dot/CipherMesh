@@ -52,10 +52,26 @@ Scenario B (infrastructure) and Scenario C (cloud security) on the **local Docke
 | 6 | Evidence, status Missing and Deferred | Missing items (for example Jira screenshots) and the deferred audit-ledger evidence are visible. 5.33 and 8.15 are Partial because Phase 12 was deferred. |
 | 7 | Security dashboard (administrator) | Aggregates from the database with definitions; SD-10, SD-11, SD-12 and SD-15 say "Not implemented"; no score. Everyone else gets 404. |
 
+## 4a. Operational ISMS: the ISMS Control Center (8 minutes)
+
+Before the session: sign in as the platform administrator (section 1, step 5) and open **Trust Center → ISMS Control Center** (`/trust/isms`). The demonstration data contains one labelled EXERCISE set from the evidence capture (EV-22-04 to EV-22-16); records you make yourself during the session are real project-owner records unless you tick "This is a demonstration exercise". Decisions ask for your account password and authentication code. Say once: "This is an academic ISO/IEC 27001:2022-aligned ISMS for a one-person project, not a certified one; the badges at the top say where it runs."
+
+| Scenario | Where | Do and say |
+|---|---|---|
+| A Foundation | Overview, then Scope & context, Assets, Policies & roles | The lifecycle strip is the management system: context, assets, risk, treatment, controls, verification, audit, corrective action, review, improvement. Scope revision 2 names exactly what is in scope (the local Docker demonstration) and what is designed but not deployed (Oracle). Show the interested parties and the assets with owners and classification. In Policies, show that a policy is "documented" until a decision adopts it; adopt POL-03 live if you wish (a real decision). |
+| B Risk | Risk register, open T-06 | The matrix is computed from the register with the threat model's 3x3 method. T-06: affected assets, threat, scenario, inherent Critical, the controls that treat it with their live assurance, the treatment record, residual Medium and who accepted it ("project owner decision, no independent approver"). |
+| C Control assurance | Control assurance, open 8.3 and 8.8 | "Implemented" is not "verified": 8.3 is verified by a record that cites EV-05-02, valid until its freshness rule expires. 8.8: EV-01-07 is stale under the 7-day vulnerability rule; the verification shows the attached dependency-audit output and its SHA-256. |
+| D Audit and improvement | Audits & findings, Corrective actions | The self-assessment declares that it is not independent; its observation (19 Annex A numbers not covered) became a finding. The 8.8 finding walks Open → Analyzed → Action planned → Implemented → Awaiting effectiveness → Closed, and the effectiveness check is recorded as self-verified. Status cannot be set directly. |
+| E Management review | Management review | The inputs were computed by the server when the draft was made (metrics, open findings, stale evidence). Decisions and the follow-up action, which became an improvement finding. Optionally prepare a real one-person review now. |
+| F Continual improvement | Improvement & activity, then Overview | The activity history shows who changed what, when and why; it is append-only but not tamper-evident (L-81). Back on the Overview the measured objectives changed with the records. |
+
+Optional security proof (1 minute): open `/trust/isms` in a private window with an ordinary account: the page and the API refuse it (404). A decision without a recent identity confirmation is refused until you confirm.
+
 ## 5. What not to claim
 
 - Not "unhackable", "military grade", "zero knowledge", "tamper-proof" or "ISO 27001 compliant or certified".
 - Not "deployed in the cloud": the cloud deployment is the next workstream.
+- Not "ISO/IEC 27001 certified", "audited" or "independently reviewed": the ISMS is operated and self-assessed by one person (L-82) for days, not months (L-83); exercise records are labelled.
 - Not "tamper-evident audit ledger": it is designed (ADR-009) but deferred; security events go to the redacted log.
 - The Safety Code and the commitment do not protect against a key that every member received from a compromised server (T-36, OCD-12).
 

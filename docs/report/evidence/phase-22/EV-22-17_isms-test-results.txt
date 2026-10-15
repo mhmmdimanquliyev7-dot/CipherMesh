@@ -1,0 +1,29 @@
+EV-22-17 Operational ISMS (CM-T088 to CM-T092): test results
+Environment: development workstation (Windows 11, Docker Desktop, PostgreSQL 17 and S3-compatible storage in the development containers), 2026-10-15. Branch feature/CM-T088-operational-isms. Local results; the CI run is EV-22-18.
+
+== Static checks
+pnpm format:check          pass
+pnpm lint                  pass (eslint --max-warnings 0)
+pnpm typecheck             pass (five workspaces)
+pnpm trust:check           pass (Trust Center data and the ISMS catalogue match the documents)
+pnpm db:drift, db:check-schema   pass (19 models, 262 classified fields)
+pnpm build                 pass
+
+== Vitest (pnpm test, every project including the new isms project)
+Full run after the last code change: 94 test files, 2389 tests passed.
+New: tests/isms/isms.test.ts 16 tests (authorization for non-administrators and anonymous callers on all six routes, step-up for decisions, schemas without a status field, unknown references, evidence freshness, secret and oversized attachments, excluded controls, CI-link validation, the treatment workflow, stale versions, history rows, internal-audit independence, the corrective-action lifecycle with eligible closure evidence, exercise-only withdrawal, management review and its tracked actions, scope and policy decisions, metrics, database guards as the runtime role).
+New: packages/shared/src/isms.test.ts 16 tests (risk method, freshness, assurance states, Annex A coverage, policy and scope lifecycles, overdue findings, secret detection, transition authority, acceptance rules, validity of a verification).
+Extended: privilege matrix (isms_records, isms_activity), route inventory, authorization matrix (PA-06 to PA-08).
+
+== Negative controls (pnpm security:negative-controls)
+Full run: 126 of 126 deliberate defects caught, including NC-22-01 to NC-22-05; sources restored byte for byte (65 files). Its final baseline step failed on two timeouts in packages/crypto/src/rekey.test.ts (RSA-3072 key generation against the 5 s default under full load; passes alone). The file now sets a 60 s test timeout; assertions unchanged.
+NC-11 rerun after the fix: 13 of 13 caught, baseline on unmodified code PASS, sources restored (7 files). An earlier NC-11 run reported a baseline failure without a failing test; run directly the same files passed (55 tests) and the rerun passed. Cause not found; recorded as a transient.
+NC-03 (authentication) rerun for the session change: 10 of 10 caught. NC-22 only: 5 of 5 caught, baseline PASS.
+
+== Browser (pnpm test:e2e, Chromium, Firefox, WebKit)
+tests/e2e/isms.spec.ts: the lifecycle (assess, treat, verify, accept with step-up, stale-evidence finding, corrective action to closure, management review, reload) and the refusal of a non-administrator passed in all three engines.
+Full suite, final run: 172 passed, 20 skipped by design, 6 failed. All six were Firefox page loads or login waits timing out (web-shell, auth, notes), in files this workstream did not change; run alone they passed (8 of 8). This is the open Firefox navigation-hang item of the handoff (section 12). An earlier full run failed 11 tests in the same way, after another full run minutes before it had used the per-address login limit; it is not evidence of an ISMS defect.
+
+== Findings fixed on the way
+tests/helpers/auth.ts: test client addresses could collide between parallel test files of one project (a counter restarting per file), adding a foreign row to the abuse suite's per-address count (expected 20, got 21 once in a full run). Addresses are now a per-process group plus a counter shared across module reloads. Mechanism inferred from the symptom and the test's own note on concurrent writers; not reproduced deterministically.
+packages/crypto/src/rekey.test.ts: file timeout, as above.

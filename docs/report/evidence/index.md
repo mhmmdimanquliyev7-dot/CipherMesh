@@ -95,6 +95,12 @@ Captured on `feature/CM-T029-secure-rooms-rbac` (from `main` at `5c1ed32`) again
 
 Captured in Prompt 08; the files are in [phase-06/](phase-06/): EV-06-01 (stored key material: lengths and hashes), EV-06-02 (RESTRICTED invitation screenshots), EV-06-03 (commitment and key-injection refusals), EV-06-04 (three-engine results), EV-06-05 and EV-06-06 (Safety Code screenshots), EV-06-07 (gates), EV-06-08 (negative controls), EV-06-09 (supply chain), EV-06-10 (CI run of pull request #22).
 
+Capture date (the commit that added the files; recorded on 2026-10-15 for the freshness rule of the operational ISMS, [../../security/isms-operations.md](../../security/isms-operations.md) section 7):
+
+| ID | File | Date | Work item | What it shows |
+|---|---|---|---|---|
+| EV-06-01 to EV-06-10 | Files `phase-06/EV-06-*`, named by item | 2026-10-11 | CM-T033 to CM-T036, CM-T085 | The Phase 6 items listed above |
+
 ## Phase 7
 
 Captured on `feature/CM-T037-encrypted-files` (from `main` at `c175d22`) against the real API, PostgreSQL and the local S3-compatible storage, with synthetic data only. Merged through pull request #24 (merge commit `ce331c0`).
@@ -112,6 +118,16 @@ Captured on `feature/CM-T037-encrypted-files` (from `main` at `c175d22`) against
 | EV-07-09 | [phase-07/EV-07-09_negative-controls.txt](phase-07/EV-07-09_negative-controls.txt) | 2026-10-11 | CM-T037 to CM-T041 | 69 of 69 negative controls caught, ten of them new |
 | EV-07-10 | [phase-07/EV-07-10_supply-chain.txt](phase-07/EV-07-10_supply-chain.txt) | 2026-10-11 | CM-T037 | `aws4fetch` 1.0.20 (LIB-09), audit, SBOM, secret scan |
 | EV-07-11 | [phase-07/EV-07-11_ci-run.txt](phase-07/EV-07-11_ci-run.txt) | 2026-10-11 | CM-T037 to CM-T041 | CI run 38143399418 of pull request #24: every job passed on attempt 2 after one unrelated WebKit timeout on attempt 1 |
+
+## Phases 8 to 10
+
+The files are in `phase-08/`, `phase-09/` and `phase-10/`, named by item; what each shows is in [../../management/phase-08-traceability.md](../../management/phase-08-traceability.md), [phase-09-traceability.md](../../management/phase-09-traceability.md) and [phase-10-traceability.md](../../management/phase-10-traceability.md). The date is that of the commit that added the files (recorded on 2026-10-15 for the freshness rule of the operational ISMS).
+
+| ID | File | Date | Work item | What it shows |
+|---|---|---|---|---|
+| EV-08-01 to EV-08-07 | Files `phase-08/EV-08-*`, named by item | 2026-10-11 | CM-T042 | Encrypted notes: stored row, XSS as text, canary scan, revision and tamper tests, gates, negative controls, CI run |
+| EV-09-01 to EV-09-09 | Files `phase-09/EV-09-*`, named by item | 2026-10-12 | CM-T043, CM-T044 | Burn secrets: reveal once, concurrency, warning, stored row, canary scan, gates, negative controls, CI run, tamper and XSS |
+| EV-10-01 to EV-10-04, EV-10-06 | Files `phase-10/EV-10-*`, named by item | 2026-10-12 | CM-T046 to CM-T049 | Security policies: policy matrix, RESTRICTED denials, downgrade and upgrade, negative controls |
 
 ## Phase 11
 
@@ -166,3 +182,24 @@ Captured on branch `infra/CM-T063-oracle-always-free-deployment` with `pnpm demo
 | EV-17-06 | [phase-17/EV-17-06_images.txt](phase-17/EV-17-06_images.txt), [phase-17/EV-17-06_containers.txt](phase-17/EV-17-06_containers.txt), [phase-17/EV-17-06_container-hardening.txt](phase-17/EV-17-06_container-hardening.txt), [phase-17/EV-17-06_edge-check.txt](phase-17/EV-17-06_edge-check.txt), [phase-17/EV-17-06_database-access.txt](phase-17/EV-17-06_database-access.txt), [phase-17/EV-17-06_browser-tests.txt](phase-17/EV-17-06_browser-tests.txt), [phase-17/EV-17-06_host-status.json](phase-17/EV-17-06_host-status.json), [phase-17/EV-17-06_resources.txt](phase-17/EV-17-06_resources.txt), [phase-17/EV-17-06_stack-check.txt](phase-17/EV-17-06_stack-check.txt) | 2026-10-15 | CM-T065 to CM-T068, CM-T070 | CI evidence, not cloud evidence: the CI job "Cloud stack (linux/arm64)" of run 38719307516 (pull request #37, head `1e4f30b`) on GitHub's native arm64 runner (Ubuntu 24.04, aarch64): native linux/arm64 images, container hardening and internal networks, 39 of 39 edge checks, database access rules, smoke and collaboration tests 6 of 6 in three engines; copied from the artifact `cloud-stack-arm64-evidence` |
 | EV-19-10 | [phase-19/EV-19-10_backup.txt](phase-19/EV-19-10_backup.txt), [phase-19/EV-19-10_backup-manifest.json](phase-19/EV-19-10_backup-manifest.json), [phase-19/EV-19-10_restore-drill.txt](phase-19/EV-19-10_restore-drill.txt), [phase-19/EV-19-10_restore.txt](phase-19/EV-19-10_restore.txt), [phase-19/EV-19-10_restore-verify.txt](phase-19/EV-19-10_restore-verify.txt) | 2026-10-15 | CM-T072 | CI evidence, not cloud evidence (same run): encrypted backup without plaintext canaries, isolated restore drill (18 of 18 tables, 3 of 3 file objects), full restore onto empty volumes and browser decryption of the restored note and file in three engines |
 | EV-19-13 | [phase-19/EV-19-13_01_vault-unlocked.png](phase-19/EV-19-13_01_vault-unlocked.png), [phase-19/EV-19-13_02_room-encrypted-file-and-note-receipts.png](phase-19/EV-19-13_02_room-encrypted-file-and-note-receipts.png), [phase-19/EV-19-13_03_trust-infrastructure-live-status.png](phase-19/EV-19-13_03_trust-infrastructure-live-status.png), [phase-19/EV-19-13_04_security-dashboard-measured-platform.png](phase-19/EV-19-13_04_security-dashboard-measured-platform.png), [phase-19/EV-19-13_05_trust-governance-risks-and-controls.png](phase-19/EV-19-13_05_trust-governance-risks-and-controls.png) | 2026-10-15 | CM-T061, CM-T072 | Screenshots of the local Docker demonstration (Chromium, 1440 px): unlocked vault, room with file and note encryption receipts (Safety Code masked), Trust Center live deployment card reporting the cloud as not connected, security dashboard with the measured local platform, governance and risk |
+
+## Phase 22A: Operational ISMS
+
+Captured on branch `feature/CM-T088-operational-isms` with `tests/deployment/isms-evidence.spec.ts` (`CM_ISMS_EVIDENCE_DIR`, Chromium, 1440 px) from the running local Docker demonstration, which is not a cloud deployment. A synthetic platform administrator walked the lifecycle and every record it made is labelled EXERCISE: a script is not the project owner, so no real approval, review or audit is shown. The support it cites is real (EV-05-02, a dependency audit run that day, the 19 uncovered Annex A numbers). Exercise records of earlier capture runs were withdrawn through the documented workflow and stay in the history.
+
+| ID | File | Date | Jira | Caption |
+|---|---|---|---|---|
+| EV-22-04 | [phase-22/EV-22-04_isms-overview-before-the-walkthrough.png](phase-22/EV-22-04_isms-overview-before-the-walkthrough.png), [phase-22/EV-22-04_isms-overview-after-the-walkthrough.png](phase-22/EV-22-04_isms-overview-after-the-walkthrough.png) | 2026-10-15 | CM-T089, CM-T092 | ISMS Control Center overview before and after the walkthrough: environment labels (local Docker, Oracle not deployed, not certified), the lifecycle, M-01 to M-07 computed from records |
+| EV-22-05 | [phase-22/EV-22-05_scope-and-context.png](phase-22/EV-22-05_scope-and-context.png) | 2026-10-15 | CM-T089, CM-T092 | Scope revision 2 with its fingerprint, boundaries, issues, interested parties, objectives and a recorded scope review (exercise) |
+| EV-22-06 | [phase-22/EV-22-06_asset-inventory.png](phase-22/EV-22-06_asset-inventory.png) | 2026-10-15 | CM-T089, CM-T092 | Asset inventory A-01 to A-18 with owners, classification, location and linked risks |
+| EV-22-07 | [phase-22/EV-22-07_risk-assessment-and-treatment.png](phase-22/EV-22-07_risk-assessment-and-treatment.png) | 2026-10-15 | CM-T089, CM-T092 | T-06 re-assessed, treated with 8.3, the control verified with EV-05-02, residual Medium accepted (exercise; project owner decision, no independent approver); risk matrix and register |
+| EV-22-08 | [phase-22/EV-22-08_statement-of-applicability.png](phase-22/EV-22-08_statement-of-applicability.png) | 2026-10-15 | CM-T089, CM-T092 | Statement of Applicability with applicability, implementation and computed assurance; 19 Annex A numbers shown as not assessed |
+| EV-22-09 | [phase-22/EV-22-09_control-verification-and-evidence.png](phase-22/EV-22-09_control-verification-and-evidence.png) | 2026-10-15 | CM-T089, CM-T092 | Control 8.8 verified with the output of a dependency audit run on 2026-10-15 (digest shown), EV-01-07 shown stale under the 7-day rule |
+| EV-22-10 | [phase-22/EV-22-10_finding-and-corrective-action.png](phase-22/EV-22-10_finding-and-corrective-action.png) | 2026-10-15 | CM-T089, CM-T092 | Stale evidence of 8.8 led to a finding: root cause, corrective action, implementation, closure evidence, effectiveness check (self-verified) and closure (exercise) |
+| EV-22-11 | [phase-22/EV-22-11_internal-audit-self-assessment.png](phase-22/EV-22-11_internal-audit-self-assessment.png) | 2026-10-15 | CM-T089, CM-T092 | Self-assessment with declared independence: one conformity, one genuine observation (19 uncovered Annex A numbers) raised as a finding |
+| EV-22-12 | [phase-22/EV-22-12_management-review.png](phase-22/EV-22-12_management-review.png) | 2026-10-15 | CM-T089, CM-T092 | One-person project review (exercise) with server-computed inputs, decisions and a follow-up action tracked as an improvement finding |
+| EV-22-13 | [phase-22/EV-22-13_policy-register.png](phase-22/EV-22-13_policy-register.png) | 2026-10-15 | CM-T089, CM-T092 | Policy register with the computed lifecycle and a recorded policy decision (exercise) |
+| EV-22-14 | [phase-22/EV-22-14_activity-and-improvement.png](phase-22/EV-22-14_activity-and-improvement.png) | 2026-10-15 | CM-T089, CM-T092 | Activity history (not tamper-evident, L-81), incidents and exercises, change control |
+| EV-22-15 | [phase-22/EV-22-15_refused-to-a-non-administrator.png](phase-22/EV-22-15_refused-to-a-non-administrator.png), [phase-22/EV-22-15_identity-confirmation-before-a-decision.png](phase-22/EV-22-15_identity-confirmation-before-a-decision.png) | 2026-10-15 | CM-T089, CM-T092 | A non-administrator receives nothing; a decision asks for the account password and an authentication code first |
+| EV-22-16 | [phase-22/EV-22-16_persistence-across-restart.txt](phase-22/EV-22-16_persistence-across-restart.txt), [phase-22/EV-22-16_records-after-restart.png](phase-22/EV-22-16_records-after-restart.png) | 2026-10-15 | CM-T089, CM-T092 | ISMS records identical before and after pnpm demo:down and pnpm demo:up; signed in again after the restart |
+| EV-22-17 | [phase-22/EV-22-17_isms-test-results.txt](phase-22/EV-22-17_isms-test-results.txt) | 2026-10-15 | CM-T091 | Local test results of the operational ISMS: 94 files and 2389 Vitest tests, negative controls (126 of 126 caught; NC-22-01 to NC-22-05), E2E in three engines, and the findings fixed on the way |
