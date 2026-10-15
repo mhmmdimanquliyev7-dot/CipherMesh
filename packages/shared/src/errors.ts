@@ -121,6 +121,17 @@ export const ErrorCode = {
   ROOM_KEY_UNAVAILABLE: 'ROOM_KEY_UNAVAILABLE',
   /** AZ-14: the member already holds the current key version under their current identity. */
   RESHARE_NOT_NEEDED: 'RESHARE_NOT_NEEDED',
+  // Operational ISMS (ADR-016, docs/security/isms-operations.md).
+  /** A risk, control, clause, evidence item, policy, user or record named in the request is unknown. */
+  ISMS_REFERENCE_UNKNOWN: 'ISMS_REFERENCE_UNKNOWN',
+  /** The transition does not exist for this record, or not from its current status. */
+  ISMS_TRANSITION_NOT_ALLOWED: 'ISMS_TRANSITION_NOT_ALLOWED',
+  /** A documented condition of the transition is not met; `issues` name which (path "condition"). */
+  ISMS_CONDITION_NOT_MET: 'ISMS_CONDITION_NOT_MET',
+  /** The record changed since the caller read it (optimistic concurrency). */
+  ISMS_VERSION_CONFLICT: 'ISMS_VERSION_CONFLICT',
+  /** An attached verification output is too large or contains secret material (INV-10). */
+  ISMS_ATTACHMENT_REJECTED: 'ISMS_ATTACHMENT_REJECTED',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

@@ -258,6 +258,9 @@ model User {
   notesAuthored       EncryptedNote[]  @relation("NoteAuthor")
   notesUpdated        EncryptedNote[]  @relation("NoteUpdatedBy")
   secretsSent         Secret[]         @relation("SecretSender")
+  ismsRecordsCreated  IsmsRecord[]     @relation("IsmsRecordCreatedBy")
+  ismsRecordsUpdated  IsmsRecord[]     @relation("IsmsRecordUpdatedBy")
+  ismsActivity        IsmsActivity[]   @relation("IsmsActivityActor")
 
   @@map("users")
 }
@@ -980,4 +983,85 @@ model AuditEvent {
   @@index([actorUserId, seq])
   @@index([occurredAt])
   @@map("audit_events")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Operational ISMS (ADR-016, docs/security/isms-operations.md). Records of management activities
+// (risk assessments and treatments, control verifications, audits, findings with corrective
+// actions, management, scope and policy reviews, incidents) and their append-only activity
+// history. Governance metadata only: no keys, content or credentials (the API validates every
+// record per kind and refuses attached output that contains secret material).
+
+enum IsmsRecordKind {
+  RISK_ASSESSMENT
+  CONTROL_VERIFICATION
+  AUDIT
+  FINDING
+  MANAGEMENT_REVIEW
+  SCOPE_REVIEW
+  POLICY_REVIEW
+  INCIDENT
+}
+
+model IsmsRecord {
+  /// class: ID
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// class: META
+  kind        IsmsRecordKind
+  /// class: META (per-kind number of the human code, for example FND-003)
+  seq         Int
+  /// class: META (catalogue reference: risk, control, policy or criterion)
+  ref         String         @db.VarChar(400)
+  /// class: META (documented workflow status; changed only by named transitions)
+  status      String         @db.VarChar(40)
+  /// class: META (governance content validated per kind by the API)
+  data        Json
+  /// class: META (optimistic concurrency: +1 on every change)
+  version     Int            @default(1)
+  /// class: META (a labelled demonstration exercise)
+  exercise    Boolean
+  /// class: META
+  createdAt   DateTime       @map("created_at") @db.Timestamptz(3)
+  /// class: META (pseudonymous user ID)
+  createdById String         @map("created_by_id") @db.Uuid
+  /// class: META
+  updatedAt   DateTime       @map("updated_at") @db.Timestamptz(3)
+  /// class: META (pseudonymous user ID)
+  updatedById String         @map("updated_by_id") @db.Uuid
+
+  createdBy User           @relation("IsmsRecordCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  updatedBy User           @relation("IsmsRecordUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  activity  IsmsActivity[]
+
+  @@unique([kind, seq])
+  @@index([kind, createdAt])
+  @@map("isms_records")
+}
+
+model IsmsActivity {
+  /// class: META (append-only order)
+  id         BigInt   @id @default(autoincrement())
+  /// class: ID
+  recordId   String   @map("record_id") @db.Uuid
+  /// class: META (transition name, or "create")
+  action     String   @db.VarChar(40)
+  /// class: META
+  fromStatus String?  @map("from_status") @db.VarChar(40)
+  /// class: META
+  toStatus   String   @map("to_status") @db.VarChar(40)
+  /// class: META (decision note or reason; no secrets)
+  rationale  String?  @db.VarChar(4000)
+  /// class: META (the record's data after the change, without attached output text)
+  snapshot   Json
+  /// class: META (pseudonymous user ID)
+  actorId    String   @map("actor_id") @db.Uuid
+  /// class: META
+  at         DateTime @db.Timestamptz(3)
+
+  record IsmsRecord @relation(fields: [recordId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actor  User       @relation("IsmsActivityActor", fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([recordId, id])
+  @@index([at])
+  @@map("isms_activity")
 }

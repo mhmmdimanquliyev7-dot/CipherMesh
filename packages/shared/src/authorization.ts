@@ -157,6 +157,11 @@ const ACCOUNT_MATRIX = {
   'PA-03': { title: 'Disable or enable a user account', scope: 'platform', stepUp: 'always' },
   'PA-04': { title: 'Administrator-assisted password or MFA reset', scope: 'platform', stepUp: 'always' },
   'PA-05': { title: 'Room content, membership, envelopes', scope: 'none' },
+  // Added for the operational ISMS (ADR-016, CM-T088): ISMS records are platform governance data,
+  // never room data; PA-08 decisions need a step-up every time.
+  'PA-06': { title: 'View operational ISMS records', scope: 'platform' },
+  'PA-07': { title: 'Record ISMS management activities', scope: 'platform' },
+  'PA-08': { title: 'Decide on ISMS records', scope: 'platform', stepUp: 'always' },
   'SS-01': { title: 'Manage own profile, sessions, MFA', scope: 'self' },
   'SS-02': { title: 'Create, unlock, re-wrap or reset own vault', scope: 'self' },
   'SS-03': { title: 'View, accept or decline own invitations', scope: 'self' },
