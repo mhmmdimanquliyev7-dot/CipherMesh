@@ -1,5 +1,5 @@
 import { createPublicKey, hkdfSync, randomUUID, verify as nodeVerify } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { generateDataKey, unwrapDataKey, wrapDataKey } from './aead';
 import { contextBytes } from './contexts';
 import { CryptoErrorCode, isCryptoError } from './errors';
@@ -23,6 +23,12 @@ import { keyVersionStatement } from './room-statements';
 import { signStatement } from './signing';
 import type { Bytes } from './types';
 import type { UnlockedVault } from './vault';
+
+// Building a room with members generates several RSA-3072 key pairs. Alone that takes about a
+// second, but in a full run (every project in parallel, and the negative-control baseline) it has
+// reached Vitest's 5 s default (observed twice on 2026-10-15, once at 5051 ms, passing alone each
+// time). The tests' assertions are unchanged; only the time they may take.
+vi.setConfig({ testTimeout: 60_000 });
 
 // Phase 11 (CM-T050, CM-T051, ADR-013, ADR-015 section 4): a rekey made in a browser. Fresh key
 // material, the signed key-version statement with the previous commitment, one envelope per
