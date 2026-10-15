@@ -1,0 +1,8 @@
+
+Running 3 tests using 1 worker
+
+  ✓  1 [chromium] › tests/deployment/restore-verify.spec.ts:26:1 › after a restore, the recorded account decrypts its note and file again (2.2s)
+  ✓  2 [firefox] › tests/deployment/restore-verify.spec.ts:26:1 › after a restore, the recorded account decrypts its note and file again (3.0s)
+  ✓  3 [webkit] › tests/deployment/restore-verify.spec.ts:26:1 › after a restore, the recorded account decrypts its note and file again (7.3s)
+
+  3 passed (14.7s)
