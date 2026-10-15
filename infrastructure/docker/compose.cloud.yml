@@ -1,0 +1,279 @@
+# CipherMesh cloud demonstration stack (CM-T065, ADR-014): one Oracle Cloud Always Free Ampere A1
+# VM running Nginx, the API, the worker job, PostgreSQL and SeaweedFS. Not the development file.
+#
+#   docker compose -f compose.cloud.yml --env-file /srv/ciphermesh/config/cloud.env up -d --wait
+#
+# Network design (deployment-architecture.md sections 1 and 2):
+#   edge     Nginx only; the only published ports (80 and 443). Has internet egress for replies.
+#   app      Nginx <-> API and worker. Internal: no egress. Nginx carries the storage host name
+#            as an alias here, so the API reaches storage over HTTPS at the same origin browsers use.
+#   data     API and worker <-> PostgreSQL. Internal. PostgreSQL accepts runtime roles over TLS only.
+#   storage  Nginx <-> SeaweedFS. Internal. Only signed object requests are proxied (nginx config).
+# Nothing but Nginx publishes a port; there is no host-network container, no privileged container
+# and no Docker socket mount. Paths default to the VM layout of infrastructure/deployment/README.md.
+name: ciphermesh
+
+x-hardening: &hardening
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '5'
+
+services:
+  nginx:
+    <<: *hardening
+    image: ciphermesh-web:${CM_RELEASE:?set CM_RELEASE}
+    environment:
+      CM_APP_HOST: ${CM_APP_HOST:?set CM_APP_HOST}
+      CM_FILES_HOST: ${CM_FILES_HOST:?set CM_FILES_HOST}
+      CM_APP_ORIGIN: ${CM_APP_ORIGIN:?set CM_APP_ORIGIN}
+      CM_FILES_ORIGIN: ${CM_FILES_ORIGIN:?set CM_FILES_ORIGIN}
+      CM_STORAGE_BUCKET: ${CM_STORAGE_BUCKET:-cm-files}
+      CM_HSTS_MAX_AGE: ${CM_HSTS_MAX_AGE:-0}
+      NGINX_ENVSUBST_OUTPUT_DIR: /tmp
+    ports:
+      - ${CM_PUBLISH_ADDRESS:-0.0.0.0}:${CM_HTTP_PORT:-80}:80
+      - ${CM_PUBLISH_ADDRESS:-0.0.0.0}:${CM_HTTPS_PORT:-443}:443
+    volumes:
+      - ${CM_TLS_DIR:-/etc/ciphermesh/tls}:/etc/ciphermesh/tls:ro
+      - ${CM_ACME_DIR:-/var/www/acme}:/var/www/acme:ro
+    tmpfs:
+      - /tmp:size=16m
+    networks:
+      edge: {}
+      app:
+        aliases:
+          - ${CM_FILES_HOST}
+      storage: {}
+    depends_on:
+      api:
+        condition: service_healthy
+      object-storage:
+        condition: service_healthy
+    healthcheck:
+      # Loopback-only status location on port 80 (the TLS listener refuses connections without
+      # a known server name, so a probe there would fail by design).
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/nginx-health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    mem_limit: 256m
+    pids_limit: 200
+
+  api:
+    <<: *hardening
+    image: ciphermesh-api:${CM_RELEASE}
+    # A dedicated uid that no host account uses; it owns the secret files (cm-secrets).
+    user: '10001:10001'
+    # Non-secret identifiers only (TOTP key ID, storage access key ID). The secret values are
+    # files under /run/secrets, never environment variables (CM-T071, L-75 resolved).
+    env_file:
+      - ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/api.env
+    secrets:
+      - api_database_url
+      - totp_encryption_key
+      - identifier_hmac_key
+      - storage_secret_access_key
+    environment:
+      NODE_ENV: production
+      DATABASE_URL_FILE: /run/secrets/api_database_url
+      TOTP_ENCRYPTION_KEY_FILE: /run/secrets/totp_encryption_key
+      IDENTIFIER_HMAC_KEY_FILE: /run/secrets/identifier_hmac_key
+      STORAGE_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_secret_access_key
+      API_HOST: 0.0.0.0
+      API_PORT: '4100'
+      APP_ORIGIN: ${CM_APP_ORIGIN}
+      TRUST_PROXY_HOPS: '1'
+      STORAGE_ENDPOINT: https://${CM_FILES_HOST}
+      STORAGE_PUBLIC_ENDPOINT: ${CM_FILES_ORIGIN}
+      STORAGE_BUCKET: ${CM_STORAGE_BUCKET:-cm-files}
+      PLATFORM_STATUS_FILE: /run/ciphermesh/status/host-status.json
+      # Trust anchor for the storage host when it is not publicly trusted (local rehearsal only).
+      NODE_EXTRA_CA_CERTS: ${CM_EXTRA_CA_IN_CONTAINER:-}
+    volumes:
+      - db-ca:/etc/ciphermesh/db-ca:ro
+      - ${CM_STATUS_DIR:-/var/lib/ciphermesh/status}:/run/ciphermesh/status:ro
+      - ${CM_EXTRA_CA_DIR:-/etc/ciphermesh/pki/extra}:/etc/ciphermesh/extra-ca:ro
+    tmpfs:
+      - /tmp:size=16m
+    networks:
+      - app
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 768m
+    pids_limit: 200
+
+  # One-shot retention job (CM-T017 to CM-T052), started by the host timer
+  # (infrastructure/deployment/systemd/ciphermesh-worker.timer): docker compose run --rm worker
+  worker:
+    <<: *hardening
+    image: ciphermesh-api:${CM_RELEASE}
+    command: ['dist/worker-retention.js']
+    profiles: ['jobs']
+    restart: 'no'
+    user: '10001:10001'
+    env_file:
+      - ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/worker.env
+    secrets:
+      - worker_database_url
+      - storage_secret_access_key
+    environment:
+      NODE_ENV: production
+      WORKER_DATABASE_URL_FILE: /run/secrets/worker_database_url
+      STORAGE_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_secret_access_key
+      STORAGE_ENDPOINT: https://${CM_FILES_HOST}
+      STORAGE_PUBLIC_ENDPOINT: ${CM_FILES_ORIGIN}
+      STORAGE_BUCKET: ${CM_STORAGE_BUCKET:-cm-files}
+      NODE_EXTRA_CA_CERTS: ${CM_EXTRA_CA_IN_CONTAINER:-}
+    volumes:
+      - db-ca:/etc/ciphermesh/db-ca:ro
+      - ${CM_EXTRA_CA_DIR:-/etc/ciphermesh/pki/extra}:/etc/ciphermesh/extra-ca:ro
+    tmpfs:
+      - /tmp:size=16m
+    networks:
+      - app
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    mem_limit: 384m
+    pids_limit: 100
+
+  postgres:
+    <<: *hardening
+    image: postgres:17.11-alpine3.24@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    # The entrypoint switches to the postgres user; it needs these capabilities only for that.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/ciphermesh/postgresql.conf
+    environment:
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=peer
+      # The superuser never gets a password (ADR-014): it is reachable only by peer authentication
+      # on the container's socket, that is by root on the VM. The image refuses to initialize
+      # without a password unless this says "trust"; cm-db-init sets it for the first start only,
+      # and the trust line it writes is never read, because pg_hba.conf below is the only HBA file.
+      POSTGRES_HOST_AUTH_METHOD: ${CM_PG_FIRST_START:-}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../postgres/postgresql.conf:/etc/ciphermesh/postgresql.conf:ro
+      - ../postgres/pg_hba.conf:/etc/ciphermesh/pg_hba.conf:ro
+      - postgres-tls:/etc/ciphermesh/tls:ro
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp:size=64m
+    shm_size: 128m
+    networks:
+      - data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready --host /var/run/postgresql --username postgres --dbname postgres']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    mem_limit: 1536m
+    pids_limit: 300
+
+  object-storage:
+    <<: *hardening
+    image: chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+    # The image's own unprivileged user. Started as that user directly, the entrypoint needs no
+    # capability to switch users; the volume is owned by it from the image's /data.
+    user: '1000:1000'
+    command:
+      - server
+      - -dir=/data
+      - -master.volumeSizeLimitMB=1024
+      - -volume.max=0
+      - -s3
+      - -s3.port=8333
+      - -s3.config=/etc/seaweedfs/identities.json
+      - -s3.allowedOrigins=${CM_APP_ORIGIN}
+      # Signatures are verified for the public storage origin; the embedded IAM API is switched
+      # off (the runtime identity is fixed in the identity file and cannot be changed over S3).
+      - -s3.externalUrl=${CM_FILES_ORIGIN}
+      - -s3.iam=false
+    volumes:
+      - object-storage-data:/data
+      - ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/seaweedfs-identities.json:/etc/seaweedfs/identities.json:ro
+    tmpfs:
+      - /tmp:size=64m
+    networks:
+      - storage
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z 127.0.0.1 8333']
+      interval: 10s
+      timeout: 3s
+      retries: 24
+    mem_limit: 768m
+    pids_limit: 300
+
+  # Operator tasks (profile ops): role bootstrap and migrations through the PostgreSQL container's
+  # own loopback interface, so no database port exists anywhere and no TLS exception is needed.
+  # Credentials arrive on standard input from the operator's workstation for one run and are
+  # never written to the VM (cm-db-init, cm-migrate).
+  ops:
+    image: ciphermesh-ops:${CM_RELEASE}
+    profiles: ['ops']
+    network_mode: service:postgres
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=64m
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+# Runtime secrets, generated on the VM by cm-secrets (owner uid 10001, mode 0400) and mounted
+# read-only under /run/secrets of the API and the worker only.
+secrets:
+  api_database_url:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/api_database_url
+  worker_database_url:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/worker_database_url
+  totp_encryption_key:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/totp_encryption_key
+  identifier_hmac_key:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/identifier_hmac_key
+  storage_secret_access_key:
+    file: ${CM_SECRETS_DIR:-/srv/ciphermesh/secrets}/storage_secret_access_key
+
+networks:
+  edge: {}
+  app:
+    internal: true
+  data:
+    internal: true
+  storage:
+    internal: true
+
+# Fixed names: the operator scripts address them directly (cm-pki installs the TLS material).
+volumes:
+  postgres-data:
+    name: ciphermesh-postgres-data
+  object-storage-data:
+    name: ciphermesh-object-storage-data
+  # Server certificate and key of PostgreSQL (key owned by uid 70, mode 0600).
+  postgres-tls:
+    name: ciphermesh-postgres-tls
+    external: true
+  # Public certificate of the deployment's private database CA, read by the API and the worker.
+  db-ca:
+    name: ciphermesh-db-ca
+    external: true

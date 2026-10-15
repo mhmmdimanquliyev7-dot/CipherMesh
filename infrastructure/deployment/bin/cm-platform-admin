@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# cm-platform-admin: grants or revokes PLATFORM_ADMIN with the server-side CLI of CM-T022, in a
+# one-off API container. There is no API for this (a stolen session cannot grant it); granting
+# requires MFA on the account, and every change revokes the account's sessions.
+#
+#   sudo cm-platform-admin grant <email>
+#   sudo cm-platform-admin revoke <email>
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker
+cm_load_config
+command="${1:-}"
+email="${2:-}"
+[[ "${command}" == grant || "${command}" == revoke ]] || cm_die 'usage: cm-platform-admin grant|revoke <email>'
+[[ "${email}" =~ ^[^[:space:]@]{1,64}@[^[:space:]@]{1,255}$ ]] || cm_die 'an email address is required'
+cm_compose run --rm --no-deps -T api dist/platform-admin.js "${command}" "${email}"

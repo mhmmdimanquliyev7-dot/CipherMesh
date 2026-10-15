@@ -1,0 +1,11 @@
+# CipherMesh encrypted backup (cm-backup): database dump, storage volume and runtime secrets,
+# encrypted to the operator's age recipient. Stops the API and storage for a few seconds.
+[Unit]
+Description=CipherMesh encrypted backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/ciphermesh/release/infrastructure/deployment/bin/cm-backup
+Nice=10

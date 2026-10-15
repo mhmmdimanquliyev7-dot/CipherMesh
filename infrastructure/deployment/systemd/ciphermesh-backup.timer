@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily CipherMesh backup at 03:30 UTC
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

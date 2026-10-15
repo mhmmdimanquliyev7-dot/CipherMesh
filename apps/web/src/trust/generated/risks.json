@@ -2271,6 +2271,175 @@
           "items": []
         }
       ]
+    },
+    {
+      "id": "T-42",
+      "threat": "Data services on the application host",
+      "title": "Data services on the same host as the application (ADR-014)",
+      "likelihood": "M",
+      "impact": "H",
+      "inherent": "High",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-71",
+        "L-75"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Information disclosure, Tampering, Elevation of privilege",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02, A-05, A-07, A-08 (ciphertext and envelopes, credentials, metadata, audit trail)",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "PostgreSQL and the object storage run in containers on the VM that also runs the edge and the API, so a compromise of that host, of Docker or of a container reaches the data services without crossing a provider boundary; a misconfiguration exposes the database or storage ports to the internet.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "An attacker with root on the VM opens a superuser session through the container socket or copies the data volumes; a Docker published-port rule or a debugging change makes 5432 or a SeaweedFS port reachable from the internet; a compromised API container scans the internal networks for the storage master or filer; the storage gateway is used to list or overwrite objects.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Only Nginx publishes ports; PostgreSQL, SeaweedFS, the API and the worker sit on internal Docker networks without egress; the provider security list and the host firewall (INPUT and DOCKER-USER) admit 22 (operator), 80 and 443 only; PostgreSQL accepts runtime roles only over TLS 1.3 with SCRAM, the superuser has no password and is reachable only through the container socket, the migration password never touches the VM's disk; Nginx forwards to storage only signed object requests in the content bucket and refuses cookies; the storage identity may read and write objects of one bucket and nothing else, and the embedded IAM API is off; read-only, non-root containers without capabilities (PostgreSQL keeps the five its entrypoint needs).",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Root on the VM controls both data services (L-71); content remains client-side ciphertext (INV-01).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "scripts/cloud/edge-check.mjs from outside (ports, storage paths, forged signatures, cookies); the database access checks of infrastructure/deployment/ci/stack-check.sh (TLS refusal, superuser refusal, TLS 1.3 sessions); the CI job \"Cloud stack (linux/arm64)\" on every pull request.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact High, inherent High. Treatment: Mitigate, Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-43",
+      "threat": "Loss of the VM or of its data",
+      "title": "Loss of the VM or of its data",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Medium",
+      "limitations": [
+        "L-72",
+        "L-73",
+        "L-74",
+        "L-77"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Denial of service, Tampering",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-02, A-07, A-08 (ciphertext and envelopes, metadata, audit trail)",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "The single VM fails, is reclaimed by the provider, is deleted by mistake, or its data is corrupted, and the service or the stored data is lost.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "A disk fills up and PostgreSQL stops; an idle Always Free instance is reclaimed; an operator deletes a volume; a failed upgrade corrupts the database; ransomware on the VM encrypts the volumes.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Daily backups of the database, the storage volume and the runtime secrets, encrypted with age to an offline key (CD-35); the operator copies backups off the VM; the restore drill verifies every table and every file object against the backup's digests; a documented restore onto an empty stack (cm-restore); disk and memory warnings in the platform status; no script deletes a volume.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "Up to 24 hours of changes can be lost, and there is no high availability (L-72, L-73).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "The CI stack check backs up, drills and fully restores the stack, then decrypts the restored note and file in Chromium, Firefox and WebKit (EV-19-10); the drill on the VM (EV-19-07).",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate, Accept. Residual: Medium.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-44",
+      "threat": "Misleading platform status",
+      "title": "Misleading platform status",
+      "likelihood": "L",
+      "impact": "M",
+      "inherent": "Low",
+      "treatment": "Mitigate",
+      "residual": "Low",
+      "limitations": [
+        "L-78"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Spoofing, Repudiation",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-07 (metadata), the operator's and the examiner's view of the deployment",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "A monitoring view shows a deployment as healthy or verified when it is not: an old success shown as current health, a collector that silently fails, values from the host forwarded as text into the page, or a rehearsal presented as the cloud.",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "The collector stops after a reboot and the last healthy status stays on screen for days; an attacker who can write the status file injects markup; the local rehearsal reports itself as an Oracle VM; a Trust Center control is marked verified in the cloud without evidence.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "Every state carries its measurement time and fixed reason codes; a host status older than 15 minutes (worker: 60 minutes) is NOT_VERIFIED, never healthy; the file is parsed against a strict schema and only short words, numbers and timestamps leave the API; the cloud is CONNECTED only with the provider's instance metadata; the status is shown to platform administrators only (PA-01); the Trust Center refuses a verified control without captured evidence (trust-content.test.ts).",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "An attacker with root on the VM can write any status (L-71); the collector runs every 5 minutes (L-78).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "apps/api/src/platform/status.test.ts (stale, future, malformed, injected text, missing services, rehearsal host) and the dashboard integration tests with a real status file.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Low, Impact Medium, inherent Low. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
     }
   ]
 }

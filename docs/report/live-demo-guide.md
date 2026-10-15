@@ -1,14 +1,14 @@
 # Live Demonstration Guide
 
-Status: Phase 14 + Prompt 16.5 (2026-10-14). For the project owner presenting CipherMesh. Order: **Cryptography → Cloud & Cloud Security → ISMS**, about 25 minutes plus questions. The same journeys are built into the application at `/trust/walkthrough`. Related: [evidence-plan.md](evidence-plan.md) section 5, [../management/phase-14-traceability.md](../management/phase-14-traceability.md).
+Status: Phase 14 + Prompt 16.5, updated for the cloud deployment of ADR-014 (2026-10-14). For the project owner presenting CipherMesh. Order: **Cryptography → Cloud & Cloud Security → ISMS**, about 25 minutes plus questions. The same journeys are built into the application at `/trust/walkthrough`. Related: [evidence-plan.md](evidence-plan.md) section 5, [../management/phase-14-traceability.md](../management/phase-14-traceability.md).
 
 ## 1. Before the session (15 minutes)
 
-1. Start the local stack: `pnpm services:up`, `pnpm storage:bootstrap`, `pnpm build`, then `node tests/e2e/static-server.mjs` (serves `https://127.0.0.1:4173` with the production security headers and the API behind `/api`). Accept the self-signed certificate once. Until the cloud workstream is done this is a **local development build**; say so.
+1. **Local Docker demonstration (the plan since 2026-10-14):** `pnpm demo:up`, then open https://app.localhost:8443 (setup, optional CA trust and troubleshooting: [local-docker-demo.md](../deployment/local-docker-demo.md)). Run `pnpm demo:status` (and `pnpm demo:worker`) shortly before showing the dashboard. Say plainly: this is the production stack on a laptop, **not** a cloud deployment. If the Oracle VM is deployed later, use its host name and the checklist in [operational-runbook.md](../deployment/operational-runbook.md) section 8 instead.
 2. Open two browser windows (for example Chromium and Firefox, or one normal and one private window).
 3. Window A: register **Alice** (a synthetic `@example.test` address), sign in, create the vault, create a STANDARD room "Demo room".
 4. Window B: register **Bob**, sign in, create the vault. In window A invite Bob as Member; in window B accept on the Invitations page.
-5. Optional, for the dashboard: register a third account, turn on two-step sign-in under Account, then on the server run `pnpm admin:platform-role grant <email>` and sign in again with the code.
+5. Optional, for the dashboard: register a third account, turn on two-step sign-in under Account, then run `pnpm demo:admin <email>` (on the cloud VM: `cm-platform-admin grant <email>`) and sign out and in again with the code.
 6. Never use real names, real email addresses or real content. Never show the Account page while an authenticator QR code or recovery codes are on screen.
 
 ## 2. Cryptography (10 minutes)
@@ -26,13 +26,18 @@ Status: Phase 14 + Prompt 16.5 (2026-10-14). For the project owner presenting Ci
 
 ## 3. Cloud & cloud security (7 minutes)
 
+Scenario B (infrastructure) and Scenario C (cloud security) on the **local Docker demonstration**. Show what runs and what is verified locally, and name what only a cloud VM can prove. Nothing on screen shows a password, passphrase, authenticator secret or key.
+
 | Step | Where | Say and show |
 |---|---|---|
-| 1 | Trust Center, Infrastructure | The designed deployment: Nginx on an IaaS VM is the only public component; the API, worker, managed PostgreSQL (PaaS) and object storage are private. Show the network exposure table. |
-| 2 | Same page, Live checks | This browser checks HTTPS, the security headers of this response, API liveness and readiness. HSTS shows "Not configured here": it belongs to the TLS edge of the cloud deployment. These are observations, not monitoring (L-69). |
-| 3 | Same page, Control register | Each control separates Designed, Configured (a file in this repository) and Verified (captured evidence, in a named environment). Nothing is claimed for the cloud yet: "Cloud deployment: Not connected". |
-| 4 | Same page, Shared responsibility | Provider versus team, per service model; "managed does not mean secure by default". |
-| 5 | Evidence, subject Cloud security | Captured: loopback-only development services, database role grants, expiring presigned URLs. Planned for the cloud workstream: firewall, TLS scan, hardening, restore test. |
+| 1 | Browser address bar on both host names | HTTPS with TLS 1.3 from a local CA limited to localhost names; the storage host is a different host name, so the session cookie never reaches it (SF-07-01). Say: in the cloud this would be a Let's Encrypt certificate (not verified yet). |
+| 2 | Application header and Trust Center, Infrastructure | "Local Docker demonstration" label. As the platform administrator: "Cloud deployment (live)" says **Not connected**, because the host reported no cloud instance metadata. That is the correct answer for a laptop (T-44, L-80). |
+| 3 | Security dashboard, Platform components and Cloud deployment | API, database and object storage measured seconds ago; worker and host from the collector with their times; containers healthy; the last backup and restore drill. Data older than 15 minutes would say "Not verified". |
+| 4 | Infrastructure, network exposure table and diagram | One VM design: only Nginx publishes ports (here on 127.0.0.1); the API, worker, PostgreSQL and SeaweedFS sit on internal Docker networks without egress; PostgreSQL accepts the API only over TLS 1.3 and has no superuser password; the storage gateway forwards only signed object requests. Same Compose file as for the cloud (ADR-014). |
+| 5 | Terminal | `node scripts/cloud/edge-check.mjs --app https://app.localhost:8443 --files https://files.localhost:8443 --connect 127.0.0.1 --ca %USERPROFILE%/.ciphermesh-rehearsal/rehearsal-ca.crt --http-port 8080 --ports 9333,8888,4100,2375`: all PASS. |
+| 6 | Evidence, subject Cloud security | EV-17-09 (local verification: container hardening, database rules, storage refusals, browser tests, backup and restore), EV-19-13 (screenshots), EV-17-06 and EV-19-10 (the same checks on linux/arm64 in CI). Cloud items (firewall, SSH, public TLS, external scan, Lynis) are shown as planned, not verified. |
+| 7 | Terminal, optional | `pnpm demo:backup` then `pnpm demo:drill`: the drill restores into isolated containers and reports every table and file object identical. |
+| 8 | Infrastructure, Shared responsibility and Limitations | Who would own what in the cloud; L-71 to L-80, including L-80 (local and CI evidence is not cloud evidence). |
 
 ## 4. ISMS & governance (7 minutes)
 
@@ -42,6 +47,7 @@ Status: Phase 14 + Prompt 16.5 (2026-10-14). For the project owner presenting Ci
 | 2 | Risk register | Open T-06 (broken object-level authorization): inherent Critical, residual Low, its controls and testing strategy. The matrix counts risks per likelihood and impact. |
 | 3 | Control register | Open 8.3 (information access restriction): its text names the BOLA suite; evidence EV-05-02 is captured. |
 | 4 | Risk register and limitations | Open T-23 (compromised client): residual High, accepted, documented in L-01. Limitations are part of the model. |
+| 4b | Risk register, cloud (Scenario D) | Open T-42 (data services on the application host): the control list names the security list, host firewall, internal networks, TLS-only database roles and the signed-object storage gateway; the evidence links show the internal networks, database rules and storage gateway verified in the local Docker demonstration and in CI (EV-17-09, EV-17-06), while the security list and host firewall stay planned until a VM exists; residual Medium, accepted in ADR-014 and L-71. The treatment decision is the owner's $0 decision, recorded in the ADR. |
 | 5 | Room, Security profile | The profile is the information classification (5.12); the rules shown come from the versioned catalogue the API enforces. |
 | 6 | Evidence, status Missing and Deferred | Missing items (for example Jira screenshots) and the deferred audit-ledger evidence are visible. 5.33 and 8.15 are Partial because Phase 12 was deferred. |
 | 7 | Security dashboard (administrator) | Aggregates from the database with definitions; SD-10, SD-11, SD-12 and SD-15 say "Not implemented"; no score. Everyone else gets 404. |

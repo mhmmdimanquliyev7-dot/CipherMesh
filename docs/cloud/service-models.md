@@ -1,6 +1,6 @@
 # Cloud Service Models
 
-Status: Phase 0.5 baseline, provider-neutral. The cloud provider is selected in Phase 17 through ADR-014 (Jira CM-T063). Related: [shared-responsibility.md](shared-responsibility.md), [deployment-architecture.md](deployment-architecture.md), [ADR-006](../architecture/adr/ADR-006-cloud-service-models.md).
+Status: Phase 0.5 baseline. The provider was selected on 2026-10-14 in [ADR-014](../architecture/adr/ADR-014-cloud-provider-oci-always-free.md) (Jira CM-T063): Oracle Cloud Always Free, one VM, with PostgreSQL and the object storage in containers on it. Sections 3 and 4 describe the managed services of the original design; section 8 states what the deployment does instead. Related: [shared-responsibility.md](shared-responsibility.md), [deployment-architecture.md](deployment-architecture.md), [ADR-006](../architecture/adr/ADR-006-cloud-service-models.md).
 
 ## 1. Summary
 
@@ -74,3 +74,15 @@ Hosting the static client on a managed frontend service would move code delivery
 7. Cost within the available student credits.
 
 Feature availability, especially retention-lock modes, private networking and signing algorithms, differs between providers. It must be verified at selection time, not assumed.
+
+## 8. The deployed variant (ADR-014)
+
+| Model | Original design | Deployed for the university delivery |
+|---|---|---|
+| IaaS | Cloud VM | **OCI VM.Standard.A1.Flex** (2 OCPUs, 12 GB, Ubuntu 24.04 aarch64), Always Free |
+| PaaS | Managed PostgreSQL | **Not deployed**: OCI's managed PostgreSQL is not Always Free and the budget is $0. PostgreSQL runs in a container on the VM; the PaaS model and its shared responsibility are explained in the report |
+| SaaS | Jira Cloud | Jira Cloud (unchanged) |
+| Storage | Provider-managed object storage | **SeaweedFS** in a container on the VM, reached by browsers through Nginx on a second host name (signed object requests only) |
+
+Criteria of section 7 as applied: 1 met (Ubuntu aarch64 image, security list, SSH key injection); 2 not met at $0 (self-hosted instead, L-71, L-72); 3 met for presigned URLs and CORS by SeaweedFS, without versioning or retention lock (L-74); 4 met (home region, single region); 5 met for console MFA (EV-19-08), no API keys are created; 6 not used (Phase 12 deferred); 7 met: $0, Always Free resources only (EV-17-07).
+

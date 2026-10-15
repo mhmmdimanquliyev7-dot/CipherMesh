@@ -17,7 +17,7 @@ function readApiBasePath(): string {
  * shown so nobody mistakes a development build for the cloud deployment, and it is never
  * presented as a verification of anything. Unknown values fail the build.
  */
-export const DEPLOYMENT_ENVIRONMENTS = ['development', 'cloud-demonstration'] as const;
+export const DEPLOYMENT_ENVIRONMENTS = ['development', 'local-docker', 'cloud-demonstration'] as const;
 export type DeploymentEnvironment = (typeof DEPLOYMENT_ENVIRONMENTS)[number];
 
 function readDeploymentEnvironment(): DeploymentEnvironment {

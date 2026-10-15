@@ -11,7 +11,7 @@ An ADR records one significant decision: its context, the decision, the alternat
 | [ADR-003](ADR-003-aes-256-gcm.md) | AES-256-GCM for symmetric encryption | Accepted |
 | [ADR-004](ADR-004-key-management.md) | Key-management approach | Accepted (revised in Phase 0.5) |
 | [ADR-005](ADR-005-jira-cloud-management-saas.md) | Jira Cloud as management SaaS | Accepted |
-| [ADR-006](ADR-006-cloud-service-models.md) | IaaS, PaaS and SaaS architecture | Accepted (classification corrected in Phase 0.5; provider selection deferred) |
+| [ADR-006](ADR-006-cloud-service-models.md) | IaaS, PaaS and SaaS architecture | Accepted (classification corrected in Phase 0.5); PaaS row and provider storage superseded for the deployment by ADR-014 |
 | [ADR-007](ADR-007-asymmetric-key-wrapping.md) | RSA-OAEP-3072 for room-key distribution | Accepted (Phase 6: room envelopes confirmed across Chromium, Firefox and WebKit) |
 | [ADR-008](ADR-008-server-side-sessions.md) | Opaque server-side sessions | Accepted (lifecycle and CSRF completed in Phase 0.5) |
 | [ADR-009](ADR-009-tamper-evident-audit-ledger.md) | Tamper-evident audit ledger | Accepted (trust model added in Phase 0.5) |
@@ -19,9 +19,10 @@ An ADR records one significant decision: its context, the decision, the alternat
 | [ADR-011](ADR-011-static-frontend-delivery.md) | Static Next.js export served by Nginx | Accepted for export and CSP (Phase 1); identifier routing confirmed in Phase 5 |
 | [ADR-012](ADR-012-room-safety-code.md) | Room Safety Code | Accepted |
 | [ADR-013](ADR-013-rekey-state-machine.md) | Client-driven rekey state machine | Accepted |
+| [ADR-014](ADR-014-cloud-provider-oci-always-free.md) | Cloud provider and deployment model: Oracle Cloud Always Free, one VM, self-hosted PostgreSQL and SeaweedFS | Accepted (2026-10-14, project owner) |
 | [ADR-015](ADR-015-identity-signing-keys.md) | Per-user signing keys and signed room-key versions (OCD-12) | Accepted (2026-10-05; identity format implemented in Phase 4, room statements in Phases 6 and 11) |
 
-"Accepted" means the decision is part of the architecture baseline, subject to the project owner's approval of Phase 0.5. ADR-014 is reserved for the cloud provider selection in Phase 17. "Proposed" means the direction is recommended but must be confirmed by a test or benchmark in a later phase.
+"Accepted" means the decision is part of the architecture baseline, subject to the project owner's approval of Phase 0.5. "Proposed" means the direction is recommended but must be confirmed by a test or benchmark in a later phase.
 
 ## Status values
 

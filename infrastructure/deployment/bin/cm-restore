@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# cm-restore: full recovery of a backup onto an EMPTY stack, for a lost or rebuilt VM and for the
+# browser-level restore test (ADR-014, docs/deployment/backup-and-restore.md). It refuses to run
+# while live data volumes exist: it never restores over a running system.
+#
+#   sudo cm-restore <backup.tar.age> < restore-input.txt
+#
+# Standard input: line 1 the cm_migrator password, then the operator's age identity. Both are
+# used for this run only. The runtime secrets of the backup are restored (the TOTP key is needed
+# to read stored TOTP secrets); existing secret files must be identical to them or absent.
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker tar cmp
+cm_load_config
+
+archive="${1:-}"
+[[ -r "${archive}" ]] || cm_die 'usage: cm-restore <backup.tar.age> < restore-input.txt'
+for volume in ciphermesh-postgres-data ciphermesh-object-storage-data; do
+  ! docker volume inspect "${volume}" > /dev/null 2>&1 || cm_die "volume ${volume} exists: cm-restore only restores onto an empty stack"
+done
+
+work="$(mktemp -d "${CM_BACKUP_WORK_BASE:-/run}/cm-restore.XXXXXX")"
+trap 'rm -rf "${work}"' EXIT
+cm_read_line migrator_password
+cat > "${work}/identity.txt"
+grep -q '^AGE-SECRET-KEY-1' "${work}/identity.txt" || cm_die 'standard input: migrator password line, then the age identity'
+cm_age_decrypt "${work}/identity.txt" < "${archive}" | tar -C "${work}" -xf -
+rm -f "${work}/identity.txt"
+for part in db.dump tables.txt object-storage.tar secrets.tar; do
+  [[ -s "${work}/${part}" ]] || cm_die "backup part ${part} missing"
+done
+
+mkdir -p "${work}/restored" && tar --force-local -C "${work}/restored" -xf "${work}/secrets.tar"
+restored="$(find "${work}/restored" -name api.env -printf '%h\n' | head -n 1)"
+mkdir -p "${CM_SECRETS_DIR}" && chmod 700 "${CM_SECRETS_DIR}"
+for file in api.env worker.env seaweedfs-identities.json api_database_url worker_database_url \
+  totp_encryption_key identifier_hmac_key storage_secret_access_key; do
+  if [[ -e "${CM_SECRETS_DIR}/${file}" ]]; then
+    cmp -s "${CM_SECRETS_DIR}/${file}" "${restored}/${file}" || cm_die "${file} differs from the backup; move it away first"
+  else
+    cp -p "${restored}/${file}" "${CM_SECRETS_DIR}/${file}"   # keeps the owner (uid 10001 or 1000) and mode
+  fi
+done
+cm_info 'runtime secrets restored'
+
+"$(dirname "$0")/cm-pki"
+printf '%s\n' "${migrator_password}" | "$(dirname "$0")/cm-db-init" --roles-only
+cm_info 'restoring the database dump'
+cm_compose exec -T -u postgres postgres pg_restore --dbname ciphermesh --no-owner --role cm_migrator --exit-on-error \
+  < "${work}/db.dump"
+cm_psql_superuser ciphermesh -At < "$(dirname "$0")/../lib/table-digests.sql" > "${work}/tables.restored.txt"
+diff -q "${work}/tables.txt" "${work}/tables.restored.txt" > /dev/null || cm_die 'restored tables differ from the backup manifest'
+cm_info "database restored: $(wc -l < "${work}/tables.txt") tables identical to the backup"
+
+cm_restore_storage_volume ciphermesh-object-storage-data < "${work}/object-storage.tar"
+cm_info 'object storage restored'
+cm_compose up --detach --wait
+cm_compose --profile jobs run --rm --no-deps -T \
+  -v "$(cd "$(dirname "$0")/../lib" && pwd)/verify-objects.mjs:/opt/cm/verify-objects.mjs:ro" \
+  worker /opt/cm/verify-objects.mjs || cm_die 'stored objects do not match the restored database'
+cm_info 'restore complete; sign in and open a note and a file to confirm browser decryption'

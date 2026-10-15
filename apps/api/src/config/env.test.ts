@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig, loadWorkerConfig } from './env';
+import { ConfigError, loadConfig, loadWorkerConfig, resolveSecretFiles } from './env';
 
 const CANARY_PASSWORD = 'canary-db-password-123';
 const LOCAL_DB = `postgresql://cm_api:${CANARY_PASSWORD}@127.0.0.1:55432/ciphermesh`;
@@ -265,6 +265,22 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('platform status file (ADR-014)', () => {
+    it('is absent unless configured, and accepts an absolute path to a JSON file', () => {
+      expect(loadConfig(valid).platformStatusFile).toBeNull();
+      expect(
+        loadConfig({ ...production, PLATFORM_STATUS_FILE: '/run/ciphermesh/status/host-status.json' })
+          .platformStatusFile,
+      ).toBe('/run/ciphermesh/status/host-status.json');
+    });
+
+    it('refuses relative paths, parent references and other file types', () => {
+      for (const value of ['status.json', '/run/../etc/passwd.json', '/etc/shadow', '/run/a b.json', 'C:/x.json']) {
+        expect(problemsOf({ ...valid, PLATFORM_STATUS_FILE: value }), value).toEqual(['PLATFORM_STATUS_FILE']);
+      }
+    });
+  });
+
   it('treats empty values as missing', () => {
     expect(loadConfig({ ...valid, API_PORT: '' }).api.port).toBe(4100);
   });
@@ -278,5 +294,74 @@ describe('loadConfig', () => {
       expect(String(error)).toContain('API_PORT');
       expect(String(error)).not.toContain('canary-secret-value');
     }
+  });
+});
+
+describe('secrets from files (ADR-014, CM-T071)', () => {
+  const files: Record<string, string> = {
+    '/run/secrets/database_url': `${LOCAL_DB}\n`,
+    '/run/secrets/totp': `${KEYS.TOTP_ENCRYPTION_KEY}\n`,
+    '/run/secrets/two-lines': 'a\nb\n',
+    '/run/secrets/empty': '\n',
+  };
+  const read = (path: string): string => {
+    const content = files[path];
+    if (content === undefined) throw new Error(`ENOENT: ${path}`);
+    return content;
+  };
+  const problemsFor = (env: Record<string, string>): string[] => {
+    try {
+      resolveSecretFiles(env, read);
+    } catch (error) {
+      if (error instanceof ConfigError) return error.problems.map((p) => `${p.variable}: ${p.problem}`);
+      throw error;
+    }
+    return [];
+  };
+
+  it('reads <NAME>_FILE into <NAME>, without the trailing newline, and removes the _FILE variable', () => {
+    const env = resolveSecretFiles(
+      {
+        NODE_ENV: 'development',
+        DATABASE_URL_FILE: '/run/secrets/database_url',
+        TOTP_ENCRYPTION_KEY_FILE: '/run/secrets/totp',
+      },
+      read,
+    );
+    expect(env['DATABASE_URL']).toBe(LOCAL_DB);
+    expect(env['TOTP_ENCRYPTION_KEY']).toBe(KEYS.TOTP_ENCRYPTION_KEY);
+    expect(env['DATABASE_URL_FILE']).toBeUndefined();
+    const { DATABASE_URL: _url, TOTP_ENCRYPTION_KEY: _totp, ...rest } = valid;
+    expect(loadConfig({ ...rest, ...env }).database.url.reveal()).toBe(LOCAL_DB);
+  });
+
+  it('refuses both forms, relative paths, unreadable, empty and multi-line files', () => {
+    expect(problemsFor({ DATABASE_URL: LOCAL_DB, DATABASE_URL_FILE: '/run/secrets/database_url' })).toEqual([
+      'DATABASE_URL_FILE: set either DATABASE_URL or DATABASE_URL_FILE, not both',
+    ]);
+    expect(problemsFor({ DATABASE_URL_FILE: 'run/secrets/database_url' })).toEqual([
+      'DATABASE_URL_FILE: must be an absolute path',
+    ]);
+    expect(problemsFor({ DATABASE_URL_FILE: '/run/secrets/../etc/shadow' })).toEqual([
+      'DATABASE_URL_FILE: must be an absolute path',
+    ]);
+    expect(problemsFor({ IDENTIFIER_HMAC_KEY_FILE: '/run/secrets/missing' })).toEqual([
+      'IDENTIFIER_HMAC_KEY_FILE: could not be read',
+    ]);
+    expect(problemsFor({ STORAGE_SECRET_ACCESS_KEY_FILE: '/run/secrets/empty' })).toEqual([
+      'STORAGE_SECRET_ACCESS_KEY_FILE: must contain one non-empty line',
+    ]);
+    expect(problemsFor({ WORKER_DATABASE_URL_FILE: '/run/secrets/two-lines' })).toEqual([
+      'WORKER_DATABASE_URL_FILE: must contain one non-empty line',
+    ]);
+  });
+
+  it('never echoes a secret file content or path content in its error', () => {
+    try {
+      resolveSecretFiles({ DATABASE_URL: 'x', DATABASE_URL_FILE: '/run/secrets/database_url' }, read);
+    } catch (error) {
+      expect(String(error)).not.toContain(CANARY_PASSWORD);
+    }
+    expect(() => resolveSecretFiles({ OTHER_FILE: '/etc/passwd' }, read)).not.toThrow();
   });
 });

@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# cm-deploy: deploys one Git commit of CipherMesh on the VM (ADR-014, CM-T065; procedure in
+# docs/deployment/operational-runbook.md). Run as root:
+#
+#   sudo cm-deploy <40-hex commit>     fetch, verify, build natively (linux/arm64), start
+#   sudo cm-deploy --rollback          switch back to the previous release's images
+#
+# Source: a clone of the public GitHub repository in /srv/ciphermesh/src. The commit must be on a
+# branch of the origin (main, or the pull request branch under review); Git verifies the object
+# hashes, so the build input is exactly that commit. Images are built here, natively, and tagged
+# with the first 12 characters of the commit. Nothing secret enters a build: the only build
+# arguments are the public storage origin and the environment label.
+#
+# Safety: no volume is removed and no image of the running or previous release is deleted. A
+# release that brings new migrations is not started until they are applied (cm-migrate, after
+# cm-backup); migrations are forward-only, so their rollback is a restore.
+. "$(dirname "$0")/cm-lib.sh"
+[[ "$(id -u)" == 0 ]] || cm_die 'run as root (sudo)'
+cm_require docker git curl
+cm_load_config
+src="${CM_HOME}/src"
+repository="${CM_REPOSITORY:-https://github.com/mhmmdimanquliyev7-dot/CipherMesh.git}"
+
+set_config() { # <name> <value>: replaces or appends one line of the non-secret configuration
+  if grep -q "^$1=" "${CM_CONFIG}"; then sed -i "s|^$1=.*|$1=$2|" "${CM_CONFIG}"; else echo "$1=$2" >> "${CM_CONFIG}"; fi
+}
+
+record_deployment() { # <commit> <release>
+  mkdir -p "${CM_STATUS_DIR}"
+  printf '{"schema":1,"commit":"%s","release":"%s","deployedAt":"%s","images":{"api":"%s","web":"%s"}}\n' "$1" "$2" \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(docker image inspect --format '{{.Id}}' "ciphermesh-api:$2")" \
+    "$(docker image inspect --format '{{.Id}}' "ciphermesh-web:$2")" > "${CM_STATUS_DIR}/deployment.json"
+  chmod 644 "${CM_STATUS_DIR}/deployment.json"
+}
+
+smoke() {
+  local origin="https://${CM_APP_HOST}"
+  for _ in $(seq 1 30); do
+    curl -fsS --max-time 5 --resolve "${CM_APP_HOST}:443:127.0.0.1" "${origin}/api/ready" > /dev/null 2>&1 && break
+    sleep 2
+  done
+  curl -fsS --max-time 5 --resolve "${CM_APP_HOST}:443:127.0.0.1" "${origin}/api/ready" > /dev/null \
+    || cm_die 'the API is not ready after the deployment (check: docker compose logs api)'
+  curl -fsS --max-time 5 --resolve "${CM_APP_HOST}:443:127.0.0.1" -o /dev/null -D - "${origin}/" \
+    | grep -qi "^content-security-policy: default-src 'none'" || cm_die 'the page is served without its CSP'
+  cm_info "smoke test passed: ${origin} ready, CSP present"
+}
+
+if [[ "${1:-}" == --rollback ]]; then
+  previous="${CM_PREVIOUS_RELEASE:-}"
+  [[ -n "${previous}" && -d "${CM_HOME}/release.prev" ]] || cm_die 'no previous release recorded'
+  docker image inspect "ciphermesh-api:${previous}" "ciphermesh-web:${previous}" > /dev/null || cm_die 'previous images missing'
+  current="${CM_RELEASE}"
+  mv "${CM_RELEASE_DIR}" "${CM_HOME}/release.rolledback"
+  mv "${CM_HOME}/release.prev" "${CM_RELEASE_DIR}"
+  rm -rf "${CM_HOME}/release.rolledback"
+  set_config CM_RELEASE "${previous}"
+  set_config CM_PREVIOUS_RELEASE ''
+  cm_load_config
+  cm_compose up --detach --wait --remove-orphans
+  record_deployment "$(cat "${CM_RELEASE_DIR}/.commit" 2> /dev/null || printf unknown)" "${previous}"
+  smoke
+  cm_info "rolled back from ${current} to ${previous}"
+  exit 0
+fi
+
+commit="${1:-}"
+[[ "${commit}" =~ ^[0-9a-f]{40}$ ]] || cm_die 'usage: cm-deploy <40-hex commit> | --rollback'
+release="${commit:0:12}"
+
+cm_info "fetching ${repository}"
+[[ -d "${src}/.git" ]] || git clone --quiet --no-checkout "${repository}" "${src}"
+git -C "${src}" fetch --quiet --prune origin '+refs/heads/*:refs/remotes/origin/*'
+git -C "${src}" cat-file -e "${commit}^{commit}" 2> /dev/null || cm_die "commit ${commit} is not in the repository"
+branches="$(git -C "${src}" branch -r --contains "${commit}" | tr -d ' ' | paste -sd, -)"
+[[ -n "${branches}" ]] || cm_die "commit ${commit} is on no branch of the origin"
+cm_info "commit ${release} is on: ${branches}"
+
+new="${CM_HOME}/release.new"
+rm -rf "${new}"
+mkdir -p "${new}"
+git -C "${src}" archive "${commit}" | tar -x -C "${new}"
+printf '%s\n' "${commit}" > "${new}/.commit"
+
+cm_info "building linux/$(uname -m) images ${release} (api, ops, web)"
+for target in api ops; do
+  docker build --quiet -f "${new}/infrastructure/docker/Dockerfile" --target "${target}" \
+    -t "ciphermesh-${target}:${release}" "${new}" > /dev/null
+done
+docker build --quiet -f "${new}/infrastructure/docker/Dockerfile" --target web \
+  --build-arg "CM_STORAGE_ORIGIN=${CM_FILES_ORIGIN}" --build-arg NEXT_PUBLIC_CM_ENVIRONMENT=cloud-demonstration \
+  -t "ciphermesh-web:${release}" "${new}" > /dev/null
+for target in api ops web; do
+  docker image inspect "ciphermesh-${target}:${release}" --format "ciphermesh-${target}:${release} {{.Os}}/{{.Architecture}} {{.Size}} bytes"
+done
+
+# Pending migrations: the release's migration directories that the database has not applied.
+if docker volume inspect ciphermesh-postgres-data > /dev/null 2>&1 && [[ -n "$(cm_compose ps -q postgres)" ]]; then
+  applied="$(printf 'SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL;\n' \
+    | cm_psql_superuser ciphermesh -At 2> /dev/null || true)"
+  pending=''
+  for dir in "${new}"/prisma/migrations/*/; do
+    name="$(basename "${dir}")"
+    grep -qx "${name}" <<< "${applied}" || pending+=" ${name}"
+  done
+  if [[ -n "${pending}" ]]; then
+    cm_info "release ${release} brings migrations:${pending}"
+    cm_die 'take a backup (cm-backup), apply them (cm-migrate from the new release), then rerun cm-deploy'
+  fi
+fi
+
+if [[ -d "${CM_RELEASE_DIR}" ]]; then
+  rm -rf "${CM_HOME}/release.prev"
+  mv "${CM_RELEASE_DIR}" "${CM_HOME}/release.prev"
+  set_config CM_PREVIOUS_RELEASE "${CM_RELEASE}"
+fi
+mv "${new}" "${CM_RELEASE_DIR}"
+set_config CM_RELEASE "${release}"
+cm_load_config
+if ! docker volume inspect ciphermesh-postgres-data > /dev/null 2>&1; then
+  cm_info "first deployment: release ${release} is installed but not started. One-time steps, in order:"
+  cm_info '  cm-pki; cm-secrets; cm-tls placeholder; cm-db-init < migrator password; cm-storage-init'
+  cm_info "  then: cm-deploy ${commit} (starts the stack), cm-tls issue, cm-status-collect"
+  exit 0
+fi
+cm_compose up --detach --wait --remove-orphans
+record_deployment "${commit}" "${release}"
+smoke
+cm_info "deployed ${release}"

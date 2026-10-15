@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# cm-status-collect: measured, sanitized host status for the platform dashboard (ADR-014).
+# Run by ciphermesh-status.timer every 5 minutes as root. Writes CM_STATUS_DIR/host-status.json,
+# which the API container reads (read-only mount) and validates; the API never runs commands.
+#
+# Sources (each value is measured now, by this script):
+#   cloud      OCI instance metadata service (IMDSv2, link-local): region, shape, OCPUs, memory.
+#              No OCIDs, availability domain, tenancy or IP address is recorded.
+#   services   docker inspect of the compose services: running state and health only.
+#   host       disk use of / and of Docker's data root, memory use, 1-minute load, host firewall
+#              state, unattended-upgrades state.
+#   tls        notAfter of the two installed certificates.
+#   jobs       outcomes recorded by cm-backup, cm-restore-drill and the worker timer.
+# Only fixed words, numbers, ISO timestamps and short identifiers are written.
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker
+cm_load_config
+mkdir -p "${CM_STATUS_DIR}"
+chmod 755 "${CM_STATUS_DIR}"
+
+iso() { date -u -d "$1" +%Y-%m-%dT%H:%M:%SZ 2> /dev/null || printf 'null'; }
+word() { [[ "$1" =~ ^[A-Za-z0-9._:-]{1,64}$ ]] && printf '"%s"' "$1" || printf 'null'; }
+num() { [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]] && printf '%s' "$1" || printf 'null'; }
+[[ -n "${CM_PYTHON}" ]] || cm_die 'python3 (or python) is required'
+json_file() { [[ -s "$1" ]] && "${CM_PYTHON}" -c 'import json,sys; json.dump(json.load(open(sys.argv[1])), sys.stdout)' "$1" 2> /dev/null || printf 'null'; }
+
+# --- cloud (OCI IMDSv2); absent outside OCI, which leaves provider "none". The local rehearsal
+# never asks: a laptop must not be presented as a cloud instance.
+provider=none region='' shape='' ocpus='' memory=''
+if [[ "${CM_REHEARSAL:-}" != 1 ]] && imds="$(curl -s --max-time 2 -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/instance/ 2> /dev/null)" \
+  && [[ -n "${imds}" ]]; then
+  read -r region shape ocpus memory < <("${CM_PYTHON}" -c '
+import json, sys
+d = json.loads(sys.stdin.read())
+c = d.get("shapeConfig") or {}
+print(d.get("canonicalRegionName") or d.get("region") or "", d.get("shape") or "", c.get("ocpus") or "", c.get("memoryInGBs") or "")
+' <<< "${imds}" 2> /dev/null || true) || true
+  [[ -n "${shape}" ]] && provider=oci
+fi
+
+# --- services
+services=''
+for service in nginx api postgres object-storage; do
+  id="$(cm_compose ps -q "${service}" 2> /dev/null | head -n 1)"
+  if [[ -z "${id}" ]]; then
+    state=absent health=none
+  else
+    read -r state health < <(docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${id}")
+  fi
+  services+="${services:+,}{\"name\":\"${service}\",\"state\":$(word "${state}"),\"health\":$(word "${health}")}"
+done
+
+# --- host
+if [[ "${CM_REHEARSAL:-}" == 1 ]]; then
+  # Docker Desktop: the stack's host is Docker's own Linux VM, so it is measured from inside a
+  # throwaway container (no network, the data volume read-only for its file system).
+  probe="$(docker run --rm --network none -v ciphermesh-postgres-data:/data:ro --entrypoint sh "${CM_POSTGRES_IMAGE}"     -c 'df -P /data | tail -n 1; cat /proc/loadavg; cat /proc/meminfo' 2> /dev/null || true)"
+  disk="$(sed -n 1p <<< "${probe}" | awk '{print $5}' | tr -dc '0-9')"
+  docker_disk="${disk}"
+  load1="$(sed -n 2p <<< "${probe}" | cut -d' ' -f1)"
+  memory_used="$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{if(t>0) printf "%d", (t-a)*100/t}' <<< "${probe}")"
+  # The cloud VM's host firewall and automatic upgrades do not apply to a laptop's Docker Desktop,
+  # which publishes the stack on 127.0.0.1 only.
+  firewall=not-applicable
+  upgrades=not-applicable
+  os_word="$(docker info --format '{{.OperatingSystem}}' 2> /dev/null | tr -c 'A-Za-z0-9.' '-' | cut -c1-40 | sed 's/-*$//')"
+  arch_word="$(docker info --format '{{.Architecture}}' 2> /dev/null)"
+else
+  disk="$(df --output=pcent / | tail -n 1 | tr -dc '0-9')"
+  docker_root="$(docker info --format '{{.DockerRootDir}}' 2> /dev/null || printf '/var/lib/docker')"
+  docker_disk="$(df --output=pcent "${docker_root}" | tail -n 1 | tr -dc '0-9')"
+  memory_used="$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{if(t>0) printf "%d", (t-a)*100/t}' /proc/meminfo)"
+  load1="$(cut -d' ' -f1 /proc/loadavg)"
+  # Active means: inbound traffic not explicitly allowed is refused (cm-firewall), and forwarded
+  # traffic from outside reaches containers only on 80 and 443 (DOCKER-USER ends in DROP).
+  firewall=inactive
+  if iptables -S INPUT 2> /dev/null | grep -Eq -- '-j (REJECT|DROP)( |$)|^-P INPUT DROP'     && iptables -S DOCKER-USER 2> /dev/null | grep -q -- '-j DROP'; then
+    firewall=active
+  fi
+  upgrades=inactive
+  systemctl is-active --quiet unattended-upgrades 2> /dev/null && upgrades=active
+  os_word="$(. /etc/os-release && printf '%s-%s' "${ID:-linux}" "${VERSION_ID:-unknown}")"
+  arch_word="$(uname -m)"
+fi
+
+# --- tls
+certs=''
+for name in app files; do
+  cert="${CM_TLS_DIR}/${name}/fullchain.pem"
+  not_after=null issuer=null
+  if [[ -s "${cert}" ]]; then
+    not_after="\"$(iso "$(openssl x509 -in "${cert}" -noout -enddate | cut -d= -f2)")\""
+    org="$(openssl x509 -in "${cert}" -noout -issuer -nameopt multiline | awk -F' = ' '/organizationName/{o=$2} /commonName/{c=$2} END{print (o != "" ? o : c)}')"
+    issuer="$(word "$(tr -c 'A-Za-z0-9._-' '-' <<< "${org:-unknown}" | cut -c1-40 | sed 's/-*$//')")"
+  fi
+  certs+="${certs:+,}{\"name\":\"${name}\",\"notAfter\":${not_after},\"issuer\":${issuer}}"
+done
+
+# --- deployment record and job outcomes (written by cm-deploy, cm-backup, cm-restore-drill, worker timer)
+cat > "${CM_STATUS_DIR}/host-status.json.partial" << EOF
+{"schema":1,"checkedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+"cloud":{"provider":"${provider}","region":$(word "${region}"),"shape":$(word "${shape}"),"ocpus":$(num "${ocpus}"),"memoryGb":$(num "${memory}"),"architecture":$(word "${arch_word}"),"os":$(word "${os_word}")},
+"deployment":$(json_file "${CM_STATUS_DIR}/deployment.json"),
+"services":[${services}],
+"host":{"diskUsedPercent":$(num "${disk}"),"dockerDiskUsedPercent":$(num "${docker_disk}"),"memoryUsedPercent":$(num "${memory_used}"),"load1":$(num "${load1}"),"hostFirewall":$(word "${firewall}"),"unattendedUpgrades":$(word "${upgrades}")},
+"certificates":[${certs}],
+"worker":$(json_file "${CM_STATUS_DIR}/worker.json"),
+"backup":$(json_file "${CM_STATUS_DIR}/backup.json"),
+"restoreDrill":$(json_file "${CM_STATUS_DIR}/restore-drill.json")}
+EOF
+"${CM_PYTHON}" -c 'import json,sys; json.load(open(sys.argv[1]))' "${CM_STATUS_DIR}/host-status.json.partial" \
+  || cm_die 'collected status is not valid JSON; previous status kept'
+chmod 644 "${CM_STATUS_DIR}/host-status.json.partial"
+mv -f "${CM_STATUS_DIR}/host-status.json.partial" "${CM_STATUS_DIR}/host-status.json"

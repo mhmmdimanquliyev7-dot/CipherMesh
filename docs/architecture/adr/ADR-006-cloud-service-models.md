@@ -1,6 +1,6 @@
 # ADR-006: IaaS, PaaS and SaaS architecture
 
-- Status: Accepted (classification corrected in Phase 0.5; cloud provider selection deferred to Phase 17)
+- Status: Accepted (classification corrected in Phase 0.5); the PaaS row and the provider-managed object storage are superseded for the university deployment by [ADR-014](ADR-014-cloud-provider-oci-always-free.md) (2026-10-14)
 - Date: 2026-09-28
 - Related: [service-models.md](../../cloud/service-models.md), [shared-responsibility.md](../../cloud/shared-responsibility.md), [deployment-architecture.md](../../cloud/deployment-architecture.md), [ADR-005](ADR-005-jira-cloud-management-saas.md)
 

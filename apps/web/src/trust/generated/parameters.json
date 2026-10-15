@@ -124,8 +124,8 @@
     {
       "id": "CP-21",
       "name": "TLS",
-      "value": "TLS 1.2 and 1.3 only, Mozilla \"intermediate\" configuration, HSTS max-age one year after a staged rollout",
-      "notes": "Database connections verify the provider certificate"
+      "value": "TLS 1.2 and 1.3 only, Mozilla \"intermediate\" configuration (ECDHE with AES-GCM or ChaCha20-Poly1305), ECDSA P-256 certificates from Let's Encrypt; HSTS staged: 0, then 86400 seconds for the demonstration once HTTPS and renewal are verified, one year in a longer-lived deployment; no includeSubDomains or preload",
+      "notes": "The database hop uses TLS 1.3 only with sslmode=verify-full against the deployment's private CA (CD-34, ADR-014)"
     },
     {
       "id": "CP-22",

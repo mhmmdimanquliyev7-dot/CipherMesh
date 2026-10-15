@@ -86,7 +86,7 @@ flowchart TD
 | Cookie | `__Host-cm_session=…; Max-Age=<remaining absolute lifetime>; Path=/; Secure; HttpOnly; SameSite=Strict`, no Domain. Identical in every environment; there is no configuration that weakens it |
 | Idle timeout | 30 minutes; activity extends it at most once a minute, never beyond the absolute lifetime |
 | Absolute lifetime | 12 hours from the password authentication; MFA and activity do not extend it |
-| Validation | On every authenticated request: digest lookup, not revoked, idle and absolute expiry, account ACTIVE. A dead cookie is answered with 401 and a cookie deletion. An expired session stays expired because expiry is checked from timestamps; it is not additionally marked revoked |
+| Validation | On every authenticated request: digest lookup, not revoked, idle and absolute expiry, account ACTIVE. A dead cookie is answered with 401 and no cookie deletion (SF-17-04: the refused token may be one a rotation just replaced, and the deletion would remove the browser's new session); logout and revocation of the current session delete the cookie. An expired session stays expired because expiry is checked from timestamps; it is not additionally marked revoked |
 | Rotation | New token after MFA completion, step-up, password change and MFA enable or disable; the old token stops working immediately |
 | Invalidation | Logout (current), "sign out other sessions", password change and MFA change (others), recovery-code login (others), account disable and platform role change (all) |
 | Limit | 10 active sessions; the 11th login revokes the least recently used one under a row lock (`SESSION_EVICTED`) |

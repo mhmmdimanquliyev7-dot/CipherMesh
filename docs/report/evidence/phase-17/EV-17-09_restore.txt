@@ -1,0 +1,16 @@
+[2026-10-15T04:07:59Z] runtime secrets restored
+[2026-10-15T04:08:00Z] database TLS material exists; use --renew to replace it
+[2026-10-15T04:08:01Z] step 1: first start of PostgreSQL (empty data directory)
+[2026-10-15T04:08:13Z] step 2: replacing the data directory HBA file with the deployment HBA file
+[2026-10-15T04:08:25Z] step 3: temporary superuser password for the bootstrap
+[2026-10-15T04:08:25Z] step 4: roles and database (scripts/db/bootstrap.mjs)
+roles ready: cm_migrator, cm_api, cm_worker, cm_verifier
+database ciphermesh created; next: pnpm db:migrate
+[2026-10-15T04:08:26Z] roles and empty database ready (no migrations: --roles-only)
+[2026-10-15T04:08:27Z] step 6: superuser password removed
+[2026-10-15T04:08:27Z] restoring the database dump
+[2026-10-15T04:08:28Z] database restored: 18 tables identical to the backup
+[2026-10-15T04:08:29Z] object storage restored
+time="2026-10-15T08:08:29+04:00" level=warning msg="volume \"ciphermesh-object-storage-data\" already exists but was not created by Docker Compose. Use `external: true` to use an existing volume"
+{"check":"stored-ciphertext-integrity","at":"2026-10-15T04:08:57.520Z","checked":16,"matched":16,"missing":0,"sizeMismatch":0,"digestMismatch":0,"errors":0,"retries":0,"transient":{}}
+[2026-10-15T04:08:57Z] restore complete; sign in and open a note and a file to confirm browser decryption

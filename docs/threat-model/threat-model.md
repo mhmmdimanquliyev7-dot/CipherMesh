@@ -486,6 +486,36 @@ Status: Phase 0.5 revision of the Phase 0 model, with implementation checks for 
 - **Testing strategy:** `tests/policy/policy-matrix.test.ts` (every control and profile, PC-01 and PC-02 on every room route), `tests/policy/profile-change.test.ts` (forced lock order for concurrent changes and writes), `tests/security/policy-catalogue.test.ts`, the BOLA suite and negative controls NC-10-01 to NC-10-12.
 - **Rating:** Likelihood Medium, Impact High, inherent **High**. Treatment: Mitigate. Residual: **Low**.
 
+### T-42 Data services on the same host as the application (ADR-014)
+- **STRIDE:** Information disclosure, Tampering, Elevation of privilege
+- **Assets:** A-02, A-05, A-07, A-08 (ciphertext and envelopes, credentials, metadata, audit trail)
+- **Threat:** PostgreSQL and the object storage run in containers on the VM that also runs the edge and the API, so a compromise of that host, of Docker or of a container reaches the data services without crossing a provider boundary; a misconfiguration exposes the database or storage ports to the internet.
+- **Attack scenario:** An attacker with root on the VM opens a superuser session through the container socket or copies the data volumes; a Docker published-port rule or a debugging change makes 5432 or a SeaweedFS port reachable from the internet; a compromised API container scans the internal networks for the storage master or filer; the storage gateway is used to list or overwrite objects.
+- **Security controls:** Only Nginx publishes ports; PostgreSQL, SeaweedFS, the API and the worker sit on internal Docker networks without egress; the provider security list and the host firewall (INPUT and DOCKER-USER) admit 22 (operator), 80 and 443 only; PostgreSQL accepts runtime roles only over TLS 1.3 with SCRAM, the superuser has no password and is reachable only through the container socket, the migration password never touches the VM's disk; Nginx forwards to storage only signed object requests in the content bucket and refuses cookies; the storage identity may read and write objects of one bucket and nothing else, and the embedded IAM API is off; read-only, non-root containers without capabilities (PostgreSQL keeps the five its entrypoint needs).
+- **Residual risk:** Root on the VM controls both data services (L-71); content remains client-side ciphertext (INV-01).
+- **Testing strategy:** `scripts/cloud/edge-check.mjs` from outside (ports, storage paths, forged signatures, cookies); the database access checks of `infrastructure/deployment/ci/stack-check.sh` (TLS refusal, superuser refusal, TLS 1.3 sessions); the CI job "Cloud stack (linux/arm64)" on every pull request.
+- **Rating:** Likelihood Medium, Impact High, inherent **High**. Treatment: Mitigate, Accept. Residual: **Medium**.
+
+### T-43 Loss of the VM or of its data
+- **STRIDE:** Denial of service, Tampering
+- **Assets:** A-02, A-07, A-08 (ciphertext and envelopes, metadata, audit trail)
+- **Threat:** The single VM fails, is reclaimed by the provider, is deleted by mistake, or its data is corrupted, and the service or the stored data is lost.
+- **Attack scenario:** A disk fills up and PostgreSQL stops; an idle Always Free instance is reclaimed; an operator deletes a volume; a failed upgrade corrupts the database; ransomware on the VM encrypts the volumes.
+- **Security controls:** Daily backups of the database, the storage volume and the runtime secrets, encrypted with age to an offline key (CD-35); the operator copies backups off the VM; the restore drill verifies every table and every file object against the backup's digests; a documented restore onto an empty stack (`cm-restore`); disk and memory warnings in the platform status; no script deletes a volume.
+- **Residual risk:** Up to 24 hours of changes can be lost, and there is no high availability (L-72, L-73).
+- **Testing strategy:** The CI stack check backs up, drills and fully restores the stack, then decrypts the restored note and file in Chromium, Firefox and WebKit (EV-19-10); the drill on the VM (EV-19-07).
+- **Rating:** Likelihood Medium, Impact Medium, inherent **Medium**. Treatment: Mitigate, Accept. Residual: **Medium**.
+
+### T-44 Misleading platform status
+- **STRIDE:** Spoofing, Repudiation
+- **Assets:** A-07 (metadata), the operator's and the examiner's view of the deployment
+- **Threat:** A monitoring view shows a deployment as healthy or verified when it is not: an old success shown as current health, a collector that silently fails, values from the host forwarded as text into the page, or a rehearsal presented as the cloud.
+- **Attack scenario:** The collector stops after a reboot and the last healthy status stays on screen for days; an attacker who can write the status file injects markup; the local rehearsal reports itself as an Oracle VM; a Trust Center control is marked verified in the cloud without evidence.
+- **Security controls:** Every state carries its measurement time and fixed reason codes; a host status older than 15 minutes (worker: 60 minutes) is NOT_VERIFIED, never healthy; the file is parsed against a strict schema and only short words, numbers and timestamps leave the API; the cloud is CONNECTED only with the provider's instance metadata; the status is shown to platform administrators only (PA-01); the Trust Center refuses a verified control without captured evidence (`trust-content.test.ts`).
+- **Residual risk:** An attacker with root on the VM can write any status (L-71); the collector runs every 5 minutes (L-78).
+- **Testing strategy:** `apps/api/src/platform/status.test.ts` (stale, future, malformed, injected text, missing services, rehearsal host) and the dashboard integration tests with a real status file.
+- **Rating:** Likelihood Low, Impact Medium, inherent **Low**. Treatment: Mitigate. Residual: **Low**.
+
 ## 5. Risk register summary
 
 | ID | Threat | Likelihood | Impact | Inherent | Treatment | Residual | Related limitation |
@@ -531,6 +561,9 @@ Status: Phase 0.5 revision of the Phase 0 model, with implementation checks for 
 | T-39 | Over-privileged database roles and schema drift | M | H | High | Mitigate | Low | L-26, L-28 |
 | T-41 | Security-profile bypass and silent weakening | M | H | High | Mitigate | Low | L-59, L-60, L-61, L-62 |
 | T-40 | Unauthorized replacement or reset of a vault | L | H | Medium | Mitigate, Accept | Low | L-07, L-40 |
+| T-42 | Data services on the application host | M | H | High | Mitigate, Accept | Medium | L-71, L-75 |
+| T-43 | Loss of the VM or of its data | M | M | Medium | Mitigate, Accept | Medium | L-72, L-73, L-74, L-77 |
+| T-44 | Misleading platform status | L | M | Low | Mitigate | Low | L-78 |
 
 Residual risks rated **High** (T-23) and every **Accept** decision require explicit acknowledgement by the project owner at the end of Phase 0 and again before the final report.
 
@@ -696,3 +729,23 @@ Phase 14 and Prompt 16.5 were delivered together (2026-10-14) after the project 
 | Encryption receipts | T-15, T-12 | Show suite, key version, sizes and the browser's own integrity result; no key, IV, wrapped key or ciphertext; rendered outside the untrusted note view (the XSS test still asserts no element in it) |
 
 Not implemented (deferred): the audit ledger metrics of the dashboard (SD-10, SD-11, SD-12, SD-15, L-70) and the T-20 controls of Phase 12.
+
+## 16. Cloud deployment implementation check (ADR-014)
+
+The cloud workstream (CM-T063 to CM-T072, 2026-10-14) moved the server side onto one Oracle Cloud Always Free VM: Nginx, the API, the worker job, PostgreSQL and SeaweedFS in containers. It adds assets (the VM, its volumes, the runtime secret files, the backup archives and the age identity held offline), a trust boundary (the provider security list and the host firewall in front of the VM), entry points (the storage host name for signed object requests; SSH for the operator) and data flows (backups off the VM; the host status file into the API). The PaaS boundary of the earlier design does not exist in this deployment (ADR-014). New threats: T-42, T-43 and T-44.
+
+| Threat in the prompt's list | Threat model entry | Implemented and verified | Still open |
+|---|---|---|---|
+| Publicly exposed database or storage | T-42, T-18 | Only Nginx publishes ports; internal networks; signed-object-only storage proxy; edge checker and CI stack check | Cloud evidence EV-19-05 after provisioning |
+| Unauthorized container management | T-19, T-42 | Docker socket root-only and never mounted; no privileged or host-network container; `no-new-privileges` daemon default | Docker Bench on the VM (EV-19-04) |
+| Credential compromise | T-16, T-17 | Secrets generated on the VM as files for the containers (`/run/secrets`, never environment variables), never in images or Git; migration password only from the workstation; no superuser password; gitleaks in CI | Root and Docker access can read the secret files (L-75) |
+| Cloud-account compromise | T-17 | Console MFA required by the runbook; no API keys created; the account owner keeps the console | MFA evidence (EV-19-08) |
+| Missing security patches | T-19 | Unattended security upgrades; digest-pinned images rebuilt by `cm-deploy` | Monthly rebuilds are an operator task |
+| Misconfigured TLS | T-31 | Mozilla intermediate, TLS 1.0 and 1.1 refused, unknown names refused, HSTS staged (edge checker) | Public certificate evidence (EV-17-04) |
+| Excessive service privileges | T-39, T-42 | Read-only, non-root containers without capabilities; least-privilege database roles (unchanged); storage identity limited to one bucket | |
+| Secrets committed to Git | T-16 | `.dockerignore` and `.gitignore` exclude keys and environment files; gitleaks on every pull request | |
+| Disk exhaustion | T-26, T-43 | Upload limits (CP-25), log rotation, disk warnings in the platform status | Alerting outside the dashboard |
+| Backup failure, lost VM, data corruption | T-43 | Encrypted daily backups, restore drill with table and ciphertext digests, full restore tested in CI with browser decryption | Off-VM copy is an operator task (L-72) |
+| Misleading monitoring status | T-44 | Freshness limits, strict parsing, fixed reason codes, administrator-only view | |
+| Compromised delivered browser JavaScript | T-24 | Static export built from a verified commit on the VM; CSP with hashes; Nginx serves only the export | Served asset hashes compared with the release (EV-17-05) |
+

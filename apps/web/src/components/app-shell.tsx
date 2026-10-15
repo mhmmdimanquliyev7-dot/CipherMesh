@@ -48,6 +48,7 @@ const PUBLIC_PAGES = new Set(['/', '/login', '/register']);
 
 const ENVIRONMENT_LABEL = {
   development: 'Development build',
+  'local-docker': 'Local Docker demonstration',
   'cloud-demonstration': 'Cloud demonstration',
 } as const;
 

@@ -4,9 +4,9 @@
     "docs/cloud/deployment-architecture.md"
   ],
   "services": [
-    "IaaS: VM",
-    "PaaS: managed PostgreSQL",
-    "Provider-managed object storage",
+    "IaaS: OCI VM",
+    "PostgreSQL (container on the VM)",
+    "Object storage: SeaweedFS (container on the VM)",
     "SaaS: Jira Cloud",
     "GitHub (development collaboration)"
   ],
@@ -34,9 +34,9 @@
     {
       "layer": "Operating system patching",
       "owners": [
-        "C",
-        "P",
-        "P",
+        "C (unattended upgrades)",
+        "C (VM)",
+        "C (VM)",
         "P",
         "P"
       ]
@@ -45,8 +45,8 @@
       "layer": "Service software patching",
       "owners": [
         "C (Nginx, Docker, Node.js, app)",
-        "P (engine); C schedules major version upgrades",
-        "P",
+        "C (pinned image, rebuilt by the team)",
+        "C (pinned image)",
         "P",
         "P"
       ]
@@ -54,9 +54,9 @@
     {
       "layer": "Network exposure (firewall rules, allowlists, private networking)",
       "owners": [
-        "C",
-        "S",
-        "S",
+        "C (security list, host firewall)",
+        "C (internal network, HBA rules)",
+        "C (internal network, signed-path proxy)",
         "P",
         "P"
       ]
@@ -64,9 +64,9 @@
     {
       "layer": "TLS configuration",
       "owners": [
-        "C (Nginx)",
-        "S (service enforces; C verifies the certificate)",
-        "P (endpoint); C uses HTTPS only",
+        "C (Nginx, Let's Encrypt)",
+        "C (private CA, TLS 1.3, verify-full)",
+        "C (TLS at Nginx; plain HTTP on the internal network)",
         "P",
         "P"
       ]
@@ -75,8 +75,8 @@
       "layer": "Identity and access management",
       "owners": [
         "C (SSH users, keys)",
-        "C (database roles, grants)",
-        "C (credentials, bucket policies)",
+        "C (database roles, grants, no superuser password)",
+        "C (one identity, one bucket)",
         "S (Atlassian identity; C manages users and permissions)",
         "S (GitHub identity; C manages access, branch protection)"
       ]
@@ -84,9 +84,9 @@
     {
       "layer": "MFA on accounts",
       "owners": [
-        "C (cloud console)",
-        "C (cloud console)",
-        "C (cloud console)",
+        "C (OCI console)",
+        "C (OCI console)",
+        "C (OCI console)",
         "C (enable and enforce)",
         "C (enable and enforce)"
       ]
@@ -94,9 +94,9 @@
     {
       "layer": "Encryption at rest (provider)",
       "owners": [
-        "S (disk encryption option)",
-        "S (usually on by default; C verifies)",
-        "S (server-side encryption option; C enables)",
+        "S (OCI encrypts block volumes by default; C verifies)",
+        "S (on the encrypted boot volume)",
+        "S (on the encrypted boot volume)",
         "P",
         "P"
       ]
@@ -114,9 +114,9 @@
     {
       "layer": "Durability and backups",
       "owners": [
-        "C (VM needs little state; configuration in Git)",
-        "S (P runs backups; C sets retention and tests restores)",
-        "S (P provides durability; C enables versioning)",
+        "C (VM rebuilt from Git)",
+        "C (encrypted dumps, restore drill)",
+        "C (volume in the encrypted backup)",
         "P",
         "P (C may export)"
       ]
@@ -126,7 +126,7 @@
       "owners": [
         "Not applicable",
         "Not applicable",
-        "S (P provides the lock feature; C chooses compliance mode and retention period and verifies deletion is refused)",
+        "Not applicable (Phase 12 deferred, ADR-014)",
         "Not applicable",
         "Not applicable"
       ]
@@ -134,9 +134,9 @@
     {
       "layer": "Logging and monitoring",
       "owners": [
+        "C (status collector, Docker logs)",
         "C",
-        "S (P offers logs; C reviews)",
-        "S (P offers access logs; C enables)",
+        "C",
         "S",
         "S"
       ]
@@ -165,8 +165,8 @@
       "layer": "Incident response",
       "owners": [
         "C",
-        "S",
-        "S",
+        "C",
+        "C",
         "S",
         "S"
       ]
@@ -184,10 +184,16 @@
   ],
   "exposure": [
     {
-      "endpoint": "Nginx HTTPS",
+      "endpoint": "Nginx HTTPS, application host",
       "exposedTo": "Internet",
       "port": "443",
-      "notes": "TLS 1.2 and 1.3 only"
+      "notes": "TLS 1.2 and 1.3 (CP-21); unknown host names get no TLS handshake"
+    },
+    {
+      "endpoint": "Nginx HTTPS, storage host",
+      "exposedTo": "Internet",
+      "port": "443",
+      "notes": "Only signed requests for /<bucket>/f/<key>; cookies refused; listing, other buckets and every SeaweedFS endpoint refused"
     },
     {
       "endpoint": "Nginx HTTP",
@@ -197,13 +203,13 @@
     },
     {
       "endpoint": "SSH",
-      "exposedTo": "Allowlisted operator addresses",
+      "exposedTo": "The operator's address (security list)",
       "port": "22",
-      "notes": "Key authentication only"
+      "notes": "Key authentication only, no root, AllowUsers"
     },
     {
       "endpoint": "API",
-      "exposedTo": "Nginx only, internal Docker network",
+      "exposedTo": "Nginx only, internal app network",
       "port": "none published",
       "notes": ""
     },
@@ -211,25 +217,25 @@
       "endpoint": "Worker",
       "exposedTo": "No inbound",
       "port": "none",
-      "notes": "Outbound to database and storage only"
+      "notes": "One-shot container started by a timer"
     },
     {
       "endpoint": "PostgreSQL",
-      "exposedTo": "The VM only",
-      "port": "provider port",
-      "notes": "Private networking or IP allowlist"
+      "exposedTo": "API and worker on the internal data network; the ops container on its loopback",
+      "port": "none published",
+      "notes": "hostssl with SCRAM for runtime roles; superuser by peer only"
     },
     {
-      "endpoint": "Object storage",
-      "exposedTo": "Browsers through presigned URLs; API and worker with credentials",
-      "port": "443",
-      "notes": "Bucket private"
+      "endpoint": "SeaweedFS (S3, master, volume, filer)",
+      "exposedTo": "Nginx on the internal storage network",
+      "port": "none published",
+      "notes": "IAM API off; one identity limited to the content bucket"
     },
     {
       "endpoint": "Docker socket",
       "exposedTo": "Nobody",
       "port": "not applicable",
-      "notes": "Never mounted into containers"
+      "notes": "Root-only, never mounted into a container"
     }
   ]
 }

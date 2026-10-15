@@ -1,0 +1,4 @@
+[2026-10-15T04:06:04Z] stopping the API and object storage for a consistent copy
+[2026-10-15T04:06:08Z] services restarted
+[2026-10-15T04:06:09Z] backup written: ciphermesh-20261015T040604Z.tar.age sha256 b4ef1c13cf59f54b7310627b5b7c090846c5e0baa7ea6446c6c09f618a47fada
+plaintext canaries in the encrypted archive (must be 0): 0

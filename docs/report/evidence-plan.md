@@ -228,27 +228,37 @@ Captured in Phase 11 (Prompt 13), with synthetic data only and no key material, 
 | EV-16-03 | SBOM and scan results | CI artifacts | Supply-chain management | ISMS, CLD |
 
 ### Phases 17 to 19: Cloud
+Adapted to ADR-014 (Oracle Cloud Always Free, one VM, self-hosted PostgreSQL and SeaweedFS) on 2026-10-14. The IDs are unchanged; items that named a managed database or a provider bucket are captured for their self-hosted equivalents. Items EV-17-06 and EV-19-10 are rehearsal evidence (CI on linux/arm64, throwaway CA), and EV-17-09 and EV-19-13 are local Docker demonstration evidence (the project owner's Windows laptop, 2026-10-14 priority); none of them is presented as cloud evidence.
+
 | ID | Evidence | How to capture | Demonstrates | Tags |
 |---|---|---|---|---|
-| EV-17-01 | VM configuration in the cloud console | Screenshot | IaaS resource | CLD |
-| EV-17-02 | Provider firewall rules | Screenshot | Network exposure minimized | CLD |
-| EV-17-03 | Docker deployment: containers, users, read-only filesystems | `docker ps` and `docker inspect` excerpts | Container hardening | CLD |
-| EV-17-04 | TLS scan result | Report | Transport security | CLD |
+| EV-17-01 | VM configuration in the cloud console: shape VM.Standard.A1.Flex with 2 OCPUs and 12 GB, the "Always Free-eligible" label, home region, boot volume | Screenshot (identifiers redacted) | IaaS resource within the Always Free allowance | CLD |
+| EV-17-02 | Provider firewall rules (security list or NSG) | Screenshot (operator address redacted) | Network exposure minimized | CLD |
+| EV-17-03 | Docker deployment: containers, users, read-only filesystems, capabilities, networks | `docker ps` and `docker inspect` excerpts | Container hardening | CLD |
+| EV-17-04 | TLS and header check of the public origins | `scripts/cloud/edge-check.mjs` output and the browser's certificate view | Transport security | CLD |
 | EV-17-05 | Deployed asset hashes match the release | Script output | Code-delivery integrity check | CLD, APP |
-| EV-18-01 | Managed database settings (network, TLS, backups) | Console screenshot | PaaS configuration responsibility | CLD |
-| EV-18-02 | Failed connection without TLS or from another host | Command output | Enforced database access controls | CLD |
-| EV-18-03 | Private bucket settings (public access blocked, CORS, versioning) | Console screenshot | Private object storage | CLD |
-| EV-18-04 | Anonymous object access denied | Command output | Storage misconfiguration prevented | CLD |
+| EV-17-06 | The cloud stack built natively and run on linux/arm64 in CI: image architectures, container hardening, edge checks, smoke test in three engines | CI artifact `cloud-stack-arm64-evidence` | ARM64 compatibility before provisioning (rehearsal) | CLD |
+| EV-17-07 | Cost classification: the account's Always Free resources and the billing or usage page showing no charges | Console screenshots | Zero-cost policy followed (not a guarantee of future charges) | CLD, ISMS |
+| EV-17-08 | Deployment smoke test against the public origin (vault, room, encrypted note and file, no plaintext in requests) | `playwright.deployment.config.ts` output | Client-side encryption on the cloud deployment | CRY, CLD |
+| EV-17-09 | Local Docker demonstration verified on the Windows laptop (`pnpm demo:verify`): images, container hardening and networks, secrets as files, edge checks, database access rules, browser tests (smoke and collaboration: invitation, burn secret, removal, key rotation) in three engines, backup, restore drill, full restore with browser decryption | Evidence files of `stack-check.sh` | The production stack and its controls work on a local Docker host (local evidence, not cloud) | CLD, CRY, ISMS |
+| EV-18-01 | Database settings on the VM: TLS 1.3 only for runtime roles, HBA rules, roles without a superuser password, connection limits | `pg_hba.conf`, `pg_authid` and `pg_stat_ssl` excerpts | Self-hosted database configuration (ADR-014) | CLD |
+| EV-18-02 | Failed connection without TLS, superuser network login refused | Command output | Enforced database access controls | CLD |
+| EV-18-03 | Storage settings: one identity limited to one bucket, IAM API off, only signed object paths proxied, CORS for the application origin | Identity file (keys redacted) and Nginx excerpt | Private object storage | CLD |
+| EV-18-04 | Unsigned, listing, forged-signature and cookie-carrying requests to storage refused | Edge checker output | Storage misconfiguration prevented | CLD |
 | EV-18-05 | Canary scan against deployed services | Test output | Ciphertext only in the cloud | CRY, CLD |
 | EV-19-01 | SSH configuration | `sshd -T` excerpt | SSH hardening | CLD |
-| EV-19-02 | Host firewall status | Command output | Host network hardening | CLD |
+| EV-19-02 | Host firewall status | `cm-firewall status` output | Host network hardening | CLD |
 | EV-19-03 | Lynis before and after | Report excerpts | Measurable OS hardening | CLD |
 | EV-19-04 | Docker Bench summary | Report excerpt | Container runtime review | CLD |
-| EV-19-05 | External port scan | nmap output | Minimal exposed services | CLD |
+| EV-19-05 | External port and path check of the public IP | Edge checker output (and nmap where available) from outside the VM | Minimal exposed services | CLD |
 | EV-19-06 | Credential rotation record | Jira item | Credential lifecycle | ISMS, CLD |
-| EV-19-07 | Backup restore test | Report | Recoverability | CLD, ISMS |
+| EV-19-07 | Backup restore drill on the VM | `cm-restore-drill` report | Recoverability | CLD, ISMS |
 | EV-19-08 | MFA enabled on cloud, GitHub and Jira | Settings screenshots | Account protection for management planes | ISMS |
 | EV-19-09 | Optional Level 2: provider key policy allowing the worker to sign only, and the provider's signing log | Console screenshots | Key custody outside the VM | CLD, CRY |
+| EV-19-10 | Backup, isolated restore drill and full restore with browser decryption of the restored note and file (CI, linux/arm64) | CI artifact `cloud-stack-arm64-evidence` | Backup and restore procedure works end to end (rehearsal) | CLD, ISMS, CRY |
+| EV-19-11 | Measured platform status of the deployment on the security dashboard | Dashboard screenshot as a platform administrator | Monitoring with freshness, no invented health | CLD, ISMS |
+| EV-19-12 | Certificate renewal dry run and timer | `cm-tls renew-test` output | Automated certificate renewal | CLD |
+| EV-19-13 | Screenshots of the local Docker demonstration: vault, room with encryption receipts, Trust Center live card, security dashboard with the measured local status, governance | `tests/deployment/demo-evidence.spec.ts` | What the examiner sees in the demonstration (local, labelled as such) | CRY, CLD, ISMS |
 
 ### Phases 20 to 22: Assessment, Remediation, Report
 | ID | Evidence | How to capture | Demonstrates | Tags |

@@ -37,7 +37,7 @@ Status: Phase 0.5 design, normative; **implemented in Phase 3** (CM-T016, CM-T01
 
 ## 4. Rotation and invalidation
 
-Rotation means the server issues a new random token, replaces the stored digest and records `rotatedAt`. The old token stops working immediately. The server never accepts a session identifier it did not issue, so a token planted before login is never promoted (session fixation, T-08).
+Rotation means the server issues a new random token, replaces the stored digest and records `rotatedAt`. The old token stops working immediately. A request that still carries the old token (in flight during the rotation, or sent by a browser that applies the new cookie late) is refused with 401 but its answer does not delete the cookie, because the browser would apply that deletion to the new session (SF-17-04). Only logout and the revocation of the current session answer with a cookie deletion. The server never accepts a session identifier it did not issue, so a token planted before login is never promoted (session fixation, T-08).
 
 | Event | Current session | Other sessions of the user | Audit event |
 |---|---|---|---|

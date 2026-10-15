@@ -12,7 +12,7 @@ import {
 import { parseWith, z } from '@ciphermesh/validation';
 import { Router, type Request, type Response } from 'express';
 import { isIP } from 'node:net';
-import { clearAuthCookie, readSingleCookie, type AuthCookieName } from '../auth/cookies';
+import { readSingleCookie, type AuthCookieName } from '../auth/cookies';
 import { requireStepUp, SESSION_POLICY, type Actor, type RequestMeta, type ResolveFailure } from '../auth/sessions';
 import type { RoomAccess, RoomAuthorizer, RoomMembershipScope } from '../authorization/rooms';
 import { getRequestId } from '../http/context';
@@ -375,14 +375,11 @@ async function authenticate(
   const token = request.cookie(SESSION_COOKIE);
   const result = await authenticator.authenticate(token);
   if ('actor' in result) return result.actor;
-  // A dead cookie is cleared so the browser stops presenting it.
-  throw new HttpError(
-    401,
-    ErrorCode.UNAUTHENTICATED,
-    'Authentication required',
-    undefined,
-    token === undefined ? {} : { 'set-cookie': clearAuthCookie(SESSION_COOKIE) },
-  );
+  // No cookie deletion here (SF-17-04): a refused token may be one that a rotation has just
+  // replaced (a request in flight, or a browser that applies Set-Cookie late), and the browser
+  // would apply the deletion to its new session. The refusal is the control; logout and
+  // revocation of the current session still delete the cookie.
+  throw new HttpError(401, ErrorCode.UNAUTHENTICATED, 'Authentication required');
 }
 
 /** The 404 of an unknown room, object or identifier; identical to every other not-found answer. */

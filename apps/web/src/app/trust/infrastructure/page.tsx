@@ -12,7 +12,8 @@ export const metadata: Metadata = { title: 'Deployment & infrastructure' };
 /**
  * Deployment & Infrastructure (Phase 14 + Prompt 16.5, CM-T061). Shows the designed cloud
  * architecture, what this browser can observe right now, and a control register that keeps
- * design, configuration and verification apart. No cloud resource exists yet, and the page says so.
+ * design, configuration and verification apart, each with the environment it was shown in (local,
+ * CI or cloud). The live cloud state comes from the API (DeploymentStatus), for administrators only.
  */
 
 const EXPOSURE = {

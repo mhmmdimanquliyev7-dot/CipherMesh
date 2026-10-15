@@ -38,6 +38,21 @@ describe('step-up', () => {
     expect((await stale.request('GET', '/auth/session')).status).toBe(401);
   });
 
+  it('refuses a late request with the pre-step-up token without deleting the new cookie (SF-17-04)', async () => {
+    const { identity, browser } = await signedInUser(api);
+    const before = String(browser.session);
+    await browser.request('POST', '/auth/step-up', { password: identity.password });
+    const after = String(browser.session);
+    // A request that still carries the replaced token (in flight during the rotation, or sent late
+    // by the browser's cookie store, as WebKit on Windows does). It is refused, but its answer must
+    // not delete the cookie: the browser would apply the deletion to the new session.
+    const late = await browser.request('GET', '/auth/session', undefined, { cookie: `${SESSION_COOKIE}=${before}` });
+    expect(late.status).toBe(401);
+    expect(late.setCookies).toEqual([]);
+    expect(browser.session).toBe(after);
+    expect((await browser.request('GET', '/auth/session')).status).toBe(200);
+  });
+
   it('a wrong password fails, is recorded, and does not unlock the gate', async () => {
     const { browser } = await signedInUser(api);
     const failed = await browser.request('POST', '/auth/step-up', { password: 'not-my-password-1' });

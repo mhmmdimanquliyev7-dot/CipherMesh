@@ -1,0 +1,62 @@
+
+==== host
+MINGW64_NT-10.0-26200 x86_64
+docker 29.4.3 linux/amd64
+Docker host: Docker Desktop, 20 CPUs, 16572801024 bytes of memory
+
+==== stack up
+[2026-10-15T04:01:01Z] database TLS material exists; use --renew to replace it
+[2026-10-15T04:01:14Z] step 3: temporary superuser password for the bootstrap
+[2026-10-15T04:01:14Z] step 4: roles and database (scripts/db/bootstrap.mjs)
+roles ready: cm_migrator, cm_api, cm_worker, cm_verifier
+database ciphermesh already existed; next: pnpm db:migrate
+[2026-10-15T04:01:15Z] step 5: migrations as cm_migrator
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "ciphermesh", schema "public" at "127.0.0.1:5432"
+
+12 migrations found in prisma/migrations
+
+
+No pending migrations to apply.
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "ciphermesh", schema "public" at "127.0.0.1:5432"
+
+12 migrations found in prisma/migrations
+
+Database schema is up to date!
+[2026-10-15T04:01:19Z] database initialized
+[2026-10-15T04:01:20Z] step 6: superuser password removed
+time="2026-10-15T08:01:20+04:00" level=warning msg="volume \"ciphermesh-object-storage-data\" already exists but was not created by Docker Compose. Use `external: true` to use an existing volume"
+[2026-10-15T04:01:21Z] bucket cm-files exists
+time="2026-10-15T08:01:22+04:00" level=warning msg="volume \"ciphermesh-object-storage-data\" already exists but was not created by Docker Compose. Use `external: true` to use an existing volume"
+[2026-10-15T04:01:28Z] local demonstration running: https://app.localhost:8443 (storage https://files.localhost:8443); CA: C:/Users/User/.ciphermesh-rehearsal/rehearsal-ca.crt
+[2026-10-15T04:01:28Z] this is a local Docker demonstration, not a cloud deployment
+
+==== edge checks
+
+==== database access rules
+
+==== browser tests: deployment smoke and collaboration (Chromium, Firefox, WebKit)
+
+==== worker run and status collection
+{"service":"worker-retention","expired":0,"roomDeleted":0,"time":"2026-10-15T04:05:56.736Z","level":"info","msg":"secret cleanup completed"}
+{"service":"worker-retention","operationsAbandoned":0,"cryptoperiodsExpired":0,"unknownPolicyVersions":0,"keyVersionsDestroyed":3,"envelopesDeleted":3,"operationsPurged":0,"time":"2026-10-15T04:05:56.788Z","level":"info","msg":"rekey maintenance completed"}
+{"service":"worker-retention","roomsDeleted":0,"envelopesDeleted":0,"invitationsRevoked":0,"keyVersionsDestroyed":0,"time":"2026-10-15T04:05:56.799Z","level":"info","msg":"room cleanup completed"}
+
+==== encrypted backup
+
+==== isolated restore drill
+
+==== screenshots of the running demonstration (Chromium)
+
+==== full restore onto empty volumes
+
+==== browser decryption after the restore
+
+==== resource use
+
+==== stack check passed

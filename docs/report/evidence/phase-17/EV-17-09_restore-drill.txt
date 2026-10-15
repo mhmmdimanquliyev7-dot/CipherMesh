@@ -1,0 +1,8 @@
+[2026-10-15T04:06:11Z] decrypting the backup into a tmpfs work directory
+[2026-10-15T04:06:12Z] drill database: empty PostgreSQL on the isolated network
+[2026-10-15T04:06:16Z] tables: 18/18 identical (pass)
+[2026-10-15T04:06:16Z] drill storage: SeaweedFS with the restored data volume and identity file
+[2026-10-15T04:06:39Z] verifying every stored file object against its recorded size and SHA-256
+[2026-10-15T04:06:40Z] objects: {"check":"stored-ciphertext-integrity","at":"2026-10-15T04:06:40.372Z","checked":16,"matched":16,"missing":0,"sizeMismatch":0,"digestMismatch":0,"errors":0,"retries":0,"transient":{}}
+{"schema":1,"startedAt":"2026-10-15T04:06:11Z","finishedAt":"2026-10-15T04:06:40Z","archive":"ciphermesh-20261015T040604Z.tar.age","backupRelease":"rehearsal","tables":{"total":18,"identical":18},"objects":{"check":"stored-ciphertext-integrity","at":"2026-10-15T04:06:40.372Z","checked":16,"matched":16,"missing":0,"sizeMismatch":0,"digestMismatch":0,"errors":0,"retries":0,"transient":{}},"result":"pass"}
+[2026-10-15T04:06:40Z] restore drill passed

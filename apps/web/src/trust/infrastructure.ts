@@ -8,8 +8,9 @@ import type { IconName } from '../components/icons';
  *   Configuration a file in this repository implements it, and where it applies;
  *   Verification  a captured evidence item shows that it works.
  * A control may be "verified" only when every cited evidence item is captured, and only for the
- * environment the evidence was taken in (trust-content.test.ts enforces both). Nothing has been
- * deployed to a cloud provider yet, so no cloud-side control is configured or verified.
+ * environment the evidence was taken in (trust-content.test.ts enforces both). The deployment is the
+ * local Docker demonstration (ADR-014 priority of 2026-10-14); nothing runs at a cloud provider, so
+ * no cloud-side control is configured or verified.
  */
 
 export type Scope = 'local' | 'ci' | 'cloud';
@@ -40,17 +41,24 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     name: 'HTTPS and TLS',
     icon: 'lock',
     design: {
-      text: 'Nginx terminates TLS 1.2 and 1.3 (Mozilla intermediate), HTTP redirects to HTTPS, HSTS after a staged rollout (CP-21).',
+      text: 'Nginx terminates TLS 1.2 and 1.3 (Mozilla intermediate), refuses unknown host names, redirects HTTP to HTTPS; Let’s Encrypt certificates and staged HSTS on the cloud VM (CP-21, ADR-014).',
       source: DEPLOYMENT,
     },
     configuration: {
-      state: 'not-configured',
-      text: 'No Nginx configuration or certificate exists yet. The local test server uses a throwaway self-signed certificate.',
+      state: 'configured',
+      scope: 'local',
+      text: 'The Nginx TLS settings run in the local Docker demonstration with a name-constrained local CA. Let’s Encrypt issuance (cm-tls) is prepared for the cloud VM and not used yet.',
+      sources: [
+        'infrastructure/nginx/snippets/tls.conf',
+        'infrastructure/nginx/templates/conf.d/ciphermesh.conf.template',
+        'infrastructure/deployment/bin/cm-tls',
+      ],
     },
     verification: {
-      state: 'not-verified',
-      text: 'A TLS scan of the deployed endpoint is planned.',
-      planned: ['EV-17-04'],
+      state: 'verified',
+      scope: 'local',
+      text: 'Local Docker demonstration: TLS 1.3 negotiated, TLS 1.0, 1.1 and unknown names refused, HTTP redirected. A publicly trusted certificate is not verified anywhere yet (cloud evidence EV-17-04).',
+      evidence: ['EV-17-09'],
     },
   },
   {
@@ -64,14 +72,18 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     configuration: {
       state: 'configured',
       scope: 'local',
-      text: 'The web build computes the CSP and header set (out-meta/security-headers.json). Serving it from Nginx in the cloud is not configured yet.',
-      sources: ['apps/web/scripts/csp-lib.mjs', 'apps/web/scripts/generate-csp.mjs'],
+      text: 'The web build computes the CSP and header set; Nginx serves exactly that set in the local Docker demonstration.',
+      sources: [
+        'apps/web/scripts/csp-lib.mjs',
+        'apps/web/scripts/generate-csp.mjs',
+        'infrastructure/nginx/render-security-headers.mjs',
+      ],
     },
     verification: {
       state: 'verified',
       scope: 'local',
-      text: 'Browser tests load every page under the generated policy with zero violations in Chromium, Firefox and WebKit.',
-      evidence: ['EV-01-04'],
+      text: 'Every page loads under the generated policy with zero violations in Chromium, Firefox and WebKit, in the test server and through Nginx in the local Docker demonstration.',
+      evidence: ['EV-01-04', 'EV-17-09'],
     },
   },
   {
@@ -79,13 +91,18 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     name: 'Firewall and network exposure',
     icon: 'network',
     design: {
-      text: 'Only 443 and 80 are public; SSH from allowlisted addresses; the API, worker, database and Docker socket are never published.',
+      text: 'Only 443 and 80 are public; SSH from allowlisted addresses; the API, worker, database, storage and Docker socket are never published.',
       source: DEPLOYMENT,
     },
-    configuration: { state: 'not-configured', text: 'No provider or host firewall exists yet.' },
+    configuration: {
+      state: 'configured',
+      scope: 'local',
+      text: 'Only Nginx publishes ports (on 127.0.0.1 in the local demonstration). The host firewall script for the cloud VM exists; no provider firewall exists because no VM exists.',
+      sources: ['infrastructure/docker/compose.cloud.yml', 'infrastructure/deployment/bin/cm-firewall'],
+    },
     verification: {
       state: 'not-verified',
-      text: 'Firewall screenshots and an external port scan are planned.',
+      text: 'Exposure to the internet can only be verified on the cloud VM: firewall rules and an external scan are planned. Locally, the internal ports are refused (EV-17-09).',
       planned: ['EV-17-02', 'EV-19-05'],
     },
   },
@@ -94,14 +111,20 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     name: 'Service isolation and container hardening',
     icon: 'server',
     design: {
-      text: 'Separate edge and internal Docker networks, non-root read-only containers, all capabilities dropped, images pinned by digest.',
+      text: 'Separate edge network and internal app, data and storage networks without egress; non-root, read-only containers without capabilities; images pinned by digest.',
       source: DEPLOYMENT,
     },
-    configuration: { state: 'not-configured', text: 'There is no production Compose file or image yet.' },
+    configuration: {
+      state: 'configured',
+      scope: 'local',
+      text: 'The production Compose file and images run unchanged in the local Docker demonstration.',
+      sources: ['infrastructure/docker/compose.cloud.yml', 'infrastructure/docker/Dockerfile'],
+    },
     verification: {
-      state: 'not-verified',
-      text: 'docker inspect excerpts and a Docker Bench report are planned.',
-      planned: ['EV-17-03', 'EV-19-04'],
+      state: 'verified',
+      scope: 'local',
+      text: 'docker inspect in the local demonstration: non-root users, read-only root filesystems, capabilities dropped (PostgreSQL keeps five for its entrypoint), internal networks, only Nginx publishes ports; the database network cannot reach storage.',
+      evidence: ['EV-17-09'],
     },
   },
   {
@@ -130,13 +153,13 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     name: 'Least-privilege database roles',
     icon: 'database',
     design: {
-      text: 'One role per component; runtime roles without DDL; no UPDATE or DELETE on audit tables; migration credentials never on the VM.',
+      text: 'One role per component; runtime roles without DDL; no UPDATE or DELETE on audit tables; the migration password never stored on the server.',
       source: 'docs/security/database-security.md',
     },
     configuration: {
       state: 'configured',
       scope: 'local',
-      text: 'Roles and grants are created by reviewed migrations, so a managed database receives the same grants.',
+      text: 'Roles and grants are created by reviewed migrations; the deployment applies the same migrations as the migration role.',
       sources: ['prisma/migrations', 'tests/database/privileges.test.ts'],
     },
     verification: {
@@ -151,19 +174,25 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     name: 'Database connections with verified TLS',
     icon: 'database',
     design: {
-      text: 'The managed database accepts only TLS from the VM, and clients verify the provider certificate (verify-full).',
+      text: 'PostgreSQL accepts the runtime roles only over TLS 1.3, and they verify its certificate (verify-full against the deployment’s CA); the superuser has no password (ADR-014, CD-34).',
       source: DEPLOYMENT,
     },
     configuration: {
       state: 'configured',
       scope: 'local',
-      text: 'The API refuses database URLs with the wrong role or without the required TLS settings.',
-      sources: ['apps/api/src/config/env.ts'],
+      text: 'HBA rules, the private database CA and the API’s URL rules run in the local Docker demonstration.',
+      sources: [
+        'infrastructure/postgres/pg_hba.conf',
+        'infrastructure/postgres/postgresql.conf',
+        'infrastructure/deployment/bin/cm-pki',
+        'apps/api/src/config/env.ts',
+      ],
     },
     verification: {
-      state: 'not-verified',
-      text: 'The URL rules are tested locally (EV-02-06); a refused non-TLS connection to the managed database is planned.',
-      planned: ['EV-18-02'],
+      state: 'verified',
+      scope: 'local',
+      text: 'Local demonstration: a login without TLS and a superuser network login are refused; the API’s sessions use TLS 1.3; the superuser has no password.',
+      evidence: ['EV-17-09'],
     },
   },
   {
@@ -171,20 +200,24 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     name: 'Secrets and environment configuration',
     icon: 'key',
     design: {
-      text: 'Secrets as root-owned files mounted read-only; the API refuses to start when a secret is missing or malformed.',
+      text: 'Secrets as files mounted read-only under /run/secrets, never environment variables; the API refuses to start when a secret is missing or malformed.',
       source: DEPLOYMENT,
     },
     configuration: {
       state: 'configured',
       scope: 'local',
-      text: 'Startup configuration is validated against a schema and refused when incomplete or unsafe.',
-      sources: ['apps/api/src/config/env.ts', 'tests/security/startup-config.test.ts'],
+      text: 'Configuration is validated at startup; secrets are generated by cm-secrets and read from files (<NAME>_FILE).',
+      sources: [
+        'apps/api/src/config/env.ts',
+        'infrastructure/deployment/bin/cm-secrets',
+        'tests/security/startup-config.test.ts',
+      ],
     },
     verification: {
       state: 'verified',
       scope: 'local',
-      text: 'Startup refusal and redaction of configuration values are tested.',
-      evidence: ['EV-02-06'],
+      text: 'Startup refusal and redaction are tested; in the local demonstration the API container’s environment holds only file paths and identifiers.',
+      evidence: ['EV-02-06', 'EV-17-09'],
     },
   },
   {
@@ -192,20 +225,23 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     name: 'Private object storage and presigned URLs',
     icon: 'bucket',
     design: {
-      text: 'Private bucket, public access blocked; browsers reach single objects through presigned URLs that expire within minutes.',
+      text: 'Private bucket; browsers reach single objects through presigned URLs that expire within minutes, on another host name, through a gateway that forwards only signed object requests.',
       source: DEPLOYMENT,
     },
     configuration: {
       state: 'configured',
       scope: 'local',
-      text: 'The storage adapter signs one object, one method and one size per URL (CP-20); objects have random names.',
-      sources: ['apps/api/src/storage/object-store.ts'],
+      text: 'The storage adapter signs one object, one method and one size per URL (CP-20); Nginx forwards only signed requests for object keys of the content bucket.',
+      sources: [
+        'apps/api/src/storage/object-store.ts',
+        'infrastructure/nginx/templates/conf.d/ciphermesh.conf.template',
+      ],
     },
     verification: {
       state: 'verified',
       scope: 'local',
-      text: 'Expired URLs are refused and objects carry random names, against the local S3 emulator. The cloud bucket policy is not verified yet.',
-      evidence: ['EV-07-06', 'EV-07-02'],
+      text: 'Expired URLs and random names tested against the emulator; in the local demonstration unsigned, listing, forged and cookie-carrying requests are refused.',
+      evidence: ['EV-07-06', 'EV-07-02', 'EV-17-09'],
     },
   },
   {
@@ -234,7 +270,7 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     name: 'Logging with central redaction',
     icon: 'note',
     design: {
-      text: 'Structured JSON logs with a central redaction list; no request bodies of sensitive endpoints.',
+      text: 'Structured JSON logs with a central redaction list; no request bodies of sensitive endpoints; Nginx logs paths without query strings.',
       source: DEPLOYMENT,
     },
     configuration: {
@@ -252,20 +288,27 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
   },
   {
     id: 'health',
-    name: 'Health checks',
+    name: 'Health checks and measured platform status',
     icon: 'checkCircle',
-    design: { text: 'Liveness and readiness probes that reveal a status word only.', source: DEPLOYMENT },
+    design: {
+      text: 'Liveness and readiness probes that reveal a status word only; a measured platform status with its time, where stale data is never shown as healthy.',
+      source: DEPLOYMENT,
+    },
     configuration: {
       state: 'configured',
       scope: 'local',
-      text: 'GET /health and GET /ready (readiness includes a cached database check).',
-      sources: ['apps/api/src/routes/system.ts'],
+      text: 'GET /health and GET /ready; the host status collector and the API’s freshness rules.',
+      sources: [
+        'apps/api/src/routes/system.ts',
+        'apps/api/src/platform/status.ts',
+        'infrastructure/deployment/bin/cm-status-collect',
+      ],
     },
     verification: {
       state: 'verified',
       scope: 'local',
-      text: 'The built API answered health, readiness and 404 with minimal bodies.',
-      evidence: ['EV-01-06'],
+      text: 'The built API answered the probes with minimal bodies; the dashboard of the local demonstration shows measured states with their times and the cloud as not connected.',
+      evidence: ['EV-01-06', 'EV-19-13'],
     },
   },
   {
@@ -273,11 +316,25 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
     name: 'Backups and restore',
     icon: 'rotate',
     design: {
-      text: 'Provider-managed database backups with point-in-time recovery, object versioning, and a team-tested restore.',
-      source: DEPLOYMENT,
+      text: 'Encrypted backups (age, offline identity), a restore drill comparing every table and every file’s ciphertext digest, and a tested full restore (ADR-014).',
+      source: 'docs/deployment/backup-and-restore.md',
     },
-    configuration: { state: 'not-configured', text: 'No managed database or bucket exists yet.' },
-    verification: { state: 'not-verified', text: 'A restore test is planned.', planned: ['EV-19-07'] },
+    configuration: {
+      state: 'configured',
+      scope: 'local',
+      text: 'cm-backup, cm-restore-drill and cm-restore run in the local Docker demonstration.',
+      sources: [
+        'infrastructure/deployment/bin/cm-backup',
+        'infrastructure/deployment/bin/cm-restore-drill',
+        'infrastructure/deployment/bin/cm-restore',
+      ],
+    },
+    verification: {
+      state: 'verified',
+      scope: 'local',
+      text: 'Local demonstration: backup without plaintext canaries, identical tables and file objects in the drill, and a full restore after which the browsers decrypt the restored note and file. The drill on a cloud VM is not done (EV-19-07).',
+      evidence: ['EV-17-09'],
+    },
   },
   {
     id: 'hardening',
@@ -287,10 +344,13 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
       text: 'SSH keys only, no root login, host firewall, unattended upgrades, Lynis and Docker Bench reviews.',
       source: DEPLOYMENT,
     },
-    configuration: { state: 'not-configured', text: 'No VM exists yet.' },
+    configuration: {
+      state: 'not-configured',
+      text: 'The scripts for the Oracle VM exist (cm-host-setup, cm-firewall); they do not apply to a laptop, and no VM exists.',
+    },
     verification: {
       state: 'not-verified',
-      text: 'sshd, firewall and Lynis evidence are planned.',
+      text: 'sshd, firewall and Lynis evidence are planned for the cloud VM.',
       planned: ['EV-19-01', 'EV-19-02', 'EV-19-03'],
     },
   },
@@ -314,7 +374,7 @@ export const CLOUD_CONTROLS: readonly CloudControl[] = [
   },
 ];
 
-/** Components of the designed deployment (deployment-architecture.md section 1). */
+/** Components of the deployment (deployment-architecture.md section 1, ADR-014). */
 export interface Component {
   readonly id: string;
   readonly name: string;
@@ -341,16 +401,16 @@ export const COMPONENTS: readonly Component[] = [
     name: 'Nginx',
     icon: 'globe',
     exposure: 'public',
-    model: 'IaaS VM',
-    role: 'TLS, security headers, rate limits, static files, /api proxy.',
-    local: 'HTTPS test server (tests/e2e)',
+    model: 'IaaS VM (container)',
+    role: 'TLS for the application and storage host names, security headers, rate limits, static files, /api proxy, signed object requests to storage.',
+    local: 'The same image in the rehearsal (cm-rehearsal) and in CI on linux/arm64',
   },
   {
     id: 'api',
     name: 'API',
     icon: 'server',
     exposure: 'private',
-    model: 'IaaS VM',
+    model: 'IaaS VM (container)',
     role: 'Authentication, authorization, policies, presigned URLs. Holds no content keys.',
     local: 'Node.js process',
   },
@@ -359,7 +419,7 @@ export const COMPONENTS: readonly Component[] = [
     name: 'Worker',
     icon: 'rotate',
     exposure: 'none',
-    model: 'IaaS VM',
+    model: 'IaaS VM (container, timer)',
     role: 'Expiry cleanup, abandoned rekeys, cryptoperiods. No inbound traffic.',
     local: 'Node.js process',
   },
@@ -368,17 +428,17 @@ export const COMPONENTS: readonly Component[] = [
     name: 'PostgreSQL',
     icon: 'database',
     exposure: 'private',
-    model: 'PaaS',
-    role: 'Metadata, ciphertext of notes and secrets, wrapped keys.',
+    model: 'IaaS VM (container, ADR-014)',
+    role: 'Metadata, ciphertext of notes and secrets, wrapped keys. TLS 1.3 for the runtime roles; no superuser password.',
     local: 'PostgreSQL 17 container on 127.0.0.1',
   },
   {
     id: 'storage',
-    name: 'Object storage',
+    name: 'Object storage (SeaweedFS)',
     icon: 'bucket',
     exposure: 'private',
-    model: 'Provider-managed storage',
-    role: 'Encrypted file blobs in a private bucket, reached by presigned URLs.',
+    model: 'IaaS VM (container, ADR-014)',
+    role: 'Encrypted file blobs in a private bucket, reached by browsers with presigned URLs through Nginx on a second host name.',
     local: 'S3 emulator container on 127.0.0.1',
   },
 ];

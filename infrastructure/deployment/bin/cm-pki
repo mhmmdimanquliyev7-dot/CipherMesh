@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# cm-pki: the private CA for the database hop (ADR-014, CP-21). PostgreSQL runs in a container on
+# the same VM, so no public CA can certify it; the API and the worker still verify its certificate
+# and host name (sslmode=verify-full) against this CA, as the production configuration requires.
+#
+#   sudo cm-pki            create the CA and the server certificate if they do not exist
+#   sudo cm-pki --renew    replace both (PostgreSQL must be restarted afterwards)
+#
+# The CA private key exists only in a temporary directory for the run and is deleted at the end:
+# renewal creates a new CA. The server key goes into the ciphermesh-postgres-tls volume (uid 70,
+# mode 0600); the CA certificate (public) into ciphermesh-db-ca. Nothing is printed but names.
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker openssl
+
+renew=false
+[[ "${1:-}" == "--renew" ]] && renew=true
+
+if ! ${renew} && docker volume inspect ciphermesh-postgres-tls > /dev/null 2>&1 \
+  && docker run --rm -v ciphermesh-postgres-tls:/tls:ro --entrypoint test "${CM_POSTGRES_IMAGE}" -s /tls/server.crt; then
+  cm_info 'database TLS material exists; use --renew to replace it'
+  exit 0
+fi
+
+work="$(mktemp -d)"
+trap 'rm -rf "${work}"' EXIT
+cd "${work}"
+
+cm_info 'creating the database CA (P-256, 400 days) and the server certificate for "postgres" (397 days)'
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 400 \
+  -subj '/CN=CipherMesh database CA' \
+  -addext 'basicConstraints=critical,CA:TRUE,pathlen:0' \
+  -addext 'keyUsage=critical,keyCertSign,cRLSign' \
+  -keyout ca.key -out ca.crt 2> /dev/null
+openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj '/CN=postgres' \
+  -keyout server.key -out server.csr 2> /dev/null
+printf '%s\n' 'subjectAltName=DNS:postgres' 'basicConstraints=critical,CA:FALSE' \
+  'keyUsage=critical,digitalSignature' 'extendedKeyUsage=serverAuth' > server.ext
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 397 \
+  -extfile server.ext -out server.crt 2> /dev/null
+openssl verify -CAfile ca.crt server.crt > /dev/null
+rm -f ca.key ca.srl server.csr server.ext
+
+docker volume create ciphermesh-postgres-tls > /dev/null
+docker volume create ciphermesh-db-ca > /dev/null
+tar -cf - server.crt server.key | docker run --rm -i -v ciphermesh-postgres-tls:/tls \
+  --entrypoint sh "${CM_POSTGRES_IMAGE}" -c \
+  'tar -xf - -C /tls && chown 70:70 /tls/server.crt /tls/server.key && chmod 600 /tls/server.key && chmod 644 /tls/server.crt'
+tar -cf - ca.crt | docker run --rm -i -v ciphermesh-db-ca:/ca --entrypoint sh "${CM_POSTGRES_IMAGE}" -c \
+  'tar -xf - -C /ca && chown 0:0 /ca/ca.crt && chmod 644 /ca/ca.crt'
+cm_info "installed; certificate valid until $(openssl x509 -in server.crt -noout -enddate | cut -d= -f2)"
+${renew} && cm_info 'restart PostgreSQL, the API and the worker to use the new material'
+exit 0

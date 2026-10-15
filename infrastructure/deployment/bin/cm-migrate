@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# cm-migrate: applies reviewed migrations of the deployed release (prisma/migrations) as the
+# schema owner cm_migrator. Never resets, pushes or creates migrations (scripts/db/prisma.mjs).
+#
+#   ssh <vm> sudo /srv/ciphermesh/release/infrastructure/deployment/bin/cm-migrate < migrator-password.txt
+#
+# The migrator password is read from standard input for this run and never written to the VM.
+# Take a backup first (cm-backup); migrations are forward-only, and the rollback for a failed
+# migration is a restore (docs/deployment/backup-and-restore.md).
+. "$(dirname "$0")/cm-lib.sh"
+cm_require docker
+cm_load_config
+
+cm_read_line migrator_password
+[[ "${migrator_password}" =~ ^[A-Za-z0-9_-]{24,128}$ ]] || cm_die 'standard input must be one line: the migrator password'
+export MIGRATION_DATABASE_URL="postgresql://cm_migrator:${migrator_password}@127.0.0.1:5432/ciphermesh"
+cm_compose --profile ops run --rm --no-deps -T -e MIGRATION_DATABASE_URL ops node scripts/db/prisma.mjs migrate deploy
+cm_compose --profile ops run --rm --no-deps -T -e MIGRATION_DATABASE_URL ops node scripts/db/prisma.mjs migrate status

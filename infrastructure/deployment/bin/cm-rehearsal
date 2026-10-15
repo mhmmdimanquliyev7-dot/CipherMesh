@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# cm-rehearsal: the local Docker demonstration of CipherMesh (Docker Desktop on Windows, or any
+# Linux host). It runs the production stack (compose.cloud.yml) with the same images, networks,
+# Nginx configuration, database TLS, file-based secrets and operator scripts as the cloud VM,
+# bound to 127.0.0.1. It is NOT a cloud deployment: the certificates come from a throwaway local
+# CA, nothing is reachable from the network, and no cloud control is verified by it (ADR-014).
+#
+#   cm-rehearsal build          build the three images (web labelled "Local Docker demonstration")
+#   cm-rehearsal up             build missing images, initialize, start, collect the status
+#   cm-rehearsal health         container states, then the external edge checks (TLS, headers,
+#                               API health and readiness, storage refusals, closed ports)
+#   cm-rehearsal status         collect the measured host status for the dashboard (every 5 min
+#                               during a demonstration: the API marks older status NOT_VERIFIED)
+#   cm-rehearsal admin <email>  grant PLATFORM_ADMIN to a registered account with MFA
+#   cm-rehearsal worker         run the retention worker once
+#   cm-rehearsal backup         encrypted backup to the work directory's backup identity
+#   cm-rehearsal drill          restore drill of the newest backup (does not touch the stack)
+#   cm-rehearsal down           stop (volumes kept)       cm-rehearsal destroy   also delete volumes
+#
+# Browsers reach https://app.localhost:8443 and https://files.localhost:8443 (*.localhost resolves
+# to loopback). The rehearsal CA is name-constrained to localhost names and its key is deleted
+# after use; trust it for a warning-free demonstration (docs/deployment/local-docker-demo.md) or
+# accept the warning. Work directory: CM_REHEARSAL_DIR (default ~/.ciphermesh-rehearsal), never
+# in the repository; it holds the rehearsal's throwaway secrets, migrator password and backup key.
+set -euo pipefail
+# Git Bash would rewrite arguments that start with "/" (openssl subjects, container paths).
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
+here="$(cd "$(dirname "$0")" && pwd)"
+repo="$(cd "${here}/../../.." && pwd)"
+# Docker and the native OpenSSL on Windows need Windows paths (C:/...), which Git Bash accepts too.
+native() { if command -v cygpath > /dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
+work="$(native "${CM_REHEARSAL_DIR:-${HOME}/.ciphermesh-rehearsal}")"
+mkdir -p "${work}/run"
+export CM_BACKUP_WORK_BASE="${work}/run" TMPDIR="${work}/run"
+
+# Git Bash accepts these Windows-style paths too, so one form serves the scripts and Docker.
+export CM_REHEARSAL=1 CM_HOME="${work}" CM_CONFIG="${work}/cloud.env" CM_SECRETS_DIR="$(native "${work}/secrets")"
+export CM_RELEASE_DIR="$(native "${repo}")" CM_BACKUP_DIR="${work}/backups"
+export CM_TLS_DIR="$(native "${work}/tls")" CM_ACME_DIR="$(native "${work}/acme")"
+export CM_STATUS_DIR="$(native "${work}/status")" CM_EXTRA_CA_DIR="$(native "${work}/extra-ca")"
+. "${here}/cm-lib.sh"
+cm_require docker openssl
+
+write_config() {
+  [[ -r "${CM_CONFIG}" ]] && return 0
+  cat > "${CM_CONFIG}" << EOF
+# Local Docker demonstration (cm-rehearsal). Loopback only; not a cloud deployment.
+CM_RELEASE=rehearsal
+CM_APP_HOST=app.localhost
+CM_FILES_HOST=files.localhost
+CM_APP_ORIGIN=https://app.localhost:8443
+CM_FILES_ORIGIN=https://files.localhost:8443
+CM_PUBLISH_ADDRESS=127.0.0.1
+CM_HTTP_PORT=8080
+CM_HTTPS_PORT=8443
+CM_HSTS_MAX_AGE=0
+CM_STORAGE_BUCKET=cm-files
+CM_EXTRA_CA_IN_CONTAINER=/etc/ciphermesh/extra-ca/rehearsal-ca.crt
+EOF
+}
+
+build() {
+  local target start
+  for target in api ops web; do
+    start=${SECONDS}
+    cm_info "building ciphermesh-${target}:rehearsal (the first build takes several minutes)"
+    docker build --quiet -f "${CM_RELEASE_DIR}/infrastructure/docker/Dockerfile" --target "${target}" \
+      --build-arg CM_STORAGE_ORIGIN=https://files.localhost:8443 --build-arg NEXT_PUBLIC_CM_ENVIRONMENT=local-docker \
+      -t "ciphermesh-${target}:rehearsal" "${CM_RELEASE_DIR}" > /dev/null
+    cm_info "ciphermesh-${target}:rehearsal built in $((SECONDS - start)) s"
+  done
+}
+
+certificates() {
+  [[ -s "${work}/tls/app/fullchain.pem" ]] && return 0
+  cm_info 'creating the rehearsal CA (localhost names only, 30 days) and the two host certificates'
+  local tmp host name
+  tmp="$(mktemp -d "${work}/run/tls.XXXXXX")"
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 30 \
+    -subj '/CN=CipherMesh local demonstration CA (localhost only)' \
+    -addext 'basicConstraints=critical,CA:TRUE,pathlen:0' -addext 'keyUsage=critical,keyCertSign' \
+    -addext 'nameConstraints=critical,permitted;DNS:localhost,permitted;DNS:.localhost' \
+    -keyout "${tmp}/ca.key" -out "${work}/rehearsal-ca.crt" 2> /dev/null
+  for name in app files; do
+    host="${name}.localhost"
+    openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj "/CN=${host}" \
+      -keyout "${work}/tls/${name}/privkey.pem" -out "${tmp}/${name}.csr" 2> /dev/null
+    printf '%s\n' "subjectAltName=DNS:${host}" 'extendedKeyUsage=serverAuth' > "${tmp}/${name}.ext"
+    openssl x509 -req -in "${tmp}/${name}.csr" -CA "${work}/rehearsal-ca.crt" -CAkey "${tmp}/ca.key" \
+      -CAcreateserial -days 30 -extfile "${tmp}/${name}.ext" -out "${work}/tls/${name}/fullchain.pem" 2> /dev/null
+  done
+  cp "${work}/rehearsal-ca.crt" "${work}/extra-ca/rehearsal-ca.crt"
+  # Nginx (uid 101) and the API (uid 10001) read these throwaway files; on the VM, cm-tls gives
+  # the real key to uid 101 with mode 0600 instead.
+  chmod 755 "${work}/tls" "${work}/tls/app" "${work}/tls/files" "${work}/extra-ca"
+  chmod 644 "${work}"/tls/*/*.pem "${work}/extra-ca/rehearsal-ca.crt"
+  # The CA key is deleted: a trusted copy of this CA can never sign another certificate.
+  rm -rf "${tmp}"
+}
+
+backup_identity() {
+  # The laptop is the operator's workstation here: the identity stays in the work directory.
+  if [[ ! -s "${work}/backup-identity.txt" ]]; then
+    (umask 077 && cm_age_keygen > "${work}/backup-identity.txt")
+  fi
+  local recipient
+  recipient="$(grep -o 'age1[0-9a-z]*' "${work}/backup-identity.txt" | head -n 1)"
+  [[ -n "${recipient}" ]] || cm_die 'could not create the backup identity'
+  sed -i '/^CM_BACKUP_RECIPIENT=/d' "${CM_CONFIG}"
+  printf 'CM_BACKUP_RECIPIENT=%s\n' "${recipient}" >> "${CM_CONFIG}"
+}
+
+command="${1:-up}"
+case "${command}" in
+  build)
+    build
+    ;;
+  up)
+    write_config
+    cm_load_config
+    mkdir -p "${work}/tls/app" "${work}/tls/files" "${work}/acme" "${work}/status" "${work}/extra-ca" "${work}/secrets"
+    certificates
+    missing=false
+    for image in api ops web; do docker image inspect "ciphermesh-${image}:rehearsal" > /dev/null 2>&1 || missing=true; done
+    ${missing} && build
+    "${here}/cm-pki"
+    [[ -r "${CM_SECRETS_DIR}/api_database_url" ]] || "${here}/cm-secrets"
+    # The rehearsal keeps its migrator password in the work directory; the VM never does.
+    [[ -s "${work}/migrator-password.txt" ]] || (umask 077 && cm_random_hex 32 > "${work}/migrator-password.txt")
+    "${here}/cm-db-init" < "${work}/migrator-password.txt"
+    "${here}/cm-storage-init"
+    cm_compose up --detach --wait
+    backup_identity
+    "${here}/cm-status-collect"
+    cm_info "local demonstration running: ${CM_APP_ORIGIN} (storage ${CM_FILES_ORIGIN}); CA: ${work}/rehearsal-ca.crt"
+    cm_info 'this is a local Docker demonstration, not a cloud deployment'
+    ;;
+  health)
+    cm_load_config
+    docker ps --all --filter label=com.docker.compose.project=ciphermesh --format '{{.Names}}  {{.Status}}'
+    node "${CM_RELEASE_DIR}/scripts/cloud/edge-check.mjs" --app "${CM_APP_ORIGIN}" --files "${CM_FILES_ORIGIN}" \
+      --connect 127.0.0.1 --ca "${work}/rehearsal-ca.crt" --http-port "${CM_HTTP_PORT}" --ports 9333,8888,18080,4100,2375,2376
+    ;;
+  restore)
+    # Full restore of the newest backup onto EMPTY volumes (cm-restore refuses otherwise): the
+    # disaster-recovery path, proven end to end by stack-check.sh.
+    cm_load_config
+    newest="$(ls -1t "${CM_BACKUP_DIR}"/ciphermesh-*.tar.age 2> /dev/null | head -n 1 || true)"
+    [[ -n "${newest}" ]] || cm_die 'no backup yet: run cm-rehearsal backup'
+    # The password file has no trailing newline: the password must be a line of its own, or it
+    # runs into the identity's first line and cm-db-init refuses it.
+    { head -n 1 "${work}/migrator-password.txt" | tr -d '\r\n'; printf '\n'; cat "${work}/backup-identity.txt"; } \
+      | "${here}/cm-restore" "${newest}"
+    "${here}/cm-status-collect"
+    ;;
+  status | worker | backup | drill | admin)
+    cm_load_config
+    case "${command}" in
+      status) "${here}/cm-status-collect" && cm_info "status collected at $(date -u +%H:%M:%SZ)" ;;
+      worker) "${here}/cm-worker-run" ;;
+      backup) backup_identity && "${here}/cm-backup" ;;
+      drill)
+        newest="$(ls -1t "${CM_BACKUP_DIR}"/ciphermesh-*.tar.age 2> /dev/null | head -n 1 || true)"
+        [[ -n "${newest}" ]] || cm_die 'no backup yet: run cm-rehearsal backup'
+        "${here}/cm-restore-drill" "${newest}" < "${work}/backup-identity.txt"
+        ;;
+      admin)
+        email="${2:-}"
+        "${here}/cm-platform-admin" grant "${email}"
+        ;;
+    esac
+    ;;
+  down | destroy)
+    [[ -r "${CM_CONFIG}" ]] || cm_die 'no rehearsal configuration'
+    cm_load_config
+    cm_compose --profile jobs --profile ops down
+    if [[ "${command}" == destroy ]]; then
+      docker volume rm ciphermesh-postgres-data ciphermesh-object-storage-data ciphermesh-postgres-tls ciphermesh-db-ca 2> /dev/null || true
+      cm_info "rehearsal volumes deleted; the work directory ${work} is kept"
+    fi
+    ;;
+  *) cm_die "unknown command ${command} (build, up, health, status, admin, worker, backup, drill, restore, down, destroy)" ;;
+esac

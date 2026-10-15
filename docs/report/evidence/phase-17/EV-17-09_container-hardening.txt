@@ -1,0 +1,10 @@
+nginx: user=101 readonly=true privileged=false capdrop=[ALL] capadd=[] secopt=[no-new-privileges:true] memory=268435456 published=map[80/tcp:[{127.0.0.1 8080}] 443/tcp:[{127.0.0.1 8443}]]
+api: user=10001:10001 readonly=true privileged=false capdrop=[ALL] capadd=[] secopt=[no-new-privileges:true] memory=805306368 published=map[]
+postgres: user= readonly=true privileged=false capdrop=[ALL] capadd=[CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID] secopt=[no-new-privileges:true] memory=1610612736 published=map[]
+object-storage: user=1000:1000 readonly=true privileged=false capdrop=[ALL] capadd=[] secopt=[no-new-privileges:true] memory=805306368 published=map[]
+api environment variable names:  API_HOST API_PORT APP_ORIGIN DATABASE_URL_FILE IDENTIFIER_HMAC_KEY_FILE NODE_ENV NODE_EXTRA_CA_CERTS NODE_VERSION PATH PLATFORM_STATUS_FILE STORAGE_ACCESS_KEY_ID STORAGE_BUCKET STORAGE_ENDPOINT STORAGE_PUBLIC_ENDPOINT STORAGE_SECRET_ACCESS_KEY_FILE TOTP_ENCRYPTION_KEY_FILE TOTP_ENCRYPTION_KEY_ID TRUST_PROXY_HOPS YARN_VERSION
+api secret files: /run/secrets/api_database_url /run/secrets/identifier_hmac_key /run/secrets/storage_secret_access_key /run/secrets/totp_encryption_key
+network ciphermesh_edge: internal=false containers=ciphermesh-nginx-1 
+network ciphermesh_app: internal=true containers=ciphermesh-api-1 ciphermesh-nginx-1 
+network ciphermesh_data: internal=true containers=ciphermesh-postgres-1 ciphermesh-api-1 
+network ciphermesh_storage: internal=true containers=ciphermesh-nginx-1 ciphermesh-object-storage-1 

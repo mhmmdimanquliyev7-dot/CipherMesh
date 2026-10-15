@@ -156,6 +156,42 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
+  # The cloud stack (ADR-014) on GitHub's native arm64 runner, the architecture of the Oracle
+  # Ampere A1 VM: production images built natively, the stack run on loopback with a throwaway CA,
+  # external edge checks, database access rules, the deployment smoke and collaboration tests
+  # (invitation, burn secret, removal, key rotation) in three engines, screenshots, an encrypted
+  # backup, an isolated restore drill and a full restore whose note and file are decrypted again.
+  # The same script is `pnpm demo:verify` on a laptop (the local Docker demonstration).
+  # No cloud account or credential is involved. Evidence files are uploaded (synthetic data only).
+  cloud-stack:
+    name: Cloud stack (linux/arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Operator tools (age for encrypted backups)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends age
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Build, run and verify the cloud stack
+        run: infrastructure/deployment/ci/stack-check.sh "${RUNNER_TEMP}/cloud-stack-evidence"
+      - name: Upload stack evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cloud-stack-arm64-evidence
+          path: ${{ runner.temp }}/cloud-stack-evidence/
+          retention-days: 30
+
   dependency-audit:
     name: Dependency audit
     runs-on: ubuntu-24.04

@@ -1,17 +1,13 @@
 'use client';
 
-import {
-  PLATFORM_COMPONENTS,
-  SECURITY_METRICS,
-  type PlatformState,
-  type SecurityMetricDefinition,
-} from '@ciphermesh/shared';
+import { SECURITY_METRICS, type SecurityMetricDefinition } from '@ciphermesh/shared';
 import { securityDashboardResponseSchema, type SecurityDashboardResponse } from '@ciphermesh/validation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../components/icons';
-import { Alert, Badge, type BadgeTone, Loading, SecondaryButton } from '../components/ui';
+import { Alert, Badge, Loading, SecondaryButton } from '../components/ui';
 import { api, ApiError, describeError } from '../lib/api';
+import { DeploymentDetails, PlatformComponents } from './platform-status';
 
 /**
  * Platform security dashboard (Phase 14, CM-T061, CM-T062). The API decides who may see it (PA-01)
@@ -26,15 +22,6 @@ type View =
   | { readonly kind: 'forbidden' }
   | { readonly kind: 'failed'; readonly message: string }
   | { readonly kind: 'ready'; readonly data: SecurityDashboardResponse };
-
-const STATE: Readonly<Record<PlatformState, { readonly tone: BadgeTone; readonly label: string }>> = {
-  HEALTHY: { tone: 'success', label: 'Healthy' },
-  DEGRADED: { tone: 'warning', label: 'Degraded' },
-  UNAVAILABLE: { tone: 'danger', label: 'Unavailable' },
-  NOT_CONFIGURED: { tone: 'neutral', label: 'Not configured' },
-  NOT_VERIFIED: { tone: 'neutral', label: 'Not verified' },
-  NOT_CONNECTED: { tone: 'warning', label: 'Not connected' },
-};
 
 const nf = new Intl.NumberFormat('en');
 
@@ -147,24 +134,15 @@ export function DashboardView() {
 
       <section aria-label="Platform components" className="space-y-3">
         <h2 className="text-lg font-semibold text-white">Platform components</h2>
-        <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-          {data.platform.map((component) => {
-            const info = PLATFORM_COMPONENTS[component.id];
-            const state = STATE[component.state];
-            return (
-              <li key={component.id} className="space-y-1.5 rounded-xl border border-line bg-surface/90 p-4">
-                <p className="flex items-start justify-between gap-2">
-                  <span className="min-w-0 text-sm font-medium text-white">{info.name}</span>
-                  <span className="shrink-0 whitespace-nowrap">
-                    <Badge tone={state.tone}>{state.label}</Badge>
-                  </span>
-                </p>
-                <p className="text-xs text-slate-400">{info.basis[component.state] ?? 'Reported by the API.'}</p>
-              </li>
-            );
-          })}
-        </ul>
+        <PlatformComponents platform={data.platform} />
       </section>
+
+      {data.deployment === null ? null : (
+        <section aria-label="Cloud deployment" className="space-y-3">
+          <h2 className="text-lg font-semibold text-white">Cloud deployment</h2>
+          <DeploymentDetails deployment={data.deployment} />
+        </section>
+      )}
 
       <section aria-label="Security metrics" className="space-y-3">
         <h2 className="text-lg font-semibold text-white">Security metrics</h2>

@@ -1,0 +1,4 @@
+ciphermesh-postgres-1  Up 25 seconds (healthy)  5432/tcp
+ciphermesh-nginx-1  Up 2 minutes (healthy)  127.0.0.1:8080->80/tcp, 127.0.0.1:8443->443/tcp
+ciphermesh-api-1  Up 2 minutes (healthy)  4100/tcp
+ciphermesh-object-storage-1  Up About a minute (healthy)  7333/tcp, 8080/tcp, 8333/tcp, 8888/tcp, 9333/tcp, 18080/tcp, 18888/tcp, 19333/tcp
