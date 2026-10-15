@@ -61,6 +61,7 @@ Priority expresses impact, not order. Phases and dependency links set the order,
 | CM-EPIC-14 | Infrastructure Hardening | 19 | T069 to T072, T087 | Cloud security |
 | CM-EPIC-15 | Security Testing & Remediation | 15, 16, 20, 21 | T073 to T078 | Assurance, corrective action |
 | CM-EPIC-16 | Documentation & Final Report | 22 | T079 to T081 | Evidence, reporting |
+| CM-EPIC-17 | Operational ISMS (added 2026-10-15) | 22A | T088 to T092 | ISMS operation, governance, assurance |
 
 ---
 
@@ -972,6 +973,56 @@ Priority expresses impact, not order. Phases and dependency links set the order,
   - Every security claim in the report is checked against `docs/security/limitations.md`.
   - The demonstration has been rehearsed end to end on the deployed system.
 - **Security considerations:** Honest-claims rule.
+
+
+---
+
+## CM-EPIC-17 Operational ISMS
+
+Added on 2026-10-15 for the Operational ISMS workstream approved by the project owner (Phase 22A, before the final report; CM-T081 stays unstarted until the owner approves it). Decision record: ADR-016. Manual: `docs/security/isms-operations.md`. Traceability: `docs/management/isms-traceability.md`.
+
+#### CM-T088 Operational ISMS records, workflows and API
+- **Epic:** CM-EPIC-17 | **Priority:** P1 | **Labels:** backend, database, security, risk | **Depends on:** CM-T080
+- **Plan:** Phase 22A | M8 Assessment and Report | Security impact: Medium | Evidence: EV-22-17 | Initial status: Backlog
+- **Description:** Persistent, versioned ISMS records (risk assessments and treatments, control verifications, audits, findings with corrective actions, management, scope and policy reviews, incidents) with an append-only activity history; server-side state machines with documented conditions; routes PA-06 to PA-08 behind the platform administrator gate, step-up for decisions.
+- **Acceptance criteria:**
+  - No status can be written directly; every change is a named transition whose conditions the API checks inside a locked transaction.
+  - Non-administrators receive 404; decisions need a step-up; stale versions are refused; attachments with secret material are refused.
+  - The activity history is append-only in the database and is not described as tamper-evident.
+- **Security considerations:** T-45, L-81, L-82; INV-09 untouched (no rows in `audit_events`).
+
+#### CM-T089 ISMS Control Center
+- **Epic:** CM-EPIC-17 | **Priority:** P1 | **Labels:** frontend, risk | **Depends on:** CM-T088
+- **Plan:** Phase 22A | M8 Assessment and Report | Security impact: Low | Evidence: EV-22-04 to EV-22-15 | Initial status: Backlog
+- **Description:** `/trust/isms`: overview, scope and context, assets, risk register and matrix, treatment plan, Statement of Applicability, policies and roles, control assurance and evidence, audits and findings, corrective actions, management review, improvement and activity, with drill-down links between them.
+- **Acceptance criteria:**
+  - Every number is computed from records, documents and time; environment labels say local Docker and Oracle not deployed.
+  - Exercise records are labelled everywhere; the page works in Chromium, Firefox and WebKit under the strict CSP.
+- **Security considerations:** No HTML rendering of record text; nothing stored in the browser.
+
+#### CM-T090 ISMS foundation documents
+- **Epic:** CM-EPIC-17 | **Priority:** P1 | **Labels:** documentation, risk | **Depends on:** CM-T003
+- **Plan:** Phase 22A | M8 Assessment and Report | Security impact: Low | Evidence: EV-22-05, EV-22-06 | Initial status: Backlog
+- **Description:** Context, issues, interested parties, boundaries, roles, policy register, freshness rules and metrics (`isms-operations.md`); asset inventory A-14 to A-18 with owners and classification; baseline risk-to-control mapping; scope revision 2; generated catalogue checked by `pnpm trust:check`.
+- **Acceptance criteria:**
+  - The catalogue cross-checks every reference (risks, controls, assets, evidence, policies) and fails the build on drift.
+- **Security considerations:** Honest scope: Oracle VM designed, not deployed; one-person operation (L-82).
+
+#### CM-T091 ISMS verification
+- **Epic:** CM-EPIC-17 | **Priority:** P1 | **Labels:** testing, security | **Depends on:** CM-T088, CM-T089
+- **Plan:** Phase 22A | M8 Assessment and Report | Security impact: Medium | Evidence: EV-22-17 | Initial status: Backlog
+- **Description:** Unit tests of the shared workflow, the `isms` integration project through the HTTP API, the route inventory and authorization matrix, the database guards, negative controls NC-22-01 to NC-22-05 and the E2E lifecycle in three engines.
+- **Acceptance criteria:**
+  - Each negative control is caught; the regression gates of the earlier phases stay green.
+- **Security considerations:** No authorization mocked; real accounts, MFA and step-up.
+
+#### CM-T092 ISMS evidence and walkthrough
+- **Epic:** CM-EPIC-17 | **Priority:** P1 | **Labels:** documentation | **Depends on:** CM-T089
+- **Plan:** Phase 22A | M8 Assessment and Report | Security impact: Low | Evidence: EV-22-04 to EV-22-16, EV-22-18 | Initial status: Backlog
+- **Description:** Screenshots from the running local Docker demonstration (exercise records, labelled), persistence across a restart, and the professor walkthrough in the live demonstration guide.
+- **Acceptance criteria:**
+  - Evidence indexed with environment and limitations; no fabricated approvals, meetings or certifications.
+- **Security considerations:** Redaction checklist; synthetic accounts only.
 
 ---
 

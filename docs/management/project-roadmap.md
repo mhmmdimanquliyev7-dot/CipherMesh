@@ -322,6 +322,19 @@ The project owner started Phases 17 to 19 as one workstream (Cloud Deployment + 
 | Documentation updates | Risk register residual ratings; limitations |
 | Jira evidence | Full lifecycle of at least one finding: discovery, SECURITY REVIEW, return to IN PROGRESS where applicable, fix, regression test, DONE |
 
+### Phase 22A: Operational ISMS (M8, CM-T088 to CM-T092; added 2026-10-15)
+| Aspect | Details |
+|---|---|
+| Goal | Turn the documented ISMS into an operated, auditable management process: records of risk assessment and treatment, control verification against evidence, internal audit, corrective action and management review, shown in the ISMS Control Center |
+| Dependencies | Phase 14 (Trust Center), the cloud workstream's local Docker demonstration |
+| Deliverables | ADR-016; `isms-operations.md`; asset inventory A-14 to A-18 and the risk-to-control baseline; the generated catalogue; `isms_records` and `isms_activity`; PA-06 to PA-08; `/trust/isms`; tests and negative controls; evidence EV-22-04 to EV-22-18; the walkthrough in the live demonstration guide |
+| Security checkpoint | No status written directly; decisions need a step-up; no fabricated approval, audit or certification; exercises labelled; activity history not described as tamper-evident |
+| Tests | `tests/isms`, `packages/shared/src/isms.test.ts`, NC-22-01 to NC-22-05, `tests/e2e/isms.spec.ts` in three engines |
+| Documentation updates | Threat model (T-45, assets), limitations L-81 to L-83, authorization model (PA-06 to PA-08), database security section 15, testing plan, evidence plan and index |
+| Jira evidence | CM-EPIC-17 items; the implementation pull request and its CI run (EV-22-18) |
+
+Status: implemented on `feature/CM-T088-operational-isms` (2026-10-15); traceability: [isms-traceability.md](isms-traceability.md). It does not include the final report: CM-T081 waits for the project owner's approval.
+
 ### Phase 22: Final Documentation (M8, CM-T079 to CM-T081)
 | Aspect | Details |
 |---|---|

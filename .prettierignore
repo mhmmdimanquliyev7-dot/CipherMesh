@@ -26,3 +26,5 @@ packages/crypto/vectors/
 
 # Generated from the normative documents by apps/web/scripts/generate-trust-data.mjs (checked byte for byte).
 apps/web/src/trust/generated/
+# Generated from the normative documents by the same script (ADR-016, checked byte for byte).
+packages/shared/src/isms-catalogue.ts

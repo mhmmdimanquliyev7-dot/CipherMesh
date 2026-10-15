@@ -560,6 +560,27 @@
       "why": "They run without a cloud account.",
       "response": "Reported as rehearsal evidence (EV-17-06, EV-19-10); the cloud evidence items are captured only on the deployed VM.",
       "demonstration": ""
+    },
+    {
+      "id": "L-81",
+      "limitation": "The ISMS activity history is not tamper-evident. Every creation and change of an ISMS record writes an append-only activity row (database trigger and grants), but a database administrator or an attacker with the migration role could change rows without detection.",
+      "why": "The hash-chained ledger of ADR-009 (Phase 12) is deferred; the operational ISMS was built without it (ADR-016).",
+      "response": "Described as an authenticated history, never as tamper-evident; Phase 12 would chain these rows.",
+      "demonstration": "ISMS Control Center, Improvement & activity"
+    },
+    {
+      "id": "L-82",
+      "limitation": "The ISMS is operated by one person. The project owner holds every role: risk owner, approver, implementer, internal auditor and top management. No audit is independent, no decision has a second approver, and an effectiveness check by the implementer is recorded as self-verified.",
+      "why": "A one-person student project (ISS-01).",
+      "response": "Independence is declared in each audit record; the API refuses an \"internal audit\" by its planner; approvals name the project owner; nothing claims independent review or certification.",
+      "demonstration": "Audits & findings, Treatment plan"
+    },
+    {
+      "id": "L-83",
+      "limitation": "The ISMS has operated for days, not months. Records date from 2026-10-15; review cycles of 90 and 180 days have not elapsed, and demonstration records are labelled exercises.",
+      "why": "The deadline (ISS-02).",
+      "response": "Metrics state their period; recurring reviews are shown as scheduled, not completed; exercise records are excluded from metrics once withdrawn.",
+      "demonstration": "Overview, Management review"
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "source": "docs/security/isms-control-mapping.md",
-  "scope": "The scope covers the design, development, deployment and demonstration operation of the CipherMesh platform: the web client, API and worker, the cloud VM, the managed database and object storage, and the management tooling (GitHub, Jira Cloud) used to build it. Physical security of data centres is the cloud provider's responsibility. People-related controls apply only in the limited sense of a student project team.",
+  "scope": "Scope revision 2 (2026-10-15, operational ISMS, CM-T090; revision 1 was the Phase 0 statement). The ISMS covers the design, development, operation and demonstration of the CipherMesh platform: the browser client, the API and worker, PostgreSQL and the SeaweedFS object storage as run in the local Docker Desktop demonstration and in CI, the project owner's development and operator workstation, the encrypted backups, the security evidence and ISMS records, and the management tooling (GitHub with CI, Jira Cloud) used to build it. The Oracle Cloud Always Free VM of ADR-014 is designed and enters the scope when it is provisioned; it is not deployed, and no cloud control is verified. Physical security of data centres would be the cloud provider's responsibility. People-related controls apply only in the limited sense of a one-person student project. Boundaries, interested parties and responsibilities: isms-operations.md sections 2 and 3.",
   "statusLegend": "Status values: Implemented by design (designed in Phase 0, built in the listed phase), Partial (limited by project context), Provider (responsibility transferred under shared responsibility), Not applicable.",
   "clauses": [
     {
@@ -51,22 +51,22 @@
     {
       "clause": "9.1",
       "requirement": "Monitoring and measurement",
-      "implementation": "Security Dashboard (Phase 14: aggregates for the platform administrator, PA-01), CI security suites; audit verification runs are deferred with Phase 12"
+      "implementation": "Security Dashboard (Phase 14: aggregates for the platform administrator, PA-01), CI security suites; the operational ISMS computes control assurance, evidence freshness and the metrics M-01 to M-07 (isms-operations.md sections 7 and 12); audit verification runs are deferred with Phase 12"
     },
     {
       "clause": "9.2",
       "requirement": "Internal audit",
-      "implementation": "Phase 20 security assessment"
+      "implementation": "Audit records in the ISMS Control Center (self-assessments and simulations, declared independence; isms-operations.md section 9); the Phase 20 security assessment remains planned"
     },
     {
       "clause": "9.3",
       "requirement": "Management review",
-      "implementation": "Project owner approval at each phase gate"
+      "implementation": "Management review records with computed inputs, decisions and tracked actions (isms-operations.md section 11); project owner approval at each phase gate"
     },
     {
       "clause": "10.1, 10.2",
       "requirement": "Continual improvement, corrective action",
-      "implementation": "Security Finding workflow with regression tests; residual risk re-rating"
+      "implementation": "Finding and corrective-action records with root cause, effectiveness check and closure evidence (isms-operations.md section 10); Security Finding workflow with regression tests; residual risk re-rating"
     }
   ],
   "controls": [
@@ -411,9 +411,10 @@
       "title": "Management of technical vulnerabilities",
       "theme": "Technological",
       "status": "Implemented by design",
-      "implementation": "Dependency, container and secret scanning; patching",
-      "evidenceText": "EV-16-03",
+      "implementation": "Dependency, container and secret scanning; patching. pnpm audit:deps and gitleaks run in CI on every pull request; the dependency audit is also evidence with a 7-day freshness rule in the operational ISMS (isms-operations.md section 7)",
+      "evidenceText": "EV-01-07, EV-16-03",
       "evidence": [
+        "EV-01-07",
         "EV-16-03"
       ]
     },

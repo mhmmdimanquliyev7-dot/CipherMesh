@@ -273,6 +273,21 @@ Adapted to ADR-014 (Oracle Cloud Always Free, one VM, self-hosted PostgreSQL and
 | EV-22-01 | Final board and release report | Jira screenshots | Project control | ISMS |
 | EV-22-02 | Demonstration recording (optional) | Video outside the repository | End-to-end system | All |
 | EV-22-03 | Complete evidence index | `index.md` | Evidence management | ISMS |
+| EV-22-04 | ISMS Control Center overview: environment labels, lifecycle, measured objectives M-01 to M-07 | Screenshot from the running local Docker demonstration (`tests/deployment/isms-evidence.spec.ts`) | The ISMS operates as a management process with defined measurements | ISMS |
+| EV-22-05 | Scope revision 2, boundaries, issues, interested parties and a recorded scope review | Screenshot | Context and scope (clauses 4.1 to 4.3) with a review record | ISMS |
+| EV-22-06 | Asset inventory A-01 to A-18 with owners, classification and linked risks | Screenshot | Asset management (control 5.9) | ISMS |
+| EV-22-07 | Risk matrix, a dated re-assessment, its treatment, verified controls and the residual-risk decision | Screenshot | Risk assessment and treatment (clauses 6.1.2, 6.1.3, 8.2, 8.3) | ISMS |
+| EV-22-08 | Statement of Applicability with applicability, implementation and computed assurance; Annex A numbers not assessed | Screenshot | Statement of Applicability (clause 6.1.3 d) | ISMS |
+| EV-22-09 | Control verification with procedure, attached output digest, evidence freshness and validity | Screenshot | Control assurance traced to evidence (clause 9.1) | ISMS, APP |
+| EV-22-10 | Stale evidence of 8.8 leading to a finding, corrective action, new verification, effectiveness check and closure | Screenshot | Nonconformity and corrective action (clause 10.2) | ISMS |
+| EV-22-11 | Self-assessment audit plan, checks and the finding raised by a check | Screenshot | Internal audit workflow with declared independence (clause 9.2) | ISMS |
+| EV-22-12 | Management review with computed inputs, decisions and tracked follow-up actions | Screenshot | Management review (clause 9.3) | ISMS |
+| EV-22-13 | Policy register with computed lifecycle and a recorded policy decision | Screenshot | Policies and their review (clause 5.2, control 5.1) | ISMS |
+| EV-22-14 | Activity history and improvement view | Screenshot | Documented information and continual improvement (clauses 7.5.3, 10.1) | ISMS |
+| EV-22-15 | Refusal for a non-administrator, and the identity confirmation before a decision | Screenshot and API status | Role-based access to ISMS records (control 5.15) | ISMS, APP |
+| EV-22-16 | ISMS records unchanged after the stack is stopped and started again | API state before and after `pnpm demo:down` and `pnpm demo:up` (counts, codes, statuses) | Persistence of management records | ISMS, CLD |
+| EV-22-17 | ISMS test results: integration, unit, E2E in three engines, negative controls NC-22-01 to NC-22-05 | Test output | The workflows and their conditions are tested | ISMS, APP |
+| EV-22-18 | CI run of the operational ISMS pull request | CI run summary | Change control of the ISMS implementation | ISMS |
 
 ## 4. Required demonstrations and where they come from
 

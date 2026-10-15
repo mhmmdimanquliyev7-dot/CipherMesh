@@ -3,9 +3,15 @@
 //   node apps/web/scripts/generate-trust-data.mjs --check  fail if the committed files are stale
 // The web build runs --check, so a build can never ship data that differs from the documents.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildTrustData, serialize } from './trust-data-lib.mjs';
+import {
+  buildIsmsCatalogue,
+  buildTrustData,
+  parseIsmsOperations,
+  renderIsmsCatalogue,
+  serialize,
+} from './trust-data-lib.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const outDir = join(root, 'apps', 'web', 'src', 'trust', 'generated');
@@ -36,14 +42,34 @@ const files = buildTrustData(
   evidenceFiles,
 );
 
+// The operational ISMS catalogue (ADR-016) for the API and the web client: written into the
+// shared package, checked byte for byte like the Trust Center data.
+const ismsOperations = read('docs/security/isms-operations.md');
+const catalogue = buildIsmsCatalogue(
+  {
+    threatModel: read('docs/threat-model/threat-model.md'),
+    isms: read('docs/security/isms-control-mapping.md'),
+    ismsOperations,
+    systemOverview: read('docs/architecture/system-overview.md'),
+    evidencePlan: read('docs/report/evidence-plan.md'),
+    evidenceIndex: read('docs/report/evidence/index.md'),
+    policyDocuments: Object.fromEntries(
+      parseIsmsOperations(ismsOperations).policies.map((p) => [p.path, read(p.path)]),
+    ),
+  },
+  evidenceFiles,
+);
+/** Output path to text: the Trust Center JSON files and the shared catalogue module. */
+const outputs = new Map(Object.entries(files).map(([name, value]) => [join(outDir, name), serialize(value)]));
+outputs.set(join(root, 'packages', 'shared', 'src', 'isms-catalogue.ts'), renderIsmsCatalogue(catalogue));
+
 const check = process.argv.includes('--check');
 const stale = [];
 if (!check) mkdirSync(outDir, { recursive: true });
-for (const [name, value] of Object.entries(files)) {
-  const path = join(outDir, name);
-  const text = serialize(value);
+for (const [path, text] of outputs) {
   if (check) {
-    if (!existsSync(path) || readFileSync(path, 'utf8').replace(/\r\n/g, '\n') !== text) stale.push(name);
+    const current = existsSync(path) ? readFileSync(path, 'utf8').replace(/\r\n/g, '\n') : undefined;
+    if (current !== text) stale.push(relative(root, path).replace(/\\/g, '/'));
   } else {
     writeFileSync(path, text);
   }

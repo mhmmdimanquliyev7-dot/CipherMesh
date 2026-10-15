@@ -325,6 +325,9 @@ Security profiles are defined as versioned, immutable constants in `packages/sha
 
 Why not a database table: a mutable policy table would let anyone with database write access silently weaken every room at once, and it would add a second source of truth. Policy distribution for the dashboard is a simple count of rooms per profile. See [../security/security-policy-profiles.md](../security/security-policy-profiles.md).
 
+### 4.16a IsmsRecord and IsmsActivity (operational ISMS, ADR-016)
+`isms_records`: one row per ISMS record (kind, per-kind number shown as a code such as `FND-003`, catalogue reference, status from the kind's documented list, JSON content validated per kind by the API, version, exercise flag, creator and updater with times). Governance metadata only (class META): no keys, content or credentials. Changes only through named transitions; a guard trigger keeps identity columns write-once, raises the version by one per change and keeps final records final (exercises can be withdrawn). `isms_activity`: append-only history (actor, action, previous and new status, rationale, content after the change without attached output text). Not part of the audit ledger (4.15) and not tamper-evident (L-81). Migration `20261015000000_operational_isms`; controls in [database-security.md](../security/database-security.md) section 15.
+
 ### 4.17 Organization: evaluated and not included
 Rooms belong to users. An Organization entity would add tenant isolation, organization administrators and organization-level policy. None of that strengthens the three subject areas enough to justify the extra authorization surface. Revisit through an ADR if multi-tenancy becomes a requirement.
 

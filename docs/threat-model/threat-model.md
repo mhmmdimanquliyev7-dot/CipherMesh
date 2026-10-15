@@ -19,21 +19,28 @@ Status: Phase 0.5 revision of the Phase 0 model, with implementation checks for 
 
 ## 2. Assets
 
-| ID | Asset | Security property |
-|---|---|---|
-| A-01 | Room content plaintext (files, notes, secrets) | Confidentiality, integrity |
-| A-02 | Room content ciphertext, wrapped DEKs, key envelopes | Integrity, availability |
-| A-03 | Encrypted private keys (encryption and signing, ADR-015) and Vault Passphrases | Confidentiality, integrity |
-| A-04 | Room key material (RKM) | Confidentiality |
-| A-05 | Account credentials: passwords, Argon2id hashes, TOTP secrets, recovery codes | Confidentiality |
-| A-06 | Session tokens | Confidentiality |
-| A-07 | Metadata: room names, membership, sizes, timestamps, IP addresses | Confidentiality (privacy) |
-| A-08 | Audit ledger and checkpoints | Integrity |
-| A-09 | Server secrets: TOTP key, HMAC key, audit signing key, TLS key, cloud and database credentials | Confidentiality |
-| A-10 | Application code, build pipeline and dependencies | Integrity |
-| A-11 | Infrastructure and service availability | Availability |
-| A-12 | Project-management data in Jira and GitHub | Confidentiality, integrity |
-| A-13 | Public identities: public keys, binding signatures, fingerprints and the directory (Phase 4) | Integrity, authenticity |
+The asset inventory of the ISMS (control 5.9; operational view in the ISMS Control Center, [isms-operations.md](../security/isms-operations.md) section 5). Owner is the accountable role; in this academic project every role is held by the project owner (section 3 of the ISMS manual). Confidentiality is the classification (Confidential, Internal, Public); integrity and availability are the requirement (High, Medium, Low). A-14 to A-18 were added on 2026-10-15 for the operational ISMS (CM-T090).
+
+| ID | Asset | Security property | Category | Owner | Confidentiality | Integrity | Availability | Where it lives |
+|---|---|---|---|---|---|---|---|---|
+| A-01 | Room content plaintext (files, notes, secrets) | Confidentiality, integrity | Information | Room owner (data owner); project owner for the platform | Confidential | High | Medium | Members' browsers only |
+| A-02 | Room content ciphertext, wrapped DEKs, key envelopes | Integrity, availability | Information | Project owner | Internal | High | Medium | PostgreSQL, SeaweedFS objects, encrypted backups |
+| A-03 | Encrypted private keys (encryption and signing, ADR-015) and Vault Passphrases | Confidentiality, integrity | Cryptographic key | User (passphrase); project owner (stored encrypted keys) | Confidential | High | Medium | PostgreSQL (encrypted), users' memory |
+| A-04 | Room key material (RKM) | Confidentiality | Cryptographic key | Room owner | Confidential | High | Medium | Members' browsers; envelopes only on the server |
+| A-05 | Account credentials: passwords, Argon2id hashes, TOTP secrets, recovery codes | Confidentiality | Access control record | Project owner | Confidential | High | Medium | PostgreSQL (hashed or encrypted) |
+| A-06 | Session tokens | Confidentiality | Access control record | Project owner | Confidential | High | Medium | Browser cookies; SHA-256 digests in PostgreSQL |
+| A-07 | Metadata: room names, membership, sizes, timestamps, IP addresses | Confidentiality (privacy) | Information | Project owner | Internal | Medium | Medium | PostgreSQL, logs |
+| A-08 | Audit ledger and checkpoints | Integrity | Record | Project owner | Internal | High | Low | PostgreSQL (append-only; hash chain deferred with Phase 12) |
+| A-09 | Server secrets: TOTP key, HMAC key, audit signing key, TLS key, cloud and database credentials | Confidentiality | Secret | Project owner (operator) | Confidential | High | High | Secret files on the host (`/run/secrets` in containers) |
+| A-10 | Application code, build pipeline and dependencies | Integrity | Software | Project owner (developer) | Public | High | Medium | GitHub repository, CI, container images |
+| A-11 | Infrastructure and service availability | Availability | Service | Project owner (operator) | Internal | Medium | Medium | Docker host (local demonstration); Oracle VM when deployed |
+| A-12 | Project-management data in Jira and GitHub | Confidentiality, integrity | Information | Project owner | Internal | Medium | Low | Jira Cloud, GitHub |
+| A-13 | Public identities: public keys, binding signatures, fingerprints and the directory (Phase 4) | Integrity, authenticity | Cryptographic key | User; project owner for the directory | Public | High | Medium | PostgreSQL |
+| A-14 | Encrypted backups and the backup identity (age) | Confidentiality, availability | Record | Project owner (operator) | Confidential | High | High | Backup directory on the operator workstation; identity kept by the operator |
+| A-15 | Operational logs and security events (redacted) | Integrity, confidentiality | Record | Project owner (operator) | Internal | Medium | Low | Container logs (JSON, central redaction) |
+| A-16 | Security evidence and ISMS records (evidence files, risk, audit, finding and review records, activity history) | Integrity | Record | Project owner (ISMS manager) | Internal | High | Medium | `docs/report/evidence/`, PostgreSQL (`isms_records`, `isms_activity`) |
+| A-17 | Developer and operator workstation | Confidentiality, integrity | Device | Project owner | Confidential | High | Medium | The project owner's Windows laptop (Docker Desktop, Git, browsers) |
+| A-18 | Deployment configuration, runtime secret files and Docker volumes | Confidentiality, integrity, availability | Configuration | Project owner (operator) | Confidential | High | High | `infrastructure/`, the rehearsal work directory, Docker volumes |
 
 ## 3. Adversaries
 
@@ -516,67 +523,80 @@ Status: Phase 0.5 revision of the Phase 0 model, with implementation checks for 
 - **Testing strategy:** `apps/api/src/platform/status.test.ts` (stale, future, malformed, injected text, missing services, rehearsal host) and the dashboard integration tests with a real status file.
 - **Rating:** Likelihood Low, Impact Medium, inherent **Low**. Treatment: Mitigate. Residual: **Low**.
 
+### T-45 Unauthorized change or disclosure of ISMS records
+- **STRIDE:** Tampering, Repudiation, Information disclosure, Elevation of privilege
+- **Assets:** A-16
+- **Threat:** Someone other than the ISMS manager reads internal findings and risk decisions, or a record is changed so that a control looks verified, a risk accepted or a finding closed without the documented steps (ADR-016).
+- **Attack scenario:** An ordinary account calls the ISMS routes; a client sends a status field or a decision through the record route; a stale browser overwrites a newer record; a verification is recorded on stale evidence; attached output smuggles a credential into the records; an "internal audit" is recorded as independent by its own planner; an activity row is edited afterwards.
+- **Security controls:** PA-06 to PA-08 behind the platform administrator gate (PLATFORM_ADMIN with MFA; 404 for everyone else) and a step-up for every decision; strict schemas with no status field; server-side state machines with documented conditions; optimistic concurrency; serialized writes; the freshness rule checked by the server; attachments limited in size and refused when they contain secret material; database CHECKs, a guard trigger and an append-only activity table with SELECT and INSERT only.
+- **Residual risk:** A platform administrator can record any decision (L-82); the activity history is not tamper-evident (L-81).
+- **Testing strategy:** `tests/isms/isms.test.ts` (authorization, step-up, every condition, conflicts, malformed input, secrets, database guards), `packages/shared/src/isms.test.ts`, negative controls NC-22-01 to NC-22-05, `tests/e2e/isms.spec.ts` in three engines.
+- **Rating:** Likelihood Medium, Impact Medium, inherent **Medium**. Treatment: Mitigate, Accept. Residual: **Low**.
+
 ## 5. Risk register summary
 
-| ID | Threat | Likelihood | Impact | Inherent | Treatment | Residual | Related limitation |
-|---|---|---|---|---|---|---|---|
-| T-01 | Stolen database | M | H | High | Mitigate | Medium | L-05, L-08 |
-| T-02 | Stolen object storage | M | H | High | Mitigate | Low | L-05 |
-| T-03 | Stolen password hashes | M | M | Medium | Mitigate | Low | |
-| T-04 | Malicious member | M | H | High | Mitigate, Accept | Medium | L-03, L-09 |
-| T-05 | Non-member room access | M | H | High | Mitigate | Low | |
-| T-06 | BOLA / IDOR | H | H | Critical | Mitigate | Low | |
-| T-07 | Ciphertext modification | L | M | Low | Mitigate | Low | L-10 |
-| T-08 | Session theft | M | H | High | Mitigate | Low | |
-| T-09 | Credential stuffing | H | M | High | Mitigate | Medium | |
-| T-10 | Online brute force | M | M | Medium | Mitigate | Low | |
-| T-11 | Malicious file upload | M | M | Medium | Mitigate, Accept | Medium | L-11 |
-| T-12 | XSS | M | H | High | Mitigate | Medium | L-01 |
-| T-13 | CSRF | M | M | Medium | Mitigate | Low | |
-| T-14 | Injection | M | H | High | Mitigate | Low | |
-| T-15 | Information disclosure | M | M | Medium | Mitigate, Accept | Low | L-05 |
-| T-16 | Exposed environment secrets | M | H | High | Mitigate | Low | |
-| T-17 | Compromised cloud credentials | L | H | Medium | Mitigate, Transfer | Medium | L-06 |
-| T-18 | Misconfigured storage | M | M | Medium | Mitigate | Low | |
-| T-19 | Compromised VM | M | H | High | Mitigate, Accept | Medium | L-02 |
-| T-20 | Audit modification | M | M | Medium | Mitigate | Low | L-13, L-25 |
-| T-21 | Removed member | H | M | High | Mitigate, Accept | Medium | L-04, L-24 |
-| T-22 | Stolen encrypted private key | M | H | High | Mitigate, Accept | Medium | L-08 |
-| T-23 | Compromised client | M | H | High | Accept | High | L-01 |
-| T-24 | Malicious code delivery | L | H | Medium | Mitigate, Accept | Medium | L-02 |
-| T-25 | Public-key substitution | L | H | Medium | Mitigate, Accept | Medium | L-07, L-18 |
-| T-26 | Denial of service | M | M | Medium | Mitigate, Accept | Medium | L-20 |
-| T-27 | Supply-chain compromise | M | H | High | Mitigate | Medium | L-02 |
-| T-28 | Metadata leakage | H | L | Medium | Mitigate, Accept | Medium | L-05 |
-| T-29 | Room-key equivocation | L | H | Medium | Mitigate, Accept | Medium | L-22 |
-| T-30 | Recovery and MFA abuse | L | H | Medium | Mitigate | Low | |
-| T-31 | Transport attacks | L | H | Medium | Mitigate | Low | |
-| T-32 | Rollback or withholding | L | L | Low | Accept | Low | L-10 |
-| T-33 | External link leakage | M | M | Medium | Mitigate, Accept | Medium | L-03 |
-| T-34 | Management SaaS leakage | L | M | Low | Mitigate, Transfer | Low | |
-| T-35 | Identity spoofing via unverified identifiers | M | H | High | Mitigate, Accept | Medium | L-21 |
-| T-36 | Injected room-key version by a server-side attacker | L | H | Medium | Mitigate (ADR-015, implemented in Phase 6) | Low (for an attacker limited to the server; the paths that remain are rated under T-25, T-23 and T-24) | L-23, L-46 |
-| T-37 | Rekey abuse and incomplete rekeys | M | M | Medium | Mitigate | Low | L-24 |
-| T-38 | Audit signing-key compromise | M | M | Medium | Mitigate, Accept | Medium (Level 1) | L-25 |
-| T-39 | Over-privileged database roles and schema drift | M | H | High | Mitigate | Low | L-26, L-28 |
-| T-41 | Security-profile bypass and silent weakening | M | H | High | Mitigate | Low | L-59, L-60, L-61, L-62 |
-| T-40 | Unauthorized replacement or reset of a vault | L | H | Medium | Mitigate, Accept | Low | L-07, L-40 |
-| T-42 | Data services on the application host | M | H | High | Mitigate, Accept | Medium | L-71, L-75 |
-| T-43 | Loss of the VM or of its data | M | M | Medium | Mitigate, Accept | Medium | L-72, L-73, L-74, L-77 |
-| T-44 | Misleading platform status | L | M | Low | Mitigate | Low | L-78 |
+| ID | Threat | Likelihood | Impact | Inherent | Treatment | Residual | Related limitation | Annex A controls |
+|---|---|---|---|---|---|---|---|---|
+| T-01 | Stolen database | M | H | High | Mitigate | Medium | L-05, L-08 | 8.24, 8.12, 5.17, 8.20, 8.21 |
+| T-02 | Stolen object storage | M | H | High | Mitigate | Low | L-05 | 8.24, 5.14, 8.21, 5.23 |
+| T-03 | Stolen password hashes | M | M | Medium | Mitigate | Low | | 5.17, 8.5, 8.24 |
+| T-04 | Malicious member | M | H | High | Mitigate, Accept | Medium | L-03, L-09 | 5.15, 5.18, 8.3, 5.12 |
+| T-05 | Non-member room access | M | H | High | Mitigate | Low | | 5.15, 8.3, 8.5 |
+| T-06 | BOLA / IDOR | H | H | Critical | Mitigate | Low | | 8.3, 5.15, 8.26, 8.29 |
+| T-07 | Ciphertext modification | L | M | Low | Mitigate | Low | L-10 | 8.24, 8.26 |
+| T-08 | Session theft | M | H | High | Mitigate | Low | | 8.5, 5.17, 8.26 |
+| T-09 | Credential stuffing | H | M | High | Mitigate | Medium | | 8.5, 5.17, 8.16 |
+| T-10 | Online brute force | M | M | Medium | Mitigate | Low | | 8.5, 5.17 |
+| T-11 | Malicious file upload | M | M | Medium | Mitigate, Accept | Medium | L-11 | 8.7, 8.26, 8.12 |
+| T-12 | XSS | M | H | High | Mitigate | Medium | L-01 | 8.26, 8.28, 8.29 |
+| T-13 | CSRF | M | M | Medium | Mitigate | Low | | 8.26, 8.28, 8.5 |
+| T-14 | Injection | M | H | High | Mitigate | Low | | 8.28, 8.26, 8.29 |
+| T-15 | Information disclosure | M | M | Medium | Mitigate, Accept | Low | L-05 | 8.12, 8.15, 8.28 |
+| T-16 | Exposed environment secrets | M | H | High | Mitigate | Low | | 8.4, 8.12, 8.9, 5.17 |
+| T-17 | Compromised cloud credentials | L | H | Medium | Mitigate, Transfer | Medium | L-06 | 5.23, 8.2, 5.17 |
+| T-18 | Misconfigured storage | M | M | Medium | Mitigate | Low | | 8.9, 8.21, 5.23 |
+| T-19 | Compromised VM | M | H | High | Mitigate, Accept | Medium | L-02 | 8.9, 8.20, 8.22, 8.8, 8.2 |
+| T-20 | Audit modification | M | M | Medium | Mitigate | Low | L-13, L-25 | 5.33, 8.15 |
+| T-21 | Removed member | H | M | High | Mitigate, Accept | Medium | L-04, L-24 | 5.18, 8.24, 5.15 |
+| T-22 | Stolen encrypted private key | M | H | High | Mitigate, Accept | Medium | L-08 | 8.24, 5.17, 8.1 |
+| T-23 | Compromised client | M | H | High | Accept | High | L-01 | 8.1, 8.7 |
+| T-24 | Malicious code delivery | L | H | Medium | Mitigate, Accept | Medium | L-02 | 8.25, 8.32, 8.4, 8.31 |
+| T-25 | Public-key substitution | L | H | Medium | Mitigate, Accept | Medium | L-07, L-18 | 8.24, 5.16 |
+| T-26 | Denial of service | M | M | Medium | Mitigate, Accept | Medium | L-20 | 8.20, 8.16 |
+| T-27 | Supply-chain compromise | M | H | High | Mitigate | Medium | L-02 | 5.19 to 5.22, 8.8, 8.25, 8.28 |
+| T-28 | Metadata leakage | H | L | Medium | Mitigate, Accept | Medium | L-05 | 5.34, 8.12 |
+| T-29 | Room-key equivocation | L | H | Medium | Mitigate, Accept | Medium | L-22 | 8.24 |
+| T-30 | Recovery and MFA abuse | L | H | Medium | Mitigate | Low | | 5.17, 8.5, 5.16 |
+| T-31 | Transport attacks | L | H | Medium | Mitigate | Low | | 5.14, 8.20, 8.21, 8.24 |
+| T-32 | Rollback or withholding | L | L | Low | Accept | Low | L-10 | 8.13, 8.24 |
+| T-33 | External link leakage | M | M | Medium | Mitigate, Accept | Medium | L-03 | 5.14, 8.24 |
+| T-34 | Management SaaS leakage | L | M | Low | Mitigate, Transfer | Low | | 5.19 to 5.22, 5.23, 8.4 |
+| T-35 | Identity spoofing via unverified identifiers | M | H | High | Mitigate, Accept | Medium | L-21 | 5.16, 8.24 |
+| T-36 | Injected room-key version by a server-side attacker | L | H | Medium | Mitigate (ADR-015, implemented in Phase 6) | Low (for an attacker limited to the server; the paths that remain are rated under T-25, T-23 and T-24) | L-23, L-46 | 8.24, 8.26 |
+| T-37 | Rekey abuse and incomplete rekeys | M | M | Medium | Mitigate | Low | L-24 | 5.18, 8.24 |
+| T-38 | Audit signing-key compromise | M | M | Medium | Mitigate, Accept | Medium (Level 1) | L-25 | 5.33, 8.24, 8.15 |
+| T-39 | Over-privileged database roles and schema drift | M | H | High | Mitigate | Low | L-26, L-28 | 8.2, 8.3, 8.9, 8.32 |
+| T-41 | Security-profile bypass and silent weakening | M | H | High | Mitigate | Low | L-59, L-60, L-61, L-62 | 5.12, 5.13, 8.26 |
+| T-40 | Unauthorized replacement or reset of a vault | L | H | Medium | Mitigate, Accept | Low | L-07, L-40 | 5.17, 8.5, 5.24 to 5.27 |
+| T-42 | Data services on the application host | M | H | High | Mitigate, Accept | Medium | L-71, L-75 | 8.22, 8.20, 8.21, 5.23 |
+| T-43 | Loss of the VM or of its data | M | M | Medium | Mitigate, Accept | Medium | L-72, L-73, L-74, L-77 | 8.13, 5.37, 5.24 to 5.27 |
+| T-44 | Misleading platform status | L | M | Low | Mitigate | Low | L-78 | 8.16, 5.37 |
+| T-45 | Unauthorized change or disclosure of ISMS records | M | M | Medium | Mitigate, Accept | Low | L-81, L-82 | 5.15, 8.3, 8.15, 5.33 |
 
 Residual risks rated **High** (T-23) and every **Accept** decision require explicit acknowledgement by the project owner at the end of Phase 0 and again before the final report.
+
+The **Annex A controls** column is the baseline risk-to-control mapping of the risk treatment plan (clause 6.1.3), added on 2026-10-15 for the operational ISMS (CM-T090). It names the Statement of Applicability rows of [isms-control-mapping.md](../security/isms-control-mapping.md) section 3 whose controls treat the risk. A treatment record in the ISMS Control Center may link further controls; it never removes this baseline.
 
 ## 6. STRIDE coverage
 
 | Category | Threats |
 |---|---|
 | Spoofing | T-03, T-08, T-09, T-10, T-13, T-17, T-23, T-25, T-29, T-30, T-35, T-36, T-38, T-40 |
-| Tampering | T-04, T-06, T-07, T-11, T-13, T-14, T-18, T-20, T-24, T-27, T-29, T-31, T-32, T-37, T-39, T-40 |
-| Repudiation | T-04, T-20, T-38 |
-| Information disclosure | T-01, T-02, T-05, T-06, T-12, T-14, T-15, T-16, T-18, T-21, T-22, T-23, T-24, T-25, T-28, T-31, T-33, T-34, T-36 |
+| Tampering | T-04, T-06, T-07, T-11, T-13, T-14, T-18, T-20, T-24, T-27, T-29, T-31, T-32, T-37, T-39, T-40, T-45 |
+| Repudiation | T-04, T-20, T-38, T-45 |
+| Information disclosure | T-01, T-02, T-05, T-06, T-12, T-14, T-15, T-16, T-18, T-21, T-22, T-23, T-24, T-25, T-28, T-31, T-33, T-34, T-36, T-45 |
 | Denial of service | T-11, T-26, T-32, T-37, T-40 |
-| Elevation of privilege | T-04, T-05, T-06, T-11, T-12, T-14, T-17, T-19, T-21, T-27, T-30, T-37, T-39 |
+| Elevation of privilege | T-04, T-05, T-06, T-11, T-12, T-14, T-17, T-19, T-21, T-27, T-30, T-37, T-39, T-45 |
 
 ## 7. Maintenance
 
@@ -749,3 +769,6 @@ The cloud workstream (CM-T063 to CM-T072, 2026-10-14) moved the server side onto
 | Misleading monitoring status | T-44 | Freshness limits, strict parsing, fixed reason codes, administrator-only view | |
 | Compromised delivered browser JavaScript | T-24 | Static export built from a verified commit on the VM; CSP with hashes; Nginx serves only the export | Served asset hashes compared with the release (EV-17-05) |
 
+## 17. Operational ISMS implementation check (ADR-016)
+
+New asset A-16 (security evidence and ISMS records) and threat T-45. New data flow: a platform administrator's browser sends ISMS records and transitions to the API, which stores them in PostgreSQL; nothing leaves the trust boundaries of section 1. New entry points: the six `/isms` routes (PA-06 to PA-08). Controls and tests are listed under T-45; the residual risks are L-81 (history not tamper-evident) and L-82 (one person holds every role). The assets A-14 to A-18 were added to make the inventory complete for the ISMS; their risks are already covered by T-16, T-19, T-27, T-43 and T-45.

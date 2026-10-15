@@ -1820,3 +1820,97 @@ CM-T057, CM-T063
 
 h3. Evidence required
 EV-19-09"
+"17","","Epic","CM-EPIC-17 Operational ISMS","Backlog","High","P1","risk","documentation","","","","22A","","","CM-EPIC-17","Operational ISMS","CM-EPIC-17","","","","","","","*Epic:* CM-EPIC-17 | *Phases:* 22A | *Subject focus:* ISMS operation, governance, assurance
+
+h3. Work items
+* CM-T088 Operational ISMS records, workflows and API (P1)
+* CM-T089 ISMS Control Center (P1)
+* CM-T090 ISMS foundation documents (P1)
+* CM-T091 ISMS verification (P1)
+* CM-T092 ISMS evidence and walkthrough (P1)"
+"1088","17","Task","CM-T088 Operational ISMS records, workflows and API","Backlog","High","P1","backend","database","security","risk","M8 Assessment and Report","22A","Medium","EV-22-17","CM-EPIC-17","","CM-T088","CM-T080","1080","","","- No status is written directly; named transitions with checked conditions.
+- Non-administrators get 404; decisions need a step-up; stale versions refused; secret attachments refused.
+- Append-only activity history, not described as tamper-evident.","T-45, L-81, L-82; INV-09 untouched.","*Placeholder ID:* CM-T088 | *Epic:* CM-EPIC-17 | *Phase:* 22A | *Release:* M8 Assessment and Report | *Security impact:* Medium
+
+h3. Description
+Persistent, versioned ISMS records with server-side state machines and an append-only activity history; routes PA-06 to PA-08 behind the platform administrator gate.
+
+h3. Acceptance criteria
+* No status is written directly; named transitions with checked conditions.
+* Non-administrators get 404; decisions need a step-up; stale versions refused; secret attachments refused.
+* Append-only activity history, not described as tamper-evident.
+
+h3. Security considerations
+T-45, L-81, L-82; INV-09 untouched.
+
+h3. Dependencies
+CM-T080
+
+h3. Evidence required
+EV-22-17"
+"1089","17","Task","CM-T089 ISMS Control Center","Backlog","High","P1","frontend","risk","","","M8 Assessment and Report","22A","Low","EV-22-04 to EV-22-15","CM-EPIC-17","","CM-T089","CM-T088","1088","","","- Every number computed from records, documents and time; environment labels honest.
+- Exercise records labelled; three engines under the strict CSP.","No HTML rendering of record text; nothing stored in the browser.","*Placeholder ID:* CM-T089 | *Epic:* CM-EPIC-17 | *Phase:* 22A | *Release:* M8 Assessment and Report | *Security impact:* Low
+
+h3. Description
+/trust/isms with twelve linked sections covering the ISMS lifecycle.
+
+h3. Acceptance criteria
+* Every number computed from records, documents and time; environment labels honest.
+* Exercise records labelled; three engines under the strict CSP.
+
+h3. Security considerations
+No HTML rendering of record text; nothing stored in the browser.
+
+h3. Dependencies
+CM-T088
+
+h3. Evidence required
+EV-22-04 to EV-22-15"
+"1090","17","Task","CM-T090 ISMS foundation documents","Backlog","High","P1","documentation","risk","","","M8 Assessment and Report","22A","Low","EV-22-05, EV-22-06","CM-EPIC-17","","CM-T090","CM-T003","1003","","","- The generated catalogue cross-checks every reference and fails the build on drift.","Honest scope (Oracle designed, not deployed); one-person operation (L-82).","*Placeholder ID:* CM-T090 | *Epic:* CM-EPIC-17 | *Phase:* 22A | *Release:* M8 Assessment and Report | *Security impact:* Low
+
+h3. Description
+Context, roles, policy register, freshness rules, metrics, asset inventory A-14 to A-18, baseline risk-to-control mapping, scope revision 2.
+
+h3. Acceptance criteria
+* The generated catalogue cross-checks every reference and fails the build on drift.
+
+h3. Security considerations
+Honest scope (Oracle designed, not deployed); one-person operation (L-82).
+
+h3. Dependencies
+CM-T003
+
+h3. Evidence required
+EV-22-05, EV-22-06"
+"1091","17","Task","CM-T091 ISMS verification","Backlog","High","P1","testing","security","","","M8 Assessment and Report","22A","Medium","EV-22-17","CM-EPIC-17","","CM-T091","CM-T088, CM-T089","1088","","","- Each negative control NC-22-01 to NC-22-05 is caught; earlier gates stay green.","No authorization mocked; real accounts, MFA and step-up.","*Placeholder ID:* CM-T091 | *Epic:* CM-EPIC-17 | *Phase:* 22A | *Release:* M8 Assessment and Report | *Security impact:* Medium
+
+h3. Description
+Unit, integration, database-guard, negative-control and three-engine E2E tests of the ISMS.
+
+h3. Acceptance criteria
+* Each negative control NC-22-01 to NC-22-05 is caught; earlier gates stay green.
+
+h3. Security considerations
+No authorization mocked; real accounts, MFA and step-up.
+
+h3. Dependencies
+CM-T088, CM-T089
+
+h3. Evidence required
+EV-22-17"
+"1092","17","Task","CM-T092 ISMS evidence and walkthrough","Backlog","High","P1","documentation","","","","M8 Assessment and Report","22A","Low","EV-22-04 to EV-22-16, EV-22-18","CM-EPIC-17","","CM-T092","CM-T089","1089","","","- Evidence indexed with environment and limitations; no fabricated approvals, meetings or certifications.","Redaction checklist; synthetic accounts only.","*Placeholder ID:* CM-T092 | *Epic:* CM-EPIC-17 | *Phase:* 22A | *Release:* M8 Assessment and Report | *Security impact:* Low
+
+h3. Description
+Screenshots from the running local Docker demonstration, persistence across a restart, professor walkthrough.
+
+h3. Acceptance criteria
+* Evidence indexed with environment and limitations; no fabricated approvals, meetings or certifications.
+
+h3. Security considerations
+Redaction checklist; synthetic accounts only.
+
+h3. Dependencies
+CM-T089
+
+h3. Evidence required
+EV-22-04 to EV-22-16, EV-22-18"
