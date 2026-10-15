@@ -49,6 +49,9 @@ done
 mkdir -p "${work}/secrets" && tar --force-local -C "${work}/secrets" -xf "${work}/secrets.tar"
 secrets="$(find "${work}/secrets" -name worker.env -printf '%h\n' | head -n 1)"
 [[ -n "${secrets}" ]] || cm_die 'worker.env missing in the backup'
+# The extracted copy belongs to the operator with mode 0400 (umask 077); SeaweedFS runs as uid
+# 1000 and must read its identity file (SF-17-05).
+cm_give 1000 "${secrets}/seaweedfs-identities.json"
 
 docker rm -f cm-drill-postgres cm-drill-storage > /dev/null 2>&1 || true
 docker volume rm ciphermesh-drill-pgdata ciphermesh-drill-storage > /dev/null 2>&1 || true

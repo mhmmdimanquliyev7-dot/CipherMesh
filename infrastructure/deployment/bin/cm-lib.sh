@@ -123,6 +123,18 @@ cm_env_value() {
   printf '%s' "${line#*=}"
 }
 
+# Gives a file to a container user; in the local rehearsal without root, makes the throwaway file
+# readable instead (never on the VM, where the operator scripts run as root).
+cm_give() { # <uid> <file>
+  if chown "$1:$1" "$2" 2> /dev/null; then
+    chmod 400 "$2"
+  elif [[ "${CM_REHEARSAL:-}" == 1 ]]; then
+    chmod 444 "$2"
+  else
+    cm_die "could not give $(basename "$2") to uid $1 (run as root)"
+  fi
+}
+
 # Restores a SeaweedFS data volume from a tar archive on standard input. BusyBox tar as root does
 # not give the volume root back to its owner, and SeaweedFS runs as uid 1000 (compose.cloud.yml),
 # so the whole tree is handed to uid 1000 afterwards.
