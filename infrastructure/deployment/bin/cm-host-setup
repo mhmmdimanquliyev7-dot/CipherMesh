@@ -15,7 +15,7 @@
 #                AllowUsers <operator>, no forwarding. Validated with "sshd -t" BEFORE the reload;
 #                the current session stays open, and an invalid file is removed again.
 #   firewall     nothing: the host firewall is a separate, explicit step (cm-firewall), because a
-#                mistake there can lock the operator out (prompt section 8).
+#                mistake there can lock the operator out.
 #   layout       /srv/ciphermesh (config, secrets 0700, src), /var/lib/ciphermesh/status,
 #                /var/backups/ciphermesh (0700), /etc/ciphermesh/tls, /var/www/acme
 #   timers       status collector (5 min), worker (15 min), backup (daily 03:30 UTC)

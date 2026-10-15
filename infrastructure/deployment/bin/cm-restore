@@ -9,7 +9,7 @@
 # used for this run only. The runtime secrets of the backup are restored (the TOTP key is needed
 # to read stored TOTP secrets); existing secret files must be identical to them or absent.
 . "$(dirname "$0")/cm-lib.sh"
-cm_require docker age tar cmp
+cm_require docker tar cmp
 cm_load_config
 
 archive="${1:-}"
@@ -23,13 +23,13 @@ trap 'rm -rf "${work}"' EXIT
 cm_read_line migrator_password
 cat > "${work}/identity.txt"
 grep -q '^AGE-SECRET-KEY-1' "${work}/identity.txt" || cm_die 'standard input: migrator password line, then the age identity'
-age -d -i "${work}/identity.txt" "${archive}" | tar -C "${work}" -xf -
+cm_age_decrypt "${work}/identity.txt" < "${archive}" | tar -C "${work}" -xf -
 rm -f "${work}/identity.txt"
 for part in db.dump tables.txt object-storage.tar secrets.tar; do
   [[ -s "${work}/${part}" ]] || cm_die "backup part ${part} missing"
 done
 
-mkdir -p "${work}/restored" && tar -C "${work}/restored" -xf "${work}/secrets.tar"
+mkdir -p "${work}/restored" && tar --force-local -C "${work}/restored" -xf "${work}/secrets.tar"
 restored="$(find "${work}/restored" -name api.env -printf '%h\n' | head -n 1)"
 mkdir -p "${CM_SECRETS_DIR}" && chmod 700 "${CM_SECRETS_DIR}"
 for file in api.env worker.env seaweedfs-identities.json api_database_url worker_database_url \
@@ -51,9 +51,7 @@ cm_psql_superuser ciphermesh -At < "$(dirname "$0")/../lib/table-digests.sql" > 
 diff -q "${work}/tables.txt" "${work}/tables.restored.txt" > /dev/null || cm_die 'restored tables differ from the backup manifest'
 cm_info "database restored: $(wc -l < "${work}/tables.txt") tables identical to the backup"
 
-docker volume create ciphermesh-object-storage-data > /dev/null
-docker run --rm -i -v ciphermesh-object-storage-data:/data --network none --entrypoint tar "${CM_POSTGRES_IMAGE}" \
-  -C /data -xf - < "${work}/object-storage.tar"
+cm_restore_storage_volume ciphermesh-object-storage-data < "${work}/object-storage.tar"
 cm_info 'object storage restored'
 cm_compose up --detach --wait
 cm_compose --profile jobs run --rm --no-deps -T \

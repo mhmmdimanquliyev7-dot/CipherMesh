@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { collectCspViolations, login } from '../e2e/helpers';
 import { openRoomThroughUi, unlockVault } from '../e2e/room-helpers';
+import { authSlots } from './pace';
 
 // Browser-level restore check (ADR-014, EV-19-07): after cm-restore rebuilt the stack from an
 // encrypted backup onto empty volumes, the synthetic account recorded by cloud-smoke.spec.ts signs
@@ -30,6 +31,7 @@ test('after a restore, the recorded account decrypts its note and file again', a
   const recorded = JSON.parse(readFileSync(file, 'utf8')) as Recorded;
   const violations = await collectCspViolations(page);
 
+  await authSlots(1);
   await login(page, recorded);
   await unlockVault(page, recorded.passphrase);
   await openRoomThroughUi(page, recorded.roomName);

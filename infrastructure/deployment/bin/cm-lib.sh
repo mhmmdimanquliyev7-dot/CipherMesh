@@ -1,5 +1,5 @@
 # Shared helpers of the CipherMesh operator scripts (ADR-014). Sourced, never executed.
-# Rules for every script (CLAUDE.md sections 8 and 9, prompt section 28):
+# Rules for every script (CLAUDE.md sections 8 and 9):
 #   - never print a secret: values are read from files or standard input, never from arguments;
 #   - never delete a volume, a backup or data; destructive steps need an explicit flag;
 #   - fail on the first error (set -euo pipefail) and say which step failed.
@@ -20,6 +20,43 @@ export CM_HOME CM_CONFIG CM_SECRETS_DIR CM_RELEASE_DIR CM_STATUS_DIR CM_BACKUP_D
 
 # Pinned like compose.cloud.yml; used for one-off helper containers (volume installs, backups).
 CM_POSTGRES_IMAGE='postgres:17.11-alpine3.24@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24'
+CM_SEAWEEDFS_IMAGE='chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882'
+
+# Python for small JSON tasks: python3 on the VM, python on Windows (Git Bash).
+# On Windows, python3 may be the Microsoft Store stub, so the interpreter must actually run.
+CM_PYTHON=''
+for candidate in python3 python; do
+  if "${candidate}" -c 'import json' > /dev/null 2>&1; then
+    CM_PYTHON="${candidate}"
+    break
+  fi
+done
+
+# age (LIB-10): the host's binary when installed (the VM), otherwise the one in the ops image
+# (Docker Desktop on Windows). The container has no network and sees only standard input and,
+# for decryption, the identity file's directory read-only.
+cm_age_encrypt() { # <recipient> < plaintext > ciphertext
+  if command -v age > /dev/null 2>&1; then
+    age -r "$1"
+  else
+    docker run --rm -i --network none --entrypoint age "ciphermesh-ops:${CM_RELEASE}" -r "$1"
+  fi
+}
+cm_age_decrypt() { # <identity file> < ciphertext > plaintext
+  if command -v age > /dev/null 2>&1; then
+    age -d -i "$1"
+  else
+    docker run --rm -i --network none -v "$(dirname "$1"):/identity:ro" --entrypoint age \
+      "ciphermesh-ops:${CM_RELEASE}" -d -i "/identity/$(basename "$1")"
+  fi
+}
+cm_age_keygen() { # > identity file (the public key is on its comment line)
+  if command -v age-keygen > /dev/null 2>&1; then
+    age-keygen 2> /dev/null
+  else
+    docker run --rm --network none --entrypoint age-keygen "ciphermesh-ops:${CM_RELEASE}" 2> /dev/null
+  fi
+}
 
 cm_info() { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 cm_die() {
@@ -84,6 +121,29 @@ cm_env_value() {
   line="$(grep -E "^${key}=" "${file}" | tail -n 1 || true)"
   [[ -n "${line}" ]] || cm_die "${key} missing in ${file}"
   printf '%s' "${line#*=}"
+}
+
+# Restores a SeaweedFS data volume from a tar archive on standard input. BusyBox tar as root does
+# not give the volume root back to its owner, and SeaweedFS runs as uid 1000 (compose.cloud.yml),
+# so the whole tree is handed to uid 1000 afterwards.
+cm_restore_storage_volume() { # <volume> < archive
+  docker volume create "$1" > /dev/null
+  docker run --rm -i -v "$1:/data" --network none --entrypoint sh "${CM_POSTGRES_IMAGE}" \
+    -c 'tar -C /data -xf - && chown -R 1000:1000 /data'
+}
+
+# Waits until the S3 gateway of a SeaweedFS container answers HTTP (an unsigned request is refused
+# with 403 once the filer behind it is ready); fails after two minutes.
+cm_wait_s3() { # <container>
+  local _ answer
+  for _ in $(seq 1 120); do
+    # wget exits non-zero on the expected 403, so its output is captured first: in a pipeline
+    # under pipefail that exit status would hide grep's match.
+    answer="$(docker exec "$1" wget -S -O /dev/null http://127.0.0.1:8333/ 2>&1 || true)"
+    grep -q 'HTTP/1.1 [0-9]' <<< "${answer}" && return 0
+    sleep 1
+  done
+  cm_die "object storage in $1 did not become ready"
 }
 
 # Runs SQL from standard input as the superuser over the container socket (peer authentication).

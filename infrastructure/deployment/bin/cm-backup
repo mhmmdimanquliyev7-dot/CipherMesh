@@ -18,7 +18,7 @@
 # volume copy, so the database and the objects match. Nothing is deleted except backups older
 # than CM_BACKUP_KEEP_DAYS (default 7) in CM_BACKUP_DIR, and never the newest three.
 . "$(dirname "$0")/cm-lib.sh"
-cm_require docker age tar sha256sum
+cm_require docker tar sha256sum
 cm_load_config
 [[ "${CM_BACKUP_RECIPIENT:-}" =~ ^age1[0-9a-z]{58}$ ]] || cm_die 'CM_BACKUP_RECIPIENT must be an age public key (age1...)'
 
@@ -40,14 +40,14 @@ restart_services
 trap 'rm -rf "${work}"' EXIT
 cm_info 'services restarted'
 
-tar -C "$(dirname "${CM_SECRETS_DIR}")" -cf "${work}/secrets.tar" "$(basename "${CM_SECRETS_DIR}")" \
+tar --force-local -C "$(dirname "${CM_SECRETS_DIR}")" -cf "${work}/secrets.tar" "$(basename "${CM_SECRETS_DIR}")" \
   -C "$(dirname "${CM_CONFIG}")" "$(basename "${CM_CONFIG}")"
 cat > "${work}/meta.json" << EOF
 {"schema":1,"createdAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","release":"${CM_RELEASE}","tables":$(wc -l < "${work}/tables.txt"),"dbDumpBytes":$(stat -c %s "${work}/db.dump"),"objectStorageBytes":$(stat -c %s "${work}/object-storage.tar")}
 EOF
 
 archive="${CM_BACKUP_DIR}/ciphermesh-${stamp}.tar.age"
-tar -C "${work}" -cf - meta.json tables.txt db.dump object-storage.tar secrets.tar | age -r "${CM_BACKUP_RECIPIENT}" > "${archive}.partial"
+tar -C "${work}" -cf - meta.json tables.txt db.dump object-storage.tar secrets.tar | cm_age_encrypt "${CM_BACKUP_RECIPIENT}" > "${archive}.partial"
 mv "${archive}.partial" "${archive}"
 digest="$(sha256sum "${archive}" | cut -d' ' -f1)"
 # Plain manifest next to the archive: counts and hashes only, no content.

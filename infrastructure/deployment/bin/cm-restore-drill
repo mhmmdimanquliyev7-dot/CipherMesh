@@ -15,7 +15,7 @@
 # Standard input: the age identity (private key) of the operator, used for this run only and kept
 # in a tmpfs directory that is deleted at the end. Output: counts and verdicts only.
 . "$(dirname "$0")/cm-lib.sh"
-cm_require docker age tar
+cm_require docker tar
 cm_load_config
 
 keep=false
@@ -41,12 +41,12 @@ started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 cat > "${work}/identity.txt"
 grep -q '^AGE-SECRET-KEY-1' "${work}/identity.txt" || cm_die 'standard input must be an age identity'
 cm_info 'decrypting the backup into a tmpfs work directory'
-age -d -i "${work}/identity.txt" "${archive}" | tar -C "${work}" -xf -
+cm_age_decrypt "${work}/identity.txt" < "${archive}" | tar -C "${work}" -xf -
 rm -f "${work}/identity.txt"
 for part in db.dump tables.txt object-storage.tar secrets.tar meta.json; do
   [[ -s "${work}/${part}" ]] || cm_die "backup part ${part} missing"
 done
-mkdir -p "${work}/secrets" && tar -C "${work}/secrets" -xf "${work}/secrets.tar"
+mkdir -p "${work}/secrets" && tar --force-local -C "${work}/secrets" -xf "${work}/secrets.tar"
 secrets="$(find "${work}/secrets" -name worker.env -printf '%h\n' | head -n 1)"
 [[ -n "${secrets}" ]] || cm_die 'worker.env missing in the backup'
 
@@ -88,18 +88,12 @@ fi
 cm_info "tables: ${tables_matched}/${tables_total} identical (${tables_result})"
 
 cm_info 'drill storage: SeaweedFS with the restored data volume and identity file'
-docker volume create ciphermesh-drill-storage > /dev/null
-docker run --rm -i -v ciphermesh-drill-storage:/data --network none --entrypoint tar "${CM_POSTGRES_IMAGE}" \
-  -C /data -xf - < "${work}/object-storage.tar"
-storage_image="$(docker inspect --format '{{.Config.Image}}' "$(cm_compose ps -q object-storage)")"
+cm_restore_storage_volume ciphermesh-drill-storage < "${work}/object-storage.tar"
 docker run -d --name cm-drill-storage --network "${net}" -v ciphermesh-drill-storage:/data \
   -v "${secrets}/seaweedfs-identities.json:/etc/seaweedfs/identities.json:ro" --security-opt no-new-privileges:true \
-  --user 1000:1000 --cap-drop ALL "${storage_image}" server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/identities.json -s3.iam=false > /dev/null
-for _ in $(seq 1 60); do
-  docker exec cm-drill-storage nc -z 127.0.0.1 8333 > /dev/null 2>&1 && break
-  sleep 1
-done
-sleep 5
+  --user 1000:1000 --cap-drop ALL "${CM_SEAWEEDFS_IMAGE}" server -dir=/data -s3 -s3.port=8333 \
+  -s3.config=/etc/seaweedfs/identities.json -s3.iam=false > /dev/null
+cm_wait_s3 cm-drill-storage
 
 cm_info 'verifying every stored file object against its recorded size and SHA-256'
 objects_json="$(docker run --rm --network "${net}" --read-only --cap-drop ALL --security-opt no-new-privileges:true \

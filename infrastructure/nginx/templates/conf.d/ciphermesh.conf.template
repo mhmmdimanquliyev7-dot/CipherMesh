@@ -67,7 +67,7 @@ server {
     include /etc/nginx/cm/api-proxy.conf;
   }
   location /api/ {
-    limit_req zone=cm_api burst=40 nodelay;
+    limit_req zone=cm_api burst=100 nodelay;
     include /etc/nginx/cm/api-proxy.conf;
   }
   location = /api { return 404; }

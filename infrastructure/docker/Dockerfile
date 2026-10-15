@@ -20,17 +20,38 @@ FROM ${NODE_IMAGE} AS build
 RUN npm install --global --ignore-scripts pnpm@12.6.0 && npm cache clean --force
 WORKDIR /src
 ENV CHECKPOINT_DISABLE=1 PRISMA_HIDE_UPDATE_MESSAGE=1 NEXT_TELEMETRY_DISABLED=1
-COPY . .
+# Dependencies first (manifests, lockfile and what the postinstall Prisma generate reads), so a
+# source change does not repeat the install.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY packages/crypto/package.json packages/crypto/
+COPY packages/shared/package.json packages/shared/
+COPY packages/validation/package.json packages/validation/
+COPY scripts/db/prisma.mjs scripts/db/
+COPY prisma/schema.prisma prisma/
 RUN pnpm install --frozen-lockfile
+COPY . .
 ARG CM_STORAGE_ORIGIN=
 ARG NEXT_PUBLIC_CM_ENVIRONMENT=cloud-demonstration
 RUN pnpm --filter @ciphermesh/api build \
  && CM_STORAGE_ORIGIN="${CM_STORAGE_ORIGIN}" NEXT_PUBLIC_CM_ENVIRONMENT="${NEXT_PUBLIC_CM_ENVIRONMENT}" \
     pnpm --filter @ciphermesh/web build \
  && node infrastructure/nginx/render-security-headers.mjs apps/web/out-meta/security-headers.json /src/nginx-security-headers.conf
-# Production dependencies of the API only, resolved from the lockfile.
+# Production dependencies of the API only, resolved from the lockfile. pnpm also links the
+# optional peers of @prisma/client (the Prisma CLI with Studio, PGlite, TypeScript, React, d3,
+# mysql2 and others); the bundle imports only @prisma/client's runtime and the pg adapter, so this
+# development tooling is removed from the runtime image. The CI stack check
+# runs the API, the worker and the smoke tests against the pruned image.
 RUN pnpm --filter @ciphermesh/api deploy --legacy --prod /out/api \
- && cp -r apps/api/dist /out/api/dist
+ && cp -r apps/api/dist /out/api/dist \
+ && cd /out/api/node_modules/.pnpm \
+ && rm -rf prisma@* @prisma+studio-core@* @prisma+dev@* @prisma+config@* @prisma+engines@* \
+      @prisma+fetch-engine@* @prisma+get-platform@* @prisma+streams-local@* @prisma+query-plan-executor@* \
+      @electric-sql+* typescript@* react@* react-dom@* scheduler@* @radix-ui+* @visx+* d3-* @types+* \
+      effect@* fast-check@* pure-rand@* mysql2@* elkjs@* @babel+* lodash@* c12@* jiti@* giget@* \
+      chokidar@* readdirp@* valibot@* better-result@* magicast@* \
+ && test -d @prisma+client@* && test -d @prisma+adapter-pg@* && test -d express@*
 # The Prisma CLI fetches its schema engine on first use; fetch it now, because the ops container
 # runs on an internal network without egress.
 RUN node scripts/db/prisma.mjs version > /dev/null
@@ -52,6 +73,10 @@ CMD ["dist/server.js"]
 
 # -------------------------------------------------------------------------------------- ops
 FROM build AS ops
+# age (LIB-10) for the backup tools on hosts without it (Docker Desktop on Windows); from the
+# Alpine repository, signature-checked by apk. Never part of the runtime images.
+USER root
+RUN apk add --no-cache age
 USER node
 WORKDIR /src
 ENTRYPOINT []

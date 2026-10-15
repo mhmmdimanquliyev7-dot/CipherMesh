@@ -158,8 +158,10 @@ jobs:
 
   # The cloud stack (ADR-014) on GitHub's native arm64 runner, the architecture of the Oracle
   # Ampere A1 VM: production images built natively, the stack run on loopback with a throwaway CA,
-  # external edge checks, the deployment smoke test in three engines, an encrypted backup, an
-  # isolated restore drill and a full restore whose note and file are decrypted again in browsers.
+  # external edge checks, database access rules, the deployment smoke and collaboration tests
+  # (invitation, burn secret, removal, key rotation) in three engines, screenshots, an encrypted
+  # backup, an isolated restore drill and a full restore whose note and file are decrypted again.
+  # The same script is `pnpm demo:verify` on a laptop (the local Docker demonstration).
   # No cloud account or credential is involved. Evidence files are uploaded (synthetic data only).
   cloud-stack:
     name: Cloud stack (linux/arm64)

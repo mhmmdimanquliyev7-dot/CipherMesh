@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { collectCspViolations, login, newUser, newVaultPassphrase, register } from '../e2e/helpers';
 import { confirmAccount, createRoomThroughUi, PASSPHRASE_FIELD } from '../e2e/room-helpers';
+import { authSlots } from './pace';
 
 // Deployment smoke test (ADR-014, Scenario A): through the deployment's public edge only, one
 // synthetic user registers, creates a vault, a room, an encrypted note and an encrypted file, and
@@ -51,9 +52,12 @@ test('deployment: vault, room, encrypted note and file round trip; no plaintext 
 
   // Account and vault through the real UI.
   const user = { ...newUser(), name: `Cloud smoke ${browserName}` };
+  await authSlots(1);
   await register(page, user);
+  await authSlots(1);
   await login(page, user);
   await page.getByRole('link', { name: 'Vault', exact: true }).click();
+  await authSlots(1);
   await confirmAccount(page, user);
   const passphrase = newVaultPassphrase();
   await page.getByLabel(PASSPHRASE_FIELD).fill(passphrase);

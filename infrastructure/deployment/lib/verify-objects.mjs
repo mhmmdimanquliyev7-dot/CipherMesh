@@ -45,7 +45,32 @@ const s3 = new AwsClient({
   retries: 0,
 });
 
-const result = { checked: 0, matched: 0, missing: 0, sizeMismatch: 0, digestMismatch: 0, errors: 0 };
+const result = { checked: 0, matched: 0, missing: 0, sizeMismatch: 0, digestMismatch: 0, errors: 0, retries: 0 };
+// Status codes of the retried attempts (counts only), so a drill report shows why it waited.
+const transient = {};
+
+// A freshly started SeaweedFS answers its S3 port before its filer and volumes serve objects, so a
+// failed fetch is retried for up to a minute. Only the fetch is retried: a missing object (404), a
+// size or digest mismatch, or a failure that persists is reported as before.
+const ATTEMPTS = 20;
+const RETRY_MS = 3000;
+async function fetchObject(url) {
+  for (let attempt = 1; ; attempt += 1) {
+    let reason;
+    try {
+      const response = await s3.fetch(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(30_000) });
+      if (response.ok || response.status === 404 || attempt === ATTEMPTS) return response;
+      reason = String(response.status);
+      await response.body?.cancel();
+    } catch (error) {
+      if (attempt === ATTEMPTS) throw error;
+      reason = 'network';
+    }
+    result.retries += 1;
+    transient[reason] = (transient[reason] ?? 0) + 1;
+    await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+  }
+}
 await db.connect();
 try {
   const { rows } = await db.query(
@@ -54,11 +79,7 @@ try {
   for (const row of rows) {
     result.checked += 1;
     try {
-      const response = await s3.fetch(`${env.STORAGE_ENDPOINT}/${env.STORAGE_BUCKET}/${row.object_key}`, {
-        method: 'GET',
-        redirect: 'error',
-        signal: AbortSignal.timeout(30_000),
-      });
+      const response = await fetchObject(`${env.STORAGE_ENDPOINT}/${env.STORAGE_BUCKET}/${row.object_key}`);
       if (response.status === 404) {
         result.missing += 1;
         await response.body?.cancel();
@@ -85,5 +106,7 @@ try {
 } finally {
   await db.end();
 }
-console.log(JSON.stringify({ check: 'stored-ciphertext-integrity', at: new Date().toISOString(), ...result }));
+console.log(
+  JSON.stringify({ check: 'stored-ciphertext-integrity', at: new Date().toISOString(), ...result, transient }),
+);
 process.exit(result.checked === result.matched ? 0 : 1);
