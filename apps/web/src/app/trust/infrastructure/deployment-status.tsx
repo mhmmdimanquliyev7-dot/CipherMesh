@@ -49,8 +49,11 @@ export function DeploymentStatus({
     };
   }, []);
 
-  const environment =
-    publicEnv.deploymentEnvironment === 'development' ? 'Development build' : 'Cloud demonstration build';
+  const environment = {
+    development: 'Development build',
+    'local-docker': 'Local Docker demonstration build (not a cloud deployment)',
+    'cloud-demonstration': 'Cloud demonstration build',
+  }[publicEnv.deploymentEnvironment];
   const cloud = live.kind === 'ready' ? live.data.platform.find((c) => c.id === 'cloud') : undefined;
   const deployment = live.kind === 'ready' ? live.data.deployment : null;
   return (

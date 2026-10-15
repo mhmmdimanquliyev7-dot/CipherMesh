@@ -95,7 +95,11 @@ export function DeploymentDetails({ deployment }: { readonly deployment: Platfor
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Cloud instance</p>
         <Row
           label="Provider"
-          value={deployment.provider === 'oci' ? 'Oracle Cloud Infrastructure' : 'none (no cloud metadata)'}
+          value={
+            deployment.provider === 'oci'
+              ? 'Oracle Cloud Infrastructure'
+              : 'None: local Docker host, not a cloud deployment'
+          }
         />
         <Row label="Region" value={or(deployment.region)} />
         <Row label="Shape" value={or(deployment.shape)} />

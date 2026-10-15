@@ -121,6 +121,21 @@ describe('host status evaluation', () => {
     expect(result.cloud.reasons).toEqual(['NOT_A_CLOUD_HOST']);
   });
 
+  it('reports a local Docker host with its own warnings, but not the cloud firewall', () => {
+    const file = healthyFile();
+    const result = evaluateHostStatus(
+      {
+        ...file,
+        cloud: { ...file.cloud, provider: 'none', region: null, shape: null },
+        host: { ...file.host, hostFirewall: 'not-applicable' },
+        services: file.services.map((s) => (s.name === 'nginx' ? { ...s, state: 'exited' } : s)),
+      },
+      NOW,
+    );
+    expect(result.cloud.state).toBe('NOT_CONNECTED');
+    expect(result.cloud.reasons).toEqual(['NOT_A_CLOUD_HOST', 'SERVICE_UNHEALTHY']);
+  });
+
   it('reports the worker from its last run: failed, stale or missing', () => {
     expect(
       evaluateHostStatus(healthyFile({ worker: { finishedAt: minutesAgo(5), result: 'failure' } }), NOW).worker,

@@ -154,7 +154,10 @@ export function evaluateHostStatus(
 
   let cloud: ComponentStatus;
   if (file.cloud.provider !== 'oci') {
-    cloud = { state: 'NOT_CONNECTED', checkedAt: iso(file.checkedAt), reasons: ['NOT_A_CLOUD_HOST', ...reasons] };
+    // A local Docker host (the rehearsal): never a connected cloud. The host firewall belongs to
+    // the cloud VM; Docker Desktop publishes only on loopback, so its absence is not a warning here.
+    const local = reasons.filter((reason) => reason !== 'HOST_FIREWALL_INACTIVE');
+    cloud = { state: 'NOT_CONNECTED', checkedAt: iso(file.checkedAt), reasons: ['NOT_A_CLOUD_HOST', ...local] };
   } else {
     cloud = { state: reasons.length === 0 ? 'HEALTHY' : 'DEGRADED', checkedAt: iso(file.checkedAt), reasons };
   }
