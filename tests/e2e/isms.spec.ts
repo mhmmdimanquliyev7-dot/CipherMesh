@@ -1,6 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectCspViolations, login, newUser, register, useDistinctClientAddress, type TestUser } from './helpers';
 import { enrollMfa, totp } from './room-helpers';
@@ -31,11 +33,45 @@ const RISK_OF: Readonly<Record<string, { readonly risk: string; readonly control
   webkit: { risk: 'T-08', control: '8.5' },
 };
 
+/**
+ * Grants the platform administrator role with the server-side CLI, as an operator would (there is
+ * no API for it). The CLI needs a full server configuration; this is the environment the E2E
+ * server gives the API, built from the test process's own settings (the database and storage of
+ * the job), so it works the same locally and in CI, where no .env file exists.
+ */
 function grantPlatformAdmin(email: string): void {
+  // Locally the settings live in .env (the E2E server loads it itself); in CI they are exported.
+  const envFile = join(root, '.env');
+  if (process.env['DATABASE_URL'] === undefined && existsSync(envFile)) process.loadEnvFile(envFile);
+  const required = ['DATABASE_URL', 'STORAGE_ENDPOINT', 'STORAGE_ACCESS_KEY_ID', 'STORAGE_SECRET_ACCESS_KEY'] as const;
+  for (const name of required) expect(process.env[name], `${name} is needed to grant the role`).toBeTruthy();
   const result = spawnSync(
     process.execPath,
-    ['--env-file-if-exists=.env', '--import', 'tsx', 'apps/api/src/cli/platform-admin.ts', 'grant', email],
-    { cwd: root, encoding: 'utf8' },
+    ['--import', 'tsx', 'apps/api/src/cli/platform-admin.ts', 'grant', email],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env['PATH'] ?? '',
+        SystemRoot: process.env['SystemRoot'] ?? '',
+        NODE_ENV: 'development',
+        APP_ORIGIN: 'https://127.0.0.1:4173',
+        API_HOST: '127.0.0.1',
+        API_PORT: '4199',
+        LOG_LEVEL: 'warn',
+        DATABASE_URL: process.env['DATABASE_URL'] ?? '',
+        TOTP_ENCRYPTION_KEY: randomBytes(32).toString('base64url'),
+        TOTP_ENCRYPTION_KEY_ID: 'e2e',
+        IDENTIFIER_HMAC_KEY: randomBytes(32).toString('base64url'),
+        TRUST_PROXY_HOPS: '1',
+        STORAGE_ENDPOINT: process.env['STORAGE_ENDPOINT'] ?? '',
+        STORAGE_PUBLIC_ENDPOINT: 'https://localhost:4174',
+        STORAGE_BUCKET: process.env['STORAGE_BUCKET'] ?? 'cm-files',
+        STORAGE_REGION: process.env['STORAGE_REGION'] ?? 'us-east-1',
+        STORAGE_ACCESS_KEY_ID: process.env['STORAGE_ACCESS_KEY_ID'] ?? '',
+        STORAGE_SECRET_ACCESS_KEY: process.env['STORAGE_SECRET_ACCESS_KEY'] ?? '',
+      },
+    },
   );
   expect(result.status, result.stderr).toBe(0);
 }
