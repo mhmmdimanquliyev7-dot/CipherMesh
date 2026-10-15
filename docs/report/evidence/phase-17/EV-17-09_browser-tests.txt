@@ -1,0 +1,11 @@
+
+Running 6 tests using 1 worker
+
+  ok 1 [chromium] › tests\deployment\cloud-smoke.spec.ts:39:1 › deployment: vault, room, encrypted note and file round trip; no plaintext leaves the browser (3.3s)
+  ok 2 [chromium] › tests\deployment\collaboration.spec.ts:60:1 › deployment: invitation, burn secret, removal and key rotation between two people (59.7s)
+  ok 3 [firefox] › tests\deployment\cloud-smoke.spec.ts:39:1 › deployment: vault, room, encrypted note and file round trip; no plaintext leaves the browser (5.7s)
+  ok 4 [firefox] › tests\deployment\collaboration.spec.ts:60:1 › deployment: invitation, burn secret, removal and key rotation between two people (1.0m)
+  ok 5 [webkit] › tests\deployment\cloud-smoke.spec.ts:39:1 › deployment: vault, room, encrypted note and file round trip; no plaintext leaves the browser (31.4s)
+  ok 6 [webkit] › tests\deployment\collaboration.spec.ts:60:1 › deployment: invitation, burn secret, removal and key rotation between two people (1.5m)
+
+  6 passed (4.2m)

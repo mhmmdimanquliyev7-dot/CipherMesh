@@ -105,7 +105,7 @@ export const NOT_IMPLEMENTED: readonly { readonly name: string; readonly text: s
   },
   {
     name: 'Cloud deployment',
-    text: 'Not deployed yet. ADR-014 chose one Oracle Cloud Always Free VM; the images, Compose stack, Nginx, hardening scripts, encrypted backups and the measured platform status are in the repository and run on linux/arm64 in CI (a rehearsal with a throwaway certificate authority). The VM waits for the account owner to approve the resource plan.',
+    text: 'Not deployed to a cloud provider. The production stack (the same images, Compose file, Nginx, database TLS, encrypted backups and measured status) runs as a local Docker demonstration on the project owner’s laptop, labelled as such, and on linux/arm64 in CI. The Oracle Cloud Always Free deployment of ADR-014 is prepared and waits for the account owner’s approval; no cloud control is verified.',
   },
   {
     name: 'Standalone Crypto Inspector',

@@ -1,6 +1,6 @@
 # Cloud Deployment + Cloud Security Hardening: Traceability
 
-Status: Stage A (repository and rehearsal) complete on branch `infra/CM-T063-oracle-always-free-deployment` (pull request #37), 2026-10-14; Stage B (Oracle Cloud resources) waits for the account owner's approval of the plan in [oracle-always-free.md](../deployment/oracle-always-free.md) section 3. Decision record: [ADR-014](../architecture/adr/ADR-014-cloud-provider-oci-always-free.md). Related: [cloud-security-hardening.md](../deployment/cloud-security-hardening.md), [current-state.md](current-state.md) section 6h.
+Status: Stage A (repository and rehearsal) complete on branch `infra/CM-T063-oracle-always-free-deployment` (pull request #37), 2026-10-14. **Local Docker demonstration (the owner's priority since 2026-10-14): verified end to end on 2026-10-15** with `pnpm demo:verify` ([local-docker-demo.md](../deployment/local-docker-demo.md), EV-17-09, EV-19-13); this is local evidence, not cloud evidence (L-80). Stage B (Oracle Cloud resources) is deferred, not verified, and waits for the account owner's approval of the plan in [oracle-always-free.md](../deployment/oracle-always-free.md) section 3. Decision record: [ADR-014](../architecture/adr/ADR-014-cloud-provider-oci-always-free.md). Related: [cloud-security-hardening.md](../deployment/cloud-security-hardening.md), [current-state.md](current-state.md) section 6h.
 
 ## 1. Scope and decisions
 
@@ -41,7 +41,14 @@ Status: Stage A (repository and rehearsal) complete on branch `infra/CM-T063-ora
 |---|---|---|---|
 | SF-17-01 | Low | First arm64 CI run: rehearsal TLS keys unreadable for Nginx (uid 101) | `cm-rehearsal` sets rehearsal file modes; the VM uses `cm-tls install` |
 | SF-17-02 | Low | Review: `cm_psql_superuser` dropped psql options, so backup digests would have been formatted tables | Options passed through; the CI stack check compares manifests |
+| SF-17-03 | Low | Local demonstration: the general API limit (20 r/s, burst 40 per address) refused page loads of two sessions behind one address | Raised to 50 r/s, burst 100; authentication limits unchanged; tests pace sign-ins |
+| SF-17-04 | Low | Local WebKit run on Windows: a late request with the token replaced by the step-up got a 401 whose cookie deletion removed the new session | The 401 no longer deletes the cookie (token still refused); logout and current-session revocation still do; regression test in `tests/auth/step-up.test.ts` |
+| SF-17-05 | Low | CI run 38606755583 and the local drill: every object reported as an error while the restored SeaweedFS was still starting; the readiness wait failed under `pipefail` | The wait reads the answer before matching; the object check retries failed fetches for up to a minute and reports them; mismatches and persistent failures still fail |
 | (test artifact) | n/a | Local WebKit run: Playwright's screenshot injected a style element that the CSP blocked | The smoke test checks the CSP before taking its screenshot, with `caret: 'initial'` |
+
+## 4a. Local Docker demonstration (priority since 2026-10-14)
+
+The project owner stopped at the provisioning gate and asked for a complete local demonstration first. Added: `pnpm demo:*` (`scripts/demo.mjs`), `cm-rehearsal` subcommands (build, status, admin, worker, backup, drill, restore), the `local-docker` build label, a name-constrained local CA, a portable status collector (measured inside Docker's VM; no cloud metadata query), age through the ops image when the host has none, `tests/deployment/collaboration.spec.ts` and `demo-evidence.spec.ts`, the portable `stack-check.sh` (`pnpm demo:verify`). Fixes: the restore drill's storage volume ownership and readiness wait (the arm64 run's failure), the dependency layer of the Dockerfile, the runtime image without the Prisma CLI tooling. Evidence: EV-17-09, EV-19-13 (local). Guide: [local-docker-demo.md](../deployment/local-docker-demo.md).
 
 ## 5. What is not done in Stage A
 

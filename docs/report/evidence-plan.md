@@ -228,7 +228,7 @@ Captured in Phase 11 (Prompt 13), with synthetic data only and no key material, 
 | EV-16-03 | SBOM and scan results | CI artifacts | Supply-chain management | ISMS, CLD |
 
 ### Phases 17 to 19: Cloud
-Adapted to ADR-014 (Oracle Cloud Always Free, one VM, self-hosted PostgreSQL and SeaweedFS) on 2026-10-14. The IDs are unchanged; items that named a managed database or a provider bucket are captured for their self-hosted equivalents. Items EV-17-06 and EV-19-10 are rehearsal evidence (CI on linux/arm64, throwaway CA), never presented as cloud evidence.
+Adapted to ADR-014 (Oracle Cloud Always Free, one VM, self-hosted PostgreSQL and SeaweedFS) on 2026-10-14. The IDs are unchanged; items that named a managed database or a provider bucket are captured for their self-hosted equivalents. Items EV-17-06 and EV-19-10 are rehearsal evidence (CI on linux/arm64, throwaway CA), and EV-17-09 and EV-19-13 are local Docker demonstration evidence (the project owner's Windows laptop, 2026-10-14 priority); none of them is presented as cloud evidence.
 
 | ID | Evidence | How to capture | Demonstrates | Tags |
 |---|---|---|---|---|
@@ -240,6 +240,7 @@ Adapted to ADR-014 (Oracle Cloud Always Free, one VM, self-hosted PostgreSQL and
 | EV-17-06 | The cloud stack built natively and run on linux/arm64 in CI: image architectures, container hardening, edge checks, smoke test in three engines | CI artifact `cloud-stack-arm64-evidence` | ARM64 compatibility before provisioning (rehearsal) | CLD |
 | EV-17-07 | Cost classification: the account's Always Free resources and the billing or usage page showing no charges | Console screenshots | Zero-cost policy followed (not a guarantee of future charges) | CLD, ISMS |
 | EV-17-08 | Deployment smoke test against the public origin (vault, room, encrypted note and file, no plaintext in requests) | `playwright.deployment.config.ts` output | Client-side encryption on the cloud deployment | CRY, CLD |
+| EV-17-09 | Local Docker demonstration verified on the Windows laptop (`pnpm demo:verify`): images, container hardening and networks, secrets as files, edge checks, database access rules, browser tests (smoke and collaboration: invitation, burn secret, removal, key rotation) in three engines, backup, restore drill, full restore with browser decryption | Evidence files of `stack-check.sh` | The production stack and its controls work on a local Docker host (local evidence, not cloud) | CLD, CRY, ISMS |
 | EV-18-01 | Database settings on the VM: TLS 1.3 only for runtime roles, HBA rules, roles without a superuser password, connection limits | `pg_hba.conf`, `pg_authid` and `pg_stat_ssl` excerpts | Self-hosted database configuration (ADR-014) | CLD |
 | EV-18-02 | Failed connection without TLS, superuser network login refused | Command output | Enforced database access controls | CLD |
 | EV-18-03 | Storage settings: one identity limited to one bucket, IAM API off, only signed object paths proxied, CORS for the application origin | Identity file (keys redacted) and Nginx excerpt | Private object storage | CLD |
@@ -257,6 +258,7 @@ Adapted to ADR-014 (Oracle Cloud Always Free, one VM, self-hosted PostgreSQL and
 | EV-19-10 | Backup, isolated restore drill and full restore with browser decryption of the restored note and file (CI, linux/arm64) | CI artifact `cloud-stack-arm64-evidence` | Backup and restore procedure works end to end (rehearsal) | CLD, ISMS, CRY |
 | EV-19-11 | Measured platform status of the deployment on the security dashboard | Dashboard screenshot as a platform administrator | Monitoring with freshness, no invented health | CLD, ISMS |
 | EV-19-12 | Certificate renewal dry run and timer | `cm-tls renew-test` output | Automated certificate renewal | CLD |
+| EV-19-13 | Screenshots of the local Docker demonstration: vault, room with encryption receipts, Trust Center live card, security dashboard with the measured local status, governance | `tests/deployment/demo-evidence.spec.ts` | What the examiner sees in the demonstration (local, labelled as such) | CRY, CLD, ISMS |
 
 ### Phases 20 to 22: Assessment, Remediation, Report
 | ID | Evidence | How to capture | Demonstrates | Tags |

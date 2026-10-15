@@ -88,7 +88,7 @@ Rules for all containers: base images pinned by digest, no `privileged`, no host
 - HTTP to HTTPS redirect; HSTS staged with `CM_HSTS_MAX_AGE` (0, then 86400 after the renewal dry run).
 - Serves the static export with the generated CSP and headers; content-hashed assets cached for a year, HTML `no-cache`; dotfiles and source maps refused; only GET and HEAD for pages.
 - Proxies `/api/` to the API with the spoofable forwarding headers replaced (TRUST_PROXY_HOPS=1).
-- Rate limits: authentication entry points 10 per minute per address, directory lookup 30 per minute, the API 20 per second, storage 10 per second; connection limits; request body 128 KiB for the API and 51 MiB for storage.
+- Rate limits: authentication entry points 10 per minute per address, directory lookup 30 per minute, the API 50 per second with a burst of 100 (SF-17-03), storage 10 per second; connection limits; request body 128 KiB for the API and 51 MiB for storage.
 - Access log as JSON with the path only (no query strings, which carry presigned signatures), no bodies.
 
 Security headers set by Nginx come from the web build (`apps/web/out-meta/security-headers.json`, rendered by `infrastructure/nginx/render-security-headers.mjs`):

@@ -2860,6 +2860,82 @@
       "date": ""
     },
     {
+      "id": "EV-17-09",
+      "phase": 17,
+      "evidence": "Local Docker demonstration verified on the Windows laptop (pnpm demo:verify): images, container hardening and networks, secrets as files, edge checks, database access rules, browser tests (smoke and collaboration: invitation, burn secret, removal, key rotation) in three engines, backup, restore drill, full restore with browser decryption",
+      "how": "Evidence files of stack-check.sh",
+      "demonstrates": "The production stack and its controls work on a local Docker host (local evidence, not cloud)",
+      "tags": [
+        "CLD",
+        "CRY",
+        "ISMS"
+      ],
+      "status": "captured",
+      "files": [
+        {
+          "label": "phase-17/EV-17-09_images.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_images.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_containers.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_containers.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_container-hardening.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_container-hardening.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_edge-check.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_edge-check.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_database-access.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_database-access.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_browser-tests.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_browser-tests.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_host-status.json",
+          "path": "docs/report/evidence/phase-17/EV-17-09_host-status.json"
+        },
+        {
+          "label": "phase-17/EV-17-09_backup.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_backup.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_backup-manifest.json",
+          "path": "docs/report/evidence/phase-17/EV-17-09_backup-manifest.json"
+        },
+        {
+          "label": "phase-17/EV-17-09_restore-drill.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_restore-drill.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_restore.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_restore.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_restore-verify.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_restore-verify.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_resources.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_resources.txt"
+        },
+        {
+          "label": "phase-17/EV-17-09_stack-check.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-09_stack-check.txt"
+        }
+      ],
+      "locations": [],
+      "captions": [
+        "Local verification passed end to end: images, container hardening and internal networks, secrets as files, 39 of 39 edge checks, database access rules, deployment smoke and collaboration tests (invitation, burn secret, removal, key rotation) 6 of 6 in Chromium, Firefox and WebKit, worker run and measured status, encrypted backup without plaintext canaries, isolated restore drill (18 of 18 tables, 16 of 16 file objects), full restore onto empty volumes and browser decryption of the restored note and file in three engines"
+      ],
+      "date": "2026-10-15"
+    },
+    {
       "id": "EV-18-01",
       "phase": 18,
       "evidence": "Database settings on the VM: TLS 1.3 only for runtime roles, HBA rules, roles without a superuser password, connection limits",
@@ -3120,6 +3196,46 @@
       "locations": [],
       "captions": [],
       "date": ""
+    },
+    {
+      "id": "EV-19-13",
+      "phase": 19,
+      "evidence": "Screenshots of the local Docker demonstration: vault, room with encryption receipts, Trust Center live card, security dashboard with the measured local status, governance",
+      "how": "tests/deployment/demo-evidence.spec.ts",
+      "demonstrates": "What the examiner sees in the demonstration (local, labelled as such)",
+      "tags": [
+        "CRY",
+        "CLD",
+        "ISMS"
+      ],
+      "status": "captured",
+      "files": [
+        {
+          "label": "phase-19/EV-19-13_01_vault-unlocked.png",
+          "path": "docs/report/evidence/phase-19/EV-19-13_01_vault-unlocked.png"
+        },
+        {
+          "label": "phase-19/EV-19-13_02_room-encrypted-file-and-note-receipts.png",
+          "path": "docs/report/evidence/phase-19/EV-19-13_02_room-encrypted-file-and-note-receipts.png"
+        },
+        {
+          "label": "phase-19/EV-19-13_03_trust-infrastructure-live-status.png",
+          "path": "docs/report/evidence/phase-19/EV-19-13_03_trust-infrastructure-live-status.png"
+        },
+        {
+          "label": "phase-19/EV-19-13_04_security-dashboard-measured-platform.png",
+          "path": "docs/report/evidence/phase-19/EV-19-13_04_security-dashboard-measured-platform.png"
+        },
+        {
+          "label": "phase-19/EV-19-13_05_trust-governance-risks-and-controls.png",
+          "path": "docs/report/evidence/phase-19/EV-19-13_05_trust-governance-risks-and-controls.png"
+        }
+      ],
+      "locations": [],
+      "captions": [
+        "Screenshots of the local Docker demonstration (Chromium, 1440 px): unlocked vault, room with file and note encryption receipts (Safety Code masked), Trust Center live deployment card reporting the cloud as not connected, security dashboard with the measured local platform, governance and risk"
+      ],
+      "date": "2026-10-15"
     },
     {
       "id": "EV-20-01",

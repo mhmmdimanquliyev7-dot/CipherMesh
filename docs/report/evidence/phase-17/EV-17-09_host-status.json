@@ -1,0 +1,92 @@
+{
+    "schema": 1,
+    "checkedAt": "2026-10-15T04:06:02Z",
+    "cloud": {
+        "provider": "none",
+        "region": null,
+        "shape": null,
+        "ocpus": null,
+        "memoryGb": null,
+        "architecture": "x86_64",
+        "os": "Docker-Desktop"
+    },
+    "deployment": null,
+    "services": [
+        {
+            "name": "nginx",
+            "state": "running",
+            "health": "healthy"
+        },
+        {
+            "name": "api",
+            "state": "running",
+            "health": "healthy"
+        },
+        {
+            "name": "postgres",
+            "state": "running",
+            "health": "healthy"
+        },
+        {
+            "name": "object-storage",
+            "state": "running",
+            "health": "healthy"
+        }
+    ],
+    "host": {
+        "diskUsedPercent": 4,
+        "dockerDiskUsedPercent": 4,
+        "memoryUsedPercent": 9,
+        "load1": 0.18,
+        "hostFirewall": "not-applicable",
+        "unattendedUpgrades": "not-applicable"
+    },
+    "certificates": [
+        {
+            "name": "app",
+            "notAfter": "2026-11-13T18:34:56Z",
+            "issuer": "CipherMesh-local-demonstration-CA--local"
+        },
+        {
+            "name": "files",
+            "notAfter": "2026-11-13T18:34:56Z",
+            "issuer": "CipherMesh-local-demonstration-CA--local"
+        }
+    ],
+    "worker": {
+        "schema": 1,
+        "lastRunAt": "2026-10-15T04:05:55Z",
+        "finishedAt": "2026-10-15T04:05:57Z",
+        "result": "success"
+    },
+    "backup": {
+        "schema": 1,
+        "lastBackupAt": "2026-10-15T03:55:47Z",
+        "archive": "ciphermesh-20261015T035542Z.tar.age",
+        "sha256": "b38d77f8d3eef509989fe659b030b09ca6f3705e53077d31b42e3861bfcd4165"
+    },
+    "restoreDrill": {
+        "schema": 1,
+        "startedAt": "2026-10-15T03:55:49Z",
+        "finishedAt": "2026-10-15T03:56:16Z",
+        "archive": "ciphermesh-20261015T035542Z.tar.age",
+        "backupRelease": "rehearsal",
+        "tables": {
+            "total": 18,
+            "identical": 18
+        },
+        "objects": {
+            "check": "stored-ciphertext-integrity",
+            "at": "2026-10-15T03:56:15.742Z",
+            "checked": 13,
+            "matched": 13,
+            "missing": 0,
+            "sizeMismatch": 0,
+            "digestMismatch": 0,
+            "errors": 0,
+            "retries": 0,
+            "transient": {}
+        },
+        "result": "pass"
+    }
+}

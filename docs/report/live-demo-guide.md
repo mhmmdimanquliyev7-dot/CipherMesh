@@ -4,11 +4,11 @@ Status: Phase 14 + Prompt 16.5, updated for the cloud deployment of ADR-014 (202
 
 ## 1. Before the session (15 minutes)
 
-1. **Cloud (preferred):** open the application host over HTTPS (the DuckDNS name of [oracle-always-free.md](../deployment/oracle-always-free.md)); go through the demonstration checklist of [operational-runbook.md](../deployment/operational-runbook.md) section 8 first. **Fallback without the cloud:** `infrastructure/deployment/bin/cm-rehearsal up` serves the same stack at `https://app.localhost:8443` with a throwaway local CA, or the development build (`pnpm services:up`, `pnpm storage:bootstrap`, `pnpm build`, `node tests/e2e/static-server.mjs`); say plainly that this is **not** the cloud deployment.
+1. **Local Docker demonstration (the plan since 2026-10-14):** `pnpm demo:up`, then open https://app.localhost:8443 (setup, optional CA trust and troubleshooting: [local-docker-demo.md](../deployment/local-docker-demo.md)). Run `pnpm demo:status` (and `pnpm demo:worker`) shortly before showing the dashboard. Say plainly: this is the production stack on a laptop, **not** a cloud deployment. If the Oracle VM is deployed later, use its host name and the checklist in [operational-runbook.md](../deployment/operational-runbook.md) section 8 instead.
 2. Open two browser windows (for example Chromium and Firefox, or one normal and one private window).
 3. Window A: register **Alice** (a synthetic `@example.test` address), sign in, create the vault, create a STANDARD room "Demo room".
 4. Window B: register **Bob**, sign in, create the vault. In window A invite Bob as Member; in window B accept on the Invitations page.
-5. Optional, for the dashboard: register a third account, turn on two-step sign-in under Account, then on the server run `pnpm admin:platform-role grant <email>` and sign in again with the code.
+5. Optional, for the dashboard: register a third account, turn on two-step sign-in under Account, then run `pnpm demo:admin <email>` (on the cloud VM: `cm-platform-admin grant <email>`) and sign out and in again with the code.
 6. Never use real names, real email addresses or real content. Never show the Account page while an authenticator QR code or recovery codes are on screen.
 
 ## 2. Cryptography (10 minutes)
@@ -26,18 +26,18 @@ Status: Phase 14 + Prompt 16.5, updated for the cloud deployment of ADR-014 (202
 
 ## 3. Cloud & cloud security (7 minutes)
 
-Scenario B (infrastructure) and Scenario C (cloud security). Everything shown is measured or captured; nothing on screen shows the public IP, OCIDs, the operator's address or a credential.
+Scenario B (infrastructure) and Scenario C (cloud security) on the **local Docker demonstration**. Show what runs and what is verified locally, and name what only a cloud VM can prove. Nothing on screen shows a password, passphrase, authenticator secret or key.
 
 | Step | Where | Say and show |
 |---|---|---|
-| 1 | Browser padlock on both host names | Let's Encrypt certificate (ECDSA), TLS 1.3, no warning; the storage host is a different host name so the session cookie never reaches it (SF-07-01). |
-| 2 | Trust Center, Infrastructure (as the platform administrator) | "Cloud deployment (live)": Healthy, VM.Standard.A1.Flex in the home region, measured minutes ago. Without the administrator role the card says "Administrators only" and claims nothing (L-78). |
-| 3 | Security dashboard, Cloud deployment | Shape, 2 OCPUs and 12 GB, aarch64, Ubuntu 24.04, the deployed commit, every container healthy, disk and memory, certificate expiry, the last worker run, backup and restore drill. Each component shows when it was measured; data older than 15 minutes would say "Not verified" (T-44). |
-| 4 | Infrastructure, network exposure table and diagram | Only Nginx publishes ports; the API, worker, PostgreSQL and SeaweedFS sit on internal Docker networks without egress; PostgreSQL accepts the API only over TLS 1.3 and has no superuser password; the storage host forwards only signed object requests. Say that PostgreSQL and storage are containers on the VM for the $0 budget (ADR-014) and that root on the VM controls them (L-71). |
-| 5 | Terminal on the workstation | Run `node scripts/cloud/edge-check.mjs --app https://<app host> --files https://<files host>`: TLS versions, headers, CSRF through the proxy, refused storage paths, closed database and storage ports, all PASS (EV-17-04, EV-18-04, EV-19-05). |
-| 6 | Evidence, subject Cloud security | Security list and host firewall (EV-17-02, EV-19-02), `sshd -T` (EV-19-01), container hardening (EV-17-03), the restore drill report (EV-19-07), the linux/arm64 CI stack check with backup, restore and browser decryption (EV-17-06, EV-19-10). |
-| 7 | Infrastructure, Shared responsibility | Self-hosting moves the provider's database and storage duties to the team; "managed does not mean secure by default" and "self-hosted is not the same as managed". |
-| 8 | Limitations | L-71 to L-80: one VM, no high availability, possible reclamation of idle Always Free instances, backups are the team's, 24-hour recovery point. |
+| 1 | Browser address bar on both host names | HTTPS with TLS 1.3 from a local CA limited to localhost names; the storage host is a different host name, so the session cookie never reaches it (SF-07-01). Say: in the cloud this would be a Let's Encrypt certificate (not verified yet). |
+| 2 | Application header and Trust Center, Infrastructure | "Local Docker demonstration" label. As the platform administrator: "Cloud deployment (live)" says **Not connected**, because the host reported no cloud instance metadata. That is the correct answer for a laptop (T-44, L-80). |
+| 3 | Security dashboard, Platform components and Cloud deployment | API, database and object storage measured seconds ago; worker and host from the collector with their times; containers healthy; the last backup and restore drill. Data older than 15 minutes would say "Not verified". |
+| 4 | Infrastructure, network exposure table and diagram | One VM design: only Nginx publishes ports (here on 127.0.0.1); the API, worker, PostgreSQL and SeaweedFS sit on internal Docker networks without egress; PostgreSQL accepts the API only over TLS 1.3 and has no superuser password; the storage gateway forwards only signed object requests. Same Compose file as for the cloud (ADR-014). |
+| 5 | Terminal | `node scripts/cloud/edge-check.mjs --app https://app.localhost:8443 --files https://files.localhost:8443 --connect 127.0.0.1 --ca %USERPROFILE%/.ciphermesh-rehearsal/rehearsal-ca.crt --http-port 8080 --ports 9333,8888,4100,2375`: all PASS. |
+| 6 | Evidence, subject Cloud security | EV-17-09 (local verification: container hardening, database rules, storage refusals, browser tests, backup and restore), EV-19-13 (screenshots), EV-17-06 and EV-19-10 (the same checks on linux/arm64 in CI). Cloud items (firewall, SSH, public TLS, external scan, Lynis) are shown as planned, not verified. |
+| 7 | Terminal, optional | `pnpm demo:backup` then `pnpm demo:drill`: the drill restores into isolated containers and reports every table and file object identical. |
+| 8 | Infrastructure, Shared responsibility and Limitations | Who would own what in the cloud; L-71 to L-80, including L-80 (local and CI evidence is not cloud evidence). |
 
 ## 4. ISMS & governance (7 minutes)
 
@@ -47,7 +47,7 @@ Scenario B (infrastructure) and Scenario C (cloud security). Everything shown is
 | 2 | Risk register | Open T-06 (broken object-level authorization): inherent Critical, residual Low, its controls and testing strategy. The matrix counts risks per likelihood and impact. |
 | 3 | Control register | Open 8.3 (information access restriction): its text names the BOLA suite; evidence EV-05-02 is captured. |
 | 4 | Risk register and limitations | Open T-23 (compromised client): residual High, accepted, documented in L-01. Limitations are part of the model. |
-| 4b | Risk register, cloud (Scenario D) | Open T-42 (data services on the application host): the control list names the security list, host firewall, internal networks, TLS-only database roles and the signed-object storage gateway; the evidence links show them verified on the VM; residual Medium, accepted in ADR-014 and L-71. The treatment decision is the owner's $0 decision, recorded in the ADR. |
+| 4b | Risk register, cloud (Scenario D) | Open T-42 (data services on the application host): the control list names the security list, host firewall, internal networks, TLS-only database roles and the signed-object storage gateway; the evidence links show the internal networks, database rules and storage gateway verified in the local Docker demonstration and in CI (EV-17-09, EV-17-06), while the security list and host firewall stay planned until a VM exists; residual Medium, accepted in ADR-014 and L-71. The treatment decision is the owner's $0 decision, recorded in the ADR. |
 | 5 | Room, Security profile | The profile is the information classification (5.12); the rules shown come from the versioned catalogue the API enforces. |
 | 6 | Evidence, status Missing and Deferred | Missing items (for example Jira screenshots) and the deferred audit-ledger evidence are visible. 5.33 and 8.15 are Partial because Phase 12 was deferred. |
 | 7 | Security dashboard (administrator) | Aggregates from the database with definitions; SD-10, SD-11, SD-12 and SD-15 say "Not implemented"; no score. Everyone else gets 404. |

@@ -104,8 +104,13 @@ describe('Trust Center data', () => {
     const audit = evidence.filter((item) => item.phase === 12);
     expect(audit.length).toBeGreaterThan(0);
     for (const item of audit) expect(item.status, item.id).toBe('deferred');
-    // Cloud evidence belongs to the later workstream and is not captured yet.
-    for (const item of evidence.filter((e) => e.phase >= 17 && e.phase <= 19)) expect(item.status).toBe('planned');
+    // Cloud evidence is not captured before a cloud deployment exists. Only the local Docker
+    // demonstration (EV-17-09, EV-19-13) and the linux/arm64 CI stack check (EV-17-06, EV-19-10)
+    // are evidence of something other than the cloud, so only they may be captured (L-80).
+    const notCloud = new Set(['EV-17-06', 'EV-17-09', 'EV-19-10', 'EV-19-13']);
+    for (const item of evidence.filter((e) => e.phase >= 17 && e.phase <= 19)) {
+      expect(['planned', ...(notCloud.has(item.id) ? ['captured', 'partial'] : [])], item.id).toContain(item.status);
+    }
   });
 
   it('tags evidence with the three subjects and the application tag only', () => {

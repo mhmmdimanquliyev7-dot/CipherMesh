@@ -79,6 +79,20 @@ docs                  All design, security, cloud, management and report documen
 
 TypeScript 6, Next.js 16, React 19, Tailwind CSS 4, Node.js 24, Express 5, zod 4, PostgreSQL 17, Prisma 7, S3-compatible object storage, WebCrypto, Argon2id, Docker, Docker Compose, Nginx, Ubuntu Server, Vitest 5, Playwright, GitHub Actions, Jira Cloud.
 
+## Local Docker demonstration
+
+The complete production stack (Nginx with TLS, the API, the worker, PostgreSQL with TLS and SeaweedFS behind a separate storage host name) on a laptop with Docker Desktop, labelled as a local demonstration, not a cloud deployment:
+
+```
+pnpm install
+pnpm demo:up        # builds the images once, then starts everything: https://app.localhost:8443
+pnpm demo:health    # container states and the external edge checks
+pnpm demo:verify    # isolation, database and storage rules, browser tests, backup and restore, screenshots
+pnpm demo:down
+```
+
+Guide, certificate trust and troubleshooting: [docs/deployment/local-docker-demo.md](docs/deployment/local-docker-demo.md).
+
 ## Getting started
 
 Requirements: Node.js 24 LTS, pnpm 12.6, and Docker with Compose for the development database (needed by the database tests and the smoke test).

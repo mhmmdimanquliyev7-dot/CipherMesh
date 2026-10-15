@@ -1,0 +1,100 @@
+{
+    "schema": 1,
+    "archive": "ciphermesh-20261015T040604Z.tar.age",
+    "sha256": "b4ef1c13cf59f54b7310627b5b7c090846c5e0baa7ea6446c6c09f618a47fada",
+    "bytes": 1331720,
+    "createdAt": "2026-10-15T04:06:09Z",
+    "release": "rehearsal",
+    "tables": [
+        {
+            "table": "_prisma_migrations",
+            "rows": 12,
+            "sha256": "1658963ef51f009380308d6356dfde8b413ada43cca51b849f6f475683bd55a3"
+        },
+        {
+            "table": "audit_events",
+            "rows": 0,
+            "sha256": "empty"
+        },
+        {
+            "table": "auth_challenges",
+            "rows": 0,
+            "sha256": "empty"
+        },
+        {
+            "table": "encrypted_files",
+            "rows": 16,
+            "sha256": "06696ca6ff6e8883fdd3100b0fcf3d32fadfb9dee993f5da4e67c72ab27df865"
+        },
+        {
+            "table": "encrypted_notes",
+            "rows": 30,
+            "sha256": "a4b2ebd2103c7c8978b77c754bcdb6aaaf263db37077c603500d4def330aa24b"
+        },
+        {
+            "table": "invitations",
+            "rows": 15,
+            "sha256": "e8bb2cf1f07342592a6f8a650c18f249c6d201dcc013bc97eb2e30e60020ab6d"
+        },
+        {
+            "table": "key_envelopes",
+            "rows": 34,
+            "sha256": "ab622b95c0799bd49ee96f10ab16e43166ce21d54fbdb86f215159324f0d321f"
+        },
+        {
+            "table": "login_attempts",
+            "rows": 58,
+            "sha256": "fcf4a380816b714e2b05e4059b30b3f176876047080529eafb860260420046b9"
+        },
+        {
+            "table": "recovery_codes",
+            "rows": 0,
+            "sha256": "empty"
+        },
+        {
+            "table": "rekey_operations",
+            "rows": 14,
+            "sha256": "12fb8a02bb822afb4a38f331f575c47a9da04146db4b6cda612fd0772eb6fbb8"
+        },
+        {
+            "table": "room_key_versions",
+            "rows": 47,
+            "sha256": "61fe12ab0dc245921abae55d6009e52af93da04a0bee0cf2eb6d0327d03937d9"
+        },
+        {
+            "table": "room_member_grants",
+            "rows": 15,
+            "sha256": "a890298d14d9267334a1fa0754062004454c172e571918cb3371e36f84bd99c4"
+        },
+        {
+            "table": "room_members",
+            "rows": 48,
+            "sha256": "7f7128eed60c7de6041d48533f464dc15793c9fbd2965c5b3ea5dde6f4eee4f4"
+        },
+        {
+            "table": "rooms",
+            "rows": 33,
+            "sha256": "2d0dd1e7e57ad3d22511ee7668569238a0c100e4878858a6c14c6a9a6dbaca98"
+        },
+        {
+            "table": "secrets",
+            "rows": 15,
+            "sha256": "f5f64f3d8ed6f3927caf8b2fe9859b94605df6bca7942495e6f382440d7a90fb"
+        },
+        {
+            "table": "sessions",
+            "rows": 57,
+            "sha256": "e404b5bdaf3558fff54fc8f033b8b2e31321651b4b25f362f97b4e1d07895d22"
+        },
+        {
+            "table": "user_key_pairs",
+            "rows": 48,
+            "sha256": "6d1e68d10614d4b6167894a0d8a6c460ad09f25b1df4748ba66c49d3af511960"
+        },
+        {
+            "table": "users",
+            "rows": 57,
+            "sha256": "141f824528a603f8581433cdd6826cb7491b1aa22918e97b171f51648566969d"
+        }
+    ]
+}

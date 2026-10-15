@@ -1,0 +1,4 @@
+ciphermesh-nginx-1  cpu 0.00%  mem 21.69MiB / 256MiB
+ciphermesh-api-1  cpu 21.30%  mem 99.53MiB / 768MiB
+ciphermesh-object-storage-1  cpu 0.56%  mem 142.4MiB / 768MiB
+ciphermesh-postgres-1  cpu 0.36%  mem 60.73MiB / 1.5GiB

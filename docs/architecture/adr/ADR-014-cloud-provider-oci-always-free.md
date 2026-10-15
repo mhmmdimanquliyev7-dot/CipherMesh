@@ -56,6 +56,10 @@ Three questions had to be decided by the project owner, because each changes an 
 - **Transport:** TLS 1.2 and 1.3 at the edge (CP-21); TLS 1.3 with certificate and host-name verification on the database hop (CD-34). The storage hop inside the VM is plain HTTP on an internal Docker network that only Nginx and SeaweedFS join.
 - **The platform status is evidence of measured state only.** Missing, malformed or stale data is never reported as healthy (T-44).
 
+## Deployment priority (2026-10-14, later the same day)
+
+The project owner stopped at the provisioning gate and set a new priority: a complete $0 demonstration with Docker Desktop on the owner's Windows laptop, using this ADR's stack unchanged ([local-docker-demo.md](../../deployment/local-docker-demo.md)). The Oracle Cloud deployment stays prepared and is not provisioned. The local demonstration is labelled as such everywhere (the web build's environment `local-docker`, the platform status reports no cloud instance), and its evidence is local evidence (EV-17-09, EV-19-13), never cloud evidence (L-80). No decision of this ADR changes.
+
 ## Status
 
 Accepted on 2026-10-14 by the project owner. It is revisited after the university delivery for the managed PostgreSQL and provider object storage options.

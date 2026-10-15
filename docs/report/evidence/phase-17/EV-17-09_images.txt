@@ -1,0 +1,5 @@
+ciphermesh-api: linux/amd64 91708516 bytes
+ciphermesh-ops: linux/amd64 535696712 bytes
+ciphermesh-web: linux/amd64 24954563 bytes
+postgres:17.11-alpine3.24: linux/amd64
+chrislusf/seaweedfs:4.47: linux/amd64
