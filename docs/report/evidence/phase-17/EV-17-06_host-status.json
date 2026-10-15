@@ -1,0 +1,64 @@
+{
+    "schema": 1,
+    "checkedAt": "2026-10-15T10:25:50Z",
+    "cloud": {
+        "provider": "none",
+        "region": null,
+        "shape": null,
+        "ocpus": null,
+        "memoryGb": null,
+        "architecture": "aarch64",
+        "os": "Ubuntu-24.04.5-LTS"
+    },
+    "deployment": null,
+    "services": [
+        {
+            "name": "nginx",
+            "state": "running",
+            "health": "healthy"
+        },
+        {
+            "name": "api",
+            "state": "running",
+            "health": "healthy"
+        },
+        {
+            "name": "postgres",
+            "state": "running",
+            "health": "healthy"
+        },
+        {
+            "name": "object-storage",
+            "state": "running",
+            "health": "healthy"
+        }
+    ],
+    "host": {
+        "diskUsedPercent": 30,
+        "dockerDiskUsedPercent": 30,
+        "memoryUsedPercent": 8,
+        "load1": 5.97,
+        "hostFirewall": "not-applicable",
+        "unattendedUpgrades": "not-applicable"
+    },
+    "certificates": [
+        {
+            "name": "app",
+            "notAfter": "2026-11-14T10:20:54Z",
+            "issuer": "CipherMesh-local-demonstration-CA--local"
+        },
+        {
+            "name": "files",
+            "notAfter": "2026-11-14T10:20:54Z",
+            "issuer": "CipherMesh-local-demonstration-CA--local"
+        }
+    ],
+    "worker": {
+        "schema": 1,
+        "lastRunAt": "2026-10-15T10:25:49Z",
+        "finishedAt": "2026-10-15T10:25:50Z",
+        "result": "success"
+    },
+    "backup": null,
+    "restoreDrill": null
+}

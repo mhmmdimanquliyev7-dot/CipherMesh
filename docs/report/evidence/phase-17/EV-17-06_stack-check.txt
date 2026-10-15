@@ -1,0 +1,89 @@
+
+==== host
+Linux aarch64
+docker 28.0.4 linux/arm64
+Docker host: Ubuntu 24.04.5 LTS, 4 CPUs, 16722006016 bytes of memory
+
+==== image build
+[2026-10-15T10:19:52Z] building ciphermesh-api:rehearsal (the first build takes several minutes)
+[2026-10-15T10:20:34Z] ciphermesh-api:rehearsal built in 42 s
+[2026-10-15T10:20:34Z] building ciphermesh-ops:rehearsal (the first build takes several minutes)
+[2026-10-15T10:20:44Z] ciphermesh-ops:rehearsal built in 10 s
+[2026-10-15T10:20:44Z] building ciphermesh-web:rehearsal (the first build takes several minutes)
+[2026-10-15T10:20:47Z] ciphermesh-web:rehearsal built in 3 s
+
+==== stack up
+[2026-10-15T10:20:54Z] creating the rehearsal CA (localhost names only, 30 days) and the two host certificates
+[2026-10-15T10:20:54Z] creating the database CA (P-256, 400 days) and the server certificate for "postgres" (397 days)
+[2026-10-15T10:20:54Z] installed; certificate valid until Nov 16 10:20:54 2027 GMT
+[2026-10-15T10:20:54Z] runtime secrets written to /home/runner/.ciphermesh-rehearsal/secrets; values were not printed
+[2026-10-15T10:20:54Z] step 1: first start of PostgreSQL (empty data directory)
+[2026-10-15T10:21:05Z] step 2: replacing the data directory HBA file with the deployment HBA file
+[2026-10-15T10:21:16Z] step 3: temporary superuser password for the bootstrap
+[2026-10-15T10:21:16Z] step 4: roles and database (scripts/db/bootstrap.mjs)
+roles ready: cm_migrator, cm_api, cm_worker, cm_verifier
+database ciphermesh created; next: pnpm db:migrate
+[2026-10-15T10:21:16Z] step 5: migrations as cm_migrator
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "ciphermesh", schema "public" at "127.0.0.1:5432"
+
+12 migrations found in prisma/migrations
+
+Applying migration `20261002000000_schema_v1`
+Applying migration `20261002000100_integrity_constraints`
+Applying migration `20261002000200_audit_append_only`
+Applying migration `20261002000300_runtime_role_grants`
+Applying migration `20261004000000_auth_challenges`
+Applying migration `20261005000000_identity_signing_key`
+Applying migration `20261006000000_room_statements`
+Applying migration `20261007000000_encrypted_files`
+Applying migration `20261008000000_encrypted_notes`
+Applying migration `20261009000000_burn_secrets`
+Applying migration `20261010000000_security_policies`
+Applying migration `20261011000000_key_rotation`
+
+The following migration(s) have been applied:
+
+migrations/
+
+All migrations have been successfully applied.
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "ciphermesh", schema "public" at "127.0.0.1:5432"
+
+12 migrations found in prisma/migrations
+
+Database schema is up to date!
+[2026-10-15T10:21:19Z] database initialized
+[2026-10-15T10:21:19Z] step 6: superuser password removed
+[2026-10-15T10:21:31Z] bucket cm-files created
+[2026-10-15T10:21:43Z] local demonstration running: https://app.localhost:8443 (storage https://files.localhost:8443); CA: /home/runner/.ciphermesh-rehearsal/rehearsal-ca.crt
+[2026-10-15T10:21:43Z] this is a local Docker demonstration, not a cloud deployment
+
+==== edge checks
+
+==== database access rules
+
+==== browser tests: deployment smoke and collaboration (Chromium, Firefox, WebKit)
+
+==== worker run and status collection
+{"service":"worker-retention","expired":0,"roomDeleted":0,"time":"2026-10-15T10:25:49.938Z","level":"info","msg":"secret cleanup completed"}
+{"service":"worker-retention","operationsAbandoned":0,"cryptoperiodsExpired":0,"unknownPolicyVersions":0,"keyVersionsDestroyed":3,"envelopesDeleted":3,"operationsPurged":0,"time":"2026-10-15T10:25:49.965Z","level":"info","msg":"rekey maintenance completed"}
+{"service":"worker-retention","roomsDeleted":0,"envelopesDeleted":0,"invitationsRevoked":0,"keyVersionsDestroyed":0,"time":"2026-10-15T10:25:49.976Z","level":"info","msg":"room cleanup completed"}
+
+==== encrypted backup
+
+==== isolated restore drill
+
+==== screenshots of the running demonstration (Chromium)
+
+==== full restore onto empty volumes
+
+==== browser decryption after the restore
+
+==== resource use
+
+==== stack check passed

@@ -2821,11 +2821,50 @@
       "tags": [
         "CLD"
       ],
-      "status": "planned",
-      "files": [],
+      "status": "captured",
+      "files": [
+        {
+          "label": "phase-17/EV-17-06_images.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-06_images.txt"
+        },
+        {
+          "label": "phase-17/EV-17-06_containers.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-06_containers.txt"
+        },
+        {
+          "label": "phase-17/EV-17-06_container-hardening.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-06_container-hardening.txt"
+        },
+        {
+          "label": "phase-17/EV-17-06_edge-check.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-06_edge-check.txt"
+        },
+        {
+          "label": "phase-17/EV-17-06_database-access.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-06_database-access.txt"
+        },
+        {
+          "label": "phase-17/EV-17-06_browser-tests.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-06_browser-tests.txt"
+        },
+        {
+          "label": "phase-17/EV-17-06_host-status.json",
+          "path": "docs/report/evidence/phase-17/EV-17-06_host-status.json"
+        },
+        {
+          "label": "phase-17/EV-17-06_resources.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-06_resources.txt"
+        },
+        {
+          "label": "phase-17/EV-17-06_stack-check.txt",
+          "path": "docs/report/evidence/phase-17/EV-17-06_stack-check.txt"
+        }
+      ],
       "locations": [],
-      "captions": [],
-      "date": ""
+      "captions": [
+        "CI evidence, not cloud evidence: the CI job \"Cloud stack (linux/arm64)\" of run 38719307516 (pull request #37, head 1e4f30b) on GitHub's native arm64 runner (Ubuntu 24.04, aarch64): native linux/arm64 images, container hardening and internal networks, 39 of 39 edge checks, database access rules, smoke and collaboration tests 6 of 6 in three engines; copied from the artifact cloud-stack-arm64-evidence"
+      ],
+      "date": "2026-10-15"
     },
     {
       "id": "EV-17-07",
@@ -3160,11 +3199,34 @@
         "ISMS",
         "CRY"
       ],
-      "status": "planned",
-      "files": [],
+      "status": "captured",
+      "files": [
+        {
+          "label": "phase-19/EV-19-10_backup.txt",
+          "path": "docs/report/evidence/phase-19/EV-19-10_backup.txt"
+        },
+        {
+          "label": "phase-19/EV-19-10_backup-manifest.json",
+          "path": "docs/report/evidence/phase-19/EV-19-10_backup-manifest.json"
+        },
+        {
+          "label": "phase-19/EV-19-10_restore-drill.txt",
+          "path": "docs/report/evidence/phase-19/EV-19-10_restore-drill.txt"
+        },
+        {
+          "label": "phase-19/EV-19-10_restore.txt",
+          "path": "docs/report/evidence/phase-19/EV-19-10_restore.txt"
+        },
+        {
+          "label": "phase-19/EV-19-10_restore-verify.txt",
+          "path": "docs/report/evidence/phase-19/EV-19-10_restore-verify.txt"
+        }
+      ],
       "locations": [],
-      "captions": [],
-      "date": ""
+      "captions": [
+        "CI evidence, not cloud evidence (same run): encrypted backup without plaintext canaries, isolated restore drill (18 of 18 tables, 3 of 3 file objects), full restore onto empty volumes and browser decryption of the restored note and file in three engines"
+      ],
+      "date": "2026-10-15"
     },
     {
       "id": "EV-19-11",
