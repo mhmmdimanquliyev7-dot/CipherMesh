@@ -78,6 +78,9 @@ describe('room matrix catalogue', () => {
       'PA-03',
       'PA-04',
       'PA-05',
+      'PA-06',
+      'PA-07',
+      'PA-08',
       'SS-01',
       'SS-02',
       'SS-03',
@@ -382,7 +385,12 @@ describe('matrix helpers', () => {
     expect(info('PA-01')).toMatchObject({ scope: 'platform', stepUpAlways: false });
     expect(info('PA-05')).toMatchObject({ scope: 'none' });
     expect(info('SS-04')).toMatchObject({ scope: 'self', stepUpAlways: false });
-    for (const unknown of ['AZ-33', 'PA-06', 'SS-00', 'XX-01', '__proto__', 'toString', '']) {
+    // Operational ISMS (ADR-016): viewing and recording are platform actions; deciding needs a
+    // step-up every time.
+    expect(info('PA-06')).toMatchObject({ scope: 'platform', stepUpAlways: false });
+    expect(info('PA-07')).toMatchObject({ scope: 'platform', stepUpAlways: false });
+    expect(info('PA-08')).toMatchObject({ scope: 'platform', stepUpAlways: true });
+    for (const unknown of ['AZ-33', 'PA-09', 'SS-00', 'XX-01', '__proto__', 'toString', '']) {
       expect(info(unknown)).toBeUndefined();
     }
   });

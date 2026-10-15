@@ -36,6 +36,10 @@ const EXPECTED: Record<'cm_api' | 'cm_worker' | 'cm_verifier', Record<string, re
     encrypted_notes: [S, I, U],
     secrets: [S, I, U],
     audit_events: [S, I],
+    // Operational ISMS (ADR-016): records change only by versioned transitions (guard trigger);
+    // the activity history is append-only (trigger). Nobody deletes either.
+    isms_records: [S, I, U],
+    isms_activity: [S, I],
   },
   cm_worker: {
     sessions: [S, D],
@@ -192,6 +196,12 @@ describe('what the API role cannot do', () => {
     ['delete users (tombstones only)', 'DELETE FROM users'],
     ['delete rooms (tombstones only)', 'DELETE FROM rooms'],
     ['delete encrypted content (tombstones only)', 'DELETE FROM encrypted_files'],
+    ['delete ISMS records (withdrawal only)', 'DELETE FROM isms_records'],
+    ['delete the ISMS activity history', 'DELETE FROM isms_activity'],
+    [
+      'disable the ISMS activity trigger',
+      'ALTER TABLE isms_activity DISABLE TRIGGER isms_activity_reject_update_delete',
+    ],
     ['read the migration history', 'SELECT * FROM _prisma_migrations'],
     ['create a role', `CREATE ROLE attacker LOGIN PASSWORD 'x'`],
     ['create a database', 'CREATE DATABASE attacker'],

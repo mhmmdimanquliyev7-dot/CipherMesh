@@ -14,6 +14,7 @@ const TRUST_PAGES = [
   ['/trust/evidence', 'Security evidence register'],
   ['/trust/walkthrough', 'Guided security walkthrough'],
   ['/trust/dashboard', 'Platform security dashboard'],
+  ['/trust/isms', 'ISMS Control Center'],
 ] as const;
 
 for (const [path, heading] of TRUST_PAGES) {

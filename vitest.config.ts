@@ -150,6 +150,18 @@ export default defineConfig({
         },
       },
       {
+        // Operational ISMS (ADR-016, CM-T088): records are platform-wide, so the project has its
+        // own freshly migrated database and runs one file at a time.
+        test: {
+          name: 'isms',
+          include: ['tests/isms/**/*.test.ts'],
+          fileParallelism: false,
+          globalSetup: ['tests/database/global-setup.ts'],
+          testTimeout: 120_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
         test: {
           name: 'database',
           include: ['tests/database/**/*.test.ts'],
