@@ -24,6 +24,7 @@ const TABS: readonly { readonly href: string; readonly label: string; readonly i
   { href: '/trust/evidence', label: 'Evidence', icon: 'evidence' },
   { href: '/trust/walkthrough', label: 'Walkthrough', icon: 'play' },
   { href: '/trust/dashboard', label: 'Security dashboard', icon: 'overview' },
+  { href: '/trust/isms', label: 'ISMS Control Center', icon: 'governance' },
 ];
 
 export function TrustNav() {
