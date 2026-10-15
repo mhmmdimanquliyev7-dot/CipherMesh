@@ -49,7 +49,7 @@ describe('session resolution', () => {
     expect((await browser.request('GET', `/auth/session?userId=${otherId.id}`)).status).toBe(400);
   });
 
-  it('rejects missing, random, malformed and duplicated session cookies, clearing a dead one', async () => {
+  it('rejects missing, random, malformed and duplicated session cookies without deleting the cookie', async () => {
     const anonymous = new Browser(api);
     const missing = await anonymous.request('GET', '/auth/session');
     expect(missing.status).toBe(401);
@@ -60,7 +60,9 @@ describe('session resolution', () => {
     random.cookies.set(SESSION_COOKIE, 'A'.repeat(43));
     const randomResponse = await random.request('GET', '/auth/session');
     expect(randomResponse.status).toBe(401);
-    expect(randomResponse.setCookies[0]).toMatch(/^__Host-cm_session=; Max-Age=0;/);
+    // No deletion: a refused token may be a replaced one, and the deletion would remove the
+    // browser's new session (SF-17-04). Logout and revocation still delete it.
+    expect(randomResponse.setCookies).toEqual([]);
 
     const { browser } = await signedInUser(api);
     const duplicated = await browser.request('GET', '/auth/session', undefined, {
