@@ -1,0 +1,18 @@
+EV-22-18 CI run of the operational ISMS pull request (CM-T088 to CM-T092)
+
+Pull request #39, branch feature/CM-T088-operational-isms, head 8da9e42, merged 2026-10-16 as 92ded2f.
+CI run 38794222646 (workflow CI, event pull_request): conclusion success; every job passed.
+  Lint, types, tests, build, E2E     pass (34 min): 94 Vitest files in the main run, Playwright 178 passed, 20 skipped by design, 0 failed
+  Cloud stack (linux/arm64)           pass (10 min): the production stack, browser tests, backup, drill and restore on the native arm64 runner
+  Dependency audit                    pass
+  Secret scan (gitleaks, full history) pass
+  GitGuardian Security Checks         pass
+The new tests/e2e/isms.spec.ts passed in Chromium, Firefox and WebKit.
+
+First run of the pull request, 38790008972 (head baeee4a): failed. The three ISMS lifecycle tests could not grant the
+platform administrator role in CI: the server-side CLI read its settings from a .env file, which exists on a workstation and not in CI
+("Invalid configuration: NODE_ENV, APP_ORIGIN"). The spec now builds the CLI's environment itself (commit 8da9e42). One WebKit test in
+trust-center.spec.ts also failed once with "WebKit encountered an internal error" on a page load and passed in the next run.
+
+Main after the merge of pull request #38 (run 38732329573, docs only): the E2E job failed once on a Firefox page.goto hang of 3.1 minutes in
+vault.spec.ts (the open Firefox navigation-hang item); the same job had passed on the pull request. Not related to the ISMS.

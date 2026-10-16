@@ -244,7 +244,7 @@ export const ISMS_CATALOGUE: IsmsCatalogue = {
         "T-24",
         "T-27"
       ],
-      "fingerprint": "d66809fcabc0c026b6f2835e37c0f8d44643e114b5f0cbce70b922f800a7f9e8"
+      "fingerprint": "20a1290fef88ee095df2c2aac653e1a0fd556afda3c607d4638cf7d115f6466b"
     },
     {
       "id": "POL-02",
@@ -5436,9 +5436,11 @@ export const ISMS_CATALOGUE: IsmsCatalogue = {
       "phase": 22,
       "title": "CI run of the operational ISMS pull request",
       "how": "CI run summary",
-      "status": "planned",
-      "captured": null,
-      "files": []
+      "status": "captured",
+      "captured": "2026-10-16",
+      "files": [
+        "docs/report/evidence/phase-22/EV-22-18_ci-run.txt"
+      ]
     }
   ]
 };

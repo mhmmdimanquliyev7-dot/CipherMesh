@@ -333,7 +333,7 @@ The project owner started Phases 17 to 19 as one workstream (Cloud Deployment + 
 | Documentation updates | Threat model (T-45, assets), limitations L-81 to L-83, authorization model (PA-06 to PA-08), database security section 15, testing plan, evidence plan and index |
 | Jira evidence | CM-EPIC-17 items; the implementation pull request and its CI run (EV-22-18) |
 
-Status: implemented on `feature/CM-T088-operational-isms` (2026-10-15); traceability: [isms-traceability.md](isms-traceability.md). It does not include the final report: CM-T081 waits for the project owner's approval.
+Status: implemented and merged into `main` through pull request #39 (merge commit `92ded2f`, 2026-10-16); traceability: [isms-traceability.md](isms-traceability.md). It does not include the final report: CM-T081 waits for the project owner's approval.
 
 ### Phase 22: Final Documentation (M8, CM-T079 to CM-T081)
 | Aspect | Details |

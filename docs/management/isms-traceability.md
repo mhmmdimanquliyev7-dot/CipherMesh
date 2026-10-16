@@ -1,6 +1,6 @@
 # Operational ISMS: Traceability (Phase 22A, CM-EPIC-17)
 
-Status: implemented on branch `feature/CM-T088-operational-isms` (2026-10-15), approved by the project owner as a dedicated workstream before the final report. Decision record: [ADR-016](../architecture/adr/ADR-016-operational-isms-records.md). Manual: [isms-operations.md](../security/isms-operations.md). The final university report (CM-T081) is **not started** and needs the owner's approval.
+Status: implemented and merged into `main` through pull request #39 (merge commit `92ded2f`, 2026-10-16; CI run 38794222646 passed every job, EV-22-18), approved by the project owner as a dedicated workstream before the final report. Decision record: [ADR-016](../architecture/adr/ADR-016-operational-isms-records.md). Manual: [isms-operations.md](../security/isms-operations.md). The final university report (CM-T081) is **not started** and needs the owner's approval.
 
 ## 1. Baseline and gap analysis (2026-10-15, `main` at `b643a2b`)
 

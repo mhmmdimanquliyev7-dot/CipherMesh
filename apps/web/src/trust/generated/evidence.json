@@ -3893,11 +3893,18 @@
       "tags": [
         "ISMS"
       ],
-      "status": "planned",
-      "files": [],
+      "status": "captured",
+      "files": [
+        {
+          "label": "phase-22/EV-22-18_ci-run.txt",
+          "path": "docs/report/evidence/phase-22/EV-22-18_ci-run.txt"
+        }
+      ],
       "locations": [],
-      "captions": [],
-      "date": ""
+      "captions": [
+        "CI run 38794222646 of pull request #39: every job passed (E2E 178 passed in three engines); the first run failed on the missing .env of the role-grant CLI, fixed; merge commit 92ded2f"
+      ],
+      "date": "2026-10-16"
     }
   ]
 }
