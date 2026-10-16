@@ -1,6 +1,6 @@
 # Operational ISMS (ISO/IEC 27001:2022-aligned)
 
-Status: introduced 2026-10-15 for the Operational ISMS workstream (CM-EPIC-17, CM-T088 to CM-T092; [ADR-016](../architecture/adr/ADR-016-operational-isms-records.md)). Normative: the ISMS Control Center (`/trust/isms`) reads the registers of this document through the generated catalogue (`pnpm trust:generate`), and the API enforces the rules of sections 6 to 12. Related: [isms-control-mapping.md](isms-control-mapping.md) (scope, clauses, Statement of Applicability), [../threat-model/threat-model.md](../threat-model/threat-model.md) (assets, method, risk register), [limitations.md](limitations.md), [../report/evidence-plan.md](../report/evidence-plan.md).
+Status: introduced 2026-10-15 for the Operational ISMS workstream (merged through pull request #39, merge commit `92ded2f`) (CM-EPIC-17, CM-T088 to CM-T092; [ADR-016](../architecture/adr/ADR-016-operational-isms-records.md)). Normative: the ISMS Control Center (`/trust/isms`) reads the registers of this document through the generated catalogue (`pnpm trust:generate`), and the API enforces the rules of sections 6 to 12. Related: [isms-control-mapping.md](isms-control-mapping.md) (scope, clauses, Statement of Applicability), [../threat-model/threat-model.md](../threat-model/threat-model.md) (assets, method, risk register), [limitations.md](limitations.md), [../report/evidence-plan.md](../report/evidence-plan.md).
 
 ## 1. What this is, and what it is not
 
