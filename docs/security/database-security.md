@@ -55,6 +55,8 @@ S = SELECT, I = INSERT, U = UPDATE, D = DELETE. Source of truth: `prisma/migrati
 | encrypted_notes | S I U | S U | | Tombstones |
 | secrets | S I U | S U | | Tombstones |
 | audit_events | S I | S I | S | Never (INV-09) |
+| isms_records (operational ISMS) | S I U | | | Never: exercises are withdrawn (status), records are versioned |
+| isms_activity (operational ISMS) | S I | | | Never: append-only (trigger refuses update, delete and truncate) |
 | _prisma_migrations | | | | Owned by `cm_migrator` |
 
 The worker grants follow the deferred effects in data-model section 5. They are reviewed again when the worker is implemented (Phase 12); any change is a migration plus an update of the test matrix.
@@ -238,3 +240,13 @@ One new table and database-level guards for the rekey state machine (data-model 
 
 Tests: `tests/database/rekey-guards.test.ts` (each guard refused as the runtime role, including a direct statement that bypasses the API) and the privilege matrix. Controls NC-11-05 and NC-11-11 remove a guard together with its API twin, because each layer alone is caught by the other.
 
+## 15. Operational ISMS (migration `20261015000000_operational_isms`)
+
+Two new tables for the operational ISMS (ADR-016, [isms-operations.md](isms-operations.md)): governance metadata only, classified META, no keys, content or credentials (the API validates every record per kind and refuses attached output that contains secret material).
+
+| Object | Guard |
+|---|---|
+| `isms_records` | Status is one of its kind's documented statuses (CHECK); kind, number, creator, creation time and the exercise flag are write-once; every change raises the version by exactly one; a final status (accepted, completed, closed, recorded, withdrawn) never changes again, except that an exercise can be withdrawn; only exercises can be withdrawn. `cm_api` has SELECT, INSERT and UPDATE; nobody can DELETE |
+| `isms_activity` | Append-only: update, delete and truncate are refused for every role (as `audit_events`). It is an authenticated history, **not** the tamper-evident ledger of ADR-009 (L-81) |
+
+Tests: `tests/isms/isms.test.ts` (the guards refused as the runtime role, including direct statements that bypass the API) and the privilege matrix (section 2.1).

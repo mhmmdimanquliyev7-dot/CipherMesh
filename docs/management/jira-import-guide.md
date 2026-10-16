@@ -8,7 +8,7 @@ Jira's menus and importer options change over time and differ between project ty
 
 | File | Content |
 |---|---|
-| `jira-backlog.csv` | 16 epics and 87 work items. UTF-8, comma-separated, every field quoted; some fields span several lines |
+| `jira-backlog.csv` | 17 epics and 92 work items. UTF-8, comma-separated, every field quoted; some fields span several lines |
 | `jira-backlog.md` | The same backlog in readable form, the source the CSV was generated from |
 | This guide | Project configuration, field mapping and checks |
 

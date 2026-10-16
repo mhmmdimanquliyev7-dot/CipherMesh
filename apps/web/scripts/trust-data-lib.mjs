@@ -7,6 +7,7 @@
 //
 // Pure functions only, so they can be unit tested. Text is reduced to plain text (no Markdown, no
 // HTML): the client renders every value as text.
+import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 
 /** Repository on GitHub; evidence and document links point to the reviewed `main` branch. */
@@ -129,6 +130,7 @@ export function parseRisks(markdown) {
       treatment = '',
       residual = '',
       related = '',
+      controls = '',
     ] = row;
     const detail = details.get(id);
     if (detail === undefined) throw new Error(`Risk ${id} has no section in the threat model`);
@@ -142,6 +144,11 @@ export function parseRisks(markdown) {
       treatment: plain(treatment),
       residual: plain(residual),
       limitations: [...plain(related).matchAll(/L-\d+/g)].map((m) => m[0]),
+      // Baseline risk-to-control mapping (risk treatment plan, clause 6.1.3): SoA row identifiers.
+      controls: plain(controls)
+        .split(/,\s*/)
+        .filter((control) => control !== ''),
+      assets: [...(detail.fields.find((f) => f.label === 'Assets')?.text ?? '').matchAll(/A-\d+/g)].map((m) => m[0]),
       fields: detail.fields,
     };
   });
@@ -339,23 +346,7 @@ export function buildTrustData(docs, evidenceFiles) {
   const risks = parseRisks(docs.threatModel);
   const limitations = parseLimitations(docs.limitations);
   const isms = parseIsms(docs.isms);
-  const plan = parseEvidencePlan(docs.evidencePlan);
-  const index = parseEvidenceIndex(docs.evidenceIndex);
-  const evidence = plan.map((item) => {
-    const rows = index.filter((row) => row.ids.includes(item.id));
-    const linked = rows.flatMap((row) => row.links.map((link) => ({ label: link.label, path: link.path })));
-    const named = evidenceFiles
-      .filter((file) => evidenceIdsOfFile(file).includes(item.id) && !linked.some((link) => link.path === file))
-      .map((file) => ({ label: posix.basename(file), path: file }));
-    return {
-      ...item,
-      status: evidenceStatus(item, index, evidenceFiles),
-      files: [...linked, ...named],
-      locations: rows.map((row) => row.location).filter((location) => location !== ''),
-      captions: rows.map((row) => (row.qualifier === '' ? row.caption : `${row.qualifier}: ${row.caption}`)),
-      date: rows.map((row) => row.date).find((date) => date !== '') ?? '',
-    };
-  });
+  const evidence = buildEvidence(docs, evidenceFiles);
   const parameters = parseParameters(docs.cryptoDecisions);
   return {
     'risks.json': { source: 'docs/threat-model/threat-model.md', risks },
@@ -374,6 +365,304 @@ export function buildTrustData(docs, evidenceFiles) {
       ...parseCloud(docs.responsibility, docs.deployment),
     },
   };
+}
+
+/**
+ * The evidence register: plan items with their status, files, captions and latest capture date.
+ * @param {{ evidencePlan: string, evidenceIndex: string }} docs
+ * @param {readonly string[]} evidenceFiles
+ */
+export function buildEvidence(docs, evidenceFiles) {
+  const plan = parseEvidencePlan(docs.evidencePlan);
+  const index = parseEvidenceIndex(docs.evidenceIndex);
+  return plan.map((item) => {
+    const rows = index.filter((row) => row.ids.includes(item.id));
+    const linked = rows.flatMap((row) => row.links.map((link) => ({ label: link.label, path: link.path })));
+    const named = evidenceFiles
+      .filter((file) => evidenceIdsOfFile(file).includes(item.id) && !linked.some((link) => link.path === file))
+      .map((file) => ({ label: posix.basename(file), path: file }));
+    return {
+      ...item,
+      status: evidenceStatus(item, index, evidenceFiles),
+      files: [...linked, ...named],
+      locations: rows.map((row) => row.location).filter((location) => location !== ''),
+      captions: rows.map((row) => (row.qualifier === '' ? row.caption : `${row.qualifier}: ${row.caption}`)),
+      // The latest capture date: a refreshed item is current from its newest capture.
+      date:
+        rows
+          .map((row) => row.date)
+          .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+          .sort()
+          .at(-1) ?? '',
+    };
+  });
+}
+
+// ------------------------------------------------------------- operational ISMS (ADR-016)
+
+/**
+ * SHA-256 (hex) of a text with LF line endings, so a checkout's line endings never change it.
+ * @param {string} text
+ */
+export function fingerprint(text) {
+  return createHash('sha256').update(text.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+}
+
+/** @param {string} text */
+const listOf = (text) =>
+  plain(text)
+    .split(/,\s*/)
+    .filter((item) => item !== '');
+
+/**
+ * Asset inventory (control 5.9): threat model section 2.
+ * @param {string} markdown docs/threat-model/threat-model.md
+ */
+export function parseAssets(markdown) {
+  return tableRows(section(markdown, '2.'), /^A-\d+$/).map(
+    ([
+      id = '',
+      asset = '',
+      property = '',
+      category = '',
+      owner = '',
+      confidentiality = '',
+      integrity = '',
+      availability = '',
+      location = '',
+    ]) => ({
+      id,
+      asset: plain(asset),
+      property: plain(property),
+      category: plain(category),
+      owner: plain(owner),
+      confidentiality: plain(confidentiality),
+      integrity: plain(integrity),
+      availability: plain(availability),
+      location: plain(location),
+    }),
+  );
+}
+
+/**
+ * Security goals G1 to G7 (the information security objectives).
+ * @param {string} markdown docs/architecture/system-overview.md
+ */
+export function parseObjectives(markdown) {
+  return tableRows(markdown.split(/\r?\n/), /^G\d+$/).map(([id = '', goal = '', how = '']) => ({
+    id,
+    goal: plain(goal),
+    how: plain(how),
+  }));
+}
+
+/**
+ * Registers of the ISMS manual: context, roles, policies, freshness classes and metrics.
+ * @param {string} markdown docs/security/isms-operations.md
+ */
+export function parseIsmsOperations(markdown) {
+  const context = section(markdown, '2.');
+  const issues = tableRows(context, /^ISS-\d+$/).map(([id = '', type = '', issue = '', effect = '']) => ({
+    id,
+    type: plain(type),
+    issue: plain(issue),
+    effect: plain(effect),
+  }));
+  const parties = tableRows(context, /^IP-\d+$/).map(([id = '', party = '', requirements = '', response = '']) => ({
+    id,
+    party: plain(party),
+    requirements: plain(requirements),
+    response: plain(response),
+  }));
+  const boundaries = tableRows(context, /^B-\d+$/).map(([id = '', boundary = '', element = '', reason = '']) => ({
+    id,
+    boundary: plain(boundary),
+    element: plain(element),
+    reason: plain(reason),
+  }));
+  const roles = tableRows(section(markdown, '3.'), /^ROLE-\d+$/).map(
+    ([id = '', role = '', heldBy = '', responsibilities = '', permission = '']) => ({
+      id,
+      role: plain(role),
+      heldBy: plain(heldBy),
+      responsibilities: plain(responsibilities),
+      permission: plain(permission),
+    }),
+  );
+  const policies = tableRows(section(markdown, '4.'), /^POL-\d+$/).map(
+    ([id = '', title = '', document = '', owner = '', cycle = '', controls = '', risks = '']) => {
+      const reviewDays = Number(plain(cycle));
+      if (!Number.isInteger(reviewDays) || reviewDays <= 0) throw new Error(`${id}: the review cycle must be days`);
+      return {
+        id,
+        title: plain(title),
+        path: plain(document),
+        owner: plain(owner),
+        reviewDays,
+        controls: listOf(controls),
+        risks: listOf(risks),
+      };
+    },
+  );
+  const freshness = section(markdown, '7.');
+  const classes = tableRows(freshness, /^(VULNERABILITY|TECHNICAL|DESIGN)$/).map(
+    ([id = '', days = '', appliesTo = '']) => {
+      const validityDays = Number(plain(days));
+      if (!Number.isInteger(validityDays) || validityDays <= 0) throw new Error(`${id}: the validity must be days`);
+      return { id, validityDays, appliesTo: plain(appliesTo) };
+    },
+  );
+  /** @type {Record<string, string>} */
+  const evidenceClasses = Object.fromEntries(
+    tableRows(freshness, /^EV-\d{2}-\d{2}$/).map(([id = '', cls = '']) => [id, plain(cls)]),
+  );
+  const metrics = tableRows(section(markdown, '12.'), /^M-\d+$/).map(
+    ([
+      id = '',
+      objective = '',
+      calculation = '',
+      source = '',
+      frequency = '',
+      owner = '',
+      target = '',
+      limitation = '',
+    ]) => ({
+      id,
+      objective: plain(objective),
+      calculation: plain(calculation),
+      source: plain(source),
+      frequency: plain(frequency),
+      owner: plain(owner),
+      target: plain(target),
+      limitation: plain(limitation),
+    }),
+  );
+  return { issues, parties, boundaries, roles, policies, classes, evidenceClasses, metrics };
+}
+
+const RISK_DETAIL_LABELS = [
+  'STRIDE',
+  'Threat',
+  'Attack scenario',
+  'Security controls',
+  'Residual risk',
+  'Testing strategy',
+];
+
+/**
+ * The catalogue of the operational ISMS (ADR-016): every risk, asset, Statement of Applicability
+ * row, evidence item, policy, role, freshness class and metric that the API and the Control Center
+ * may reference, generated from the normative documents and cross-checked here. The scope and the
+ * policy documents are fingerprinted, so a review record names the exact revision it reviewed.
+ * @param {{ threatModel: string, isms: string, ismsOperations: string, systemOverview: string, evidencePlan: string, evidenceIndex: string, policyDocuments: Record<string, string> }} docs
+ * @param {readonly string[]} evidenceFiles
+ */
+export function buildIsmsCatalogue(docs, evidenceFiles) {
+  const ops = parseIsmsOperations(docs.ismsOperations);
+  const isms = parseIsms(docs.isms);
+  const risks = parseRisks(docs.threatModel);
+  const assets = parseAssets(docs.threatModel);
+  const evidence = buildEvidence(docs, evidenceFiles);
+  /** @param {string} message */
+  const fail = (message) => {
+    throw new Error(`ISMS catalogue: ${message}`);
+  };
+  const classIds = new Set(ops.classes.map((c) => c.id));
+  if (!classIds.has('TECHNICAL')) fail('the default freshness class TECHNICAL is missing');
+  for (const [id, cls] of Object.entries(ops.evidenceClasses)) {
+    if (!classIds.has(cls)) fail(`${id} names the unknown freshness class ${cls}`);
+    if (!evidence.some((item) => item.id === id)) fail(`${id} is not in the evidence plan`);
+  }
+  const rowIds = new Set(isms.controls.map((c) => c.control));
+  const assetIds = new Set(assets.map((a) => a.id));
+  const riskIds = new Set(risks.map((r) => r.id));
+  for (const risk of risks) {
+    if (risk.controls.length === 0) fail(`${risk.id} has no Annex A controls`);
+    for (const control of risk.controls) {
+      if (!rowIds.has(control)) fail(`${risk.id} names the unknown control ${control}`);
+    }
+    for (const asset of risk.assets) if (!assetIds.has(asset)) fail(`${risk.id} names the unknown asset ${asset}`);
+  }
+  for (const policy of ops.policies) {
+    for (const control of policy.controls) {
+      if (!rowIds.has(control)) fail(`${policy.id} names the unknown control ${control}`);
+    }
+    for (const risk of policy.risks) if (!riskIds.has(risk)) fail(`${policy.id} names the unknown risk ${risk}`);
+    if (docs.policyDocuments[policy.path] === undefined) fail(`${policy.id}: ${policy.path} was not read`);
+  }
+  const revision = /Scope revision (\d+)/.exec(isms.scope)?.[1];
+  return {
+    sources: [
+      'docs/security/isms-operations.md',
+      'docs/security/isms-control-mapping.md',
+      'docs/threat-model/threat-model.md',
+      'docs/architecture/system-overview.md',
+      'docs/report/evidence-plan.md',
+      'docs/report/evidence/index.md',
+    ],
+    scope: { revision: Number(revision ?? '1'), text: isms.scope, fingerprint: fingerprint(isms.scope) },
+    issues: ops.issues,
+    parties: ops.parties,
+    boundaries: ops.boundaries,
+    roles: ops.roles,
+    objectives: parseObjectives(docs.systemOverview),
+    policies: ops.policies.map((policy) => ({
+      ...policy,
+      fingerprint: fingerprint(docs.policyDocuments[policy.path] ?? ''),
+    })),
+    freshness: { defaultClass: 'TECHNICAL', classes: ops.classes, evidence: ops.evidenceClasses },
+    metrics: ops.metrics,
+    assets,
+    risks: risks.map((risk) => ({
+      id: risk.id,
+      title: risk.title,
+      threat: risk.threat,
+      likelihood: risk.likelihood,
+      impact: risk.impact,
+      inherent: risk.inherent,
+      treatment: risk.treatment,
+      residual: risk.residual,
+      limitations: risk.limitations,
+      controls: risk.controls,
+      assets: risk.assets,
+      details: risk.fields
+        .filter((field) => RISK_DETAIL_LABELS.includes(field.label))
+        .map((field) => ({ label: field.label, text: field.text })),
+    })),
+    clauses: isms.clauses,
+    controls: isms.controls.map((control) => ({
+      id: control.control,
+      title: control.title,
+      theme: control.theme,
+      status: control.status,
+      implementation: control.implementation,
+      evidence: control.evidence,
+    })),
+    evidence: evidence.map((item) => ({
+      id: item.id,
+      phase: item.phase,
+      title: item.evidence,
+      how: item.how,
+      status: item.status,
+      captured: item.date === '' ? null : item.date,
+      files: item.files.map((file) => file.path),
+    })),
+  };
+}
+
+/**
+ * The catalogue as a TypeScript module of the shared package (read by the API and the web client).
+ * @param {unknown} catalogue
+ */
+export function renderIsmsCatalogue(catalogue) {
+  return [
+    '// Generated by `pnpm trust:generate` from the normative documents (ADR-016). Do not edit by hand:',
+    '// `pnpm trust:check` and the web build fail when this file differs from the documents.',
+    "import type { IsmsCatalogue } from './isms';",
+    '',
+    `export const ISMS_CATALOGUE: IsmsCatalogue = ${JSON.stringify(catalogue, null, 2)};`,
+    '',
+  ].join('\n');
 }
 
 /**

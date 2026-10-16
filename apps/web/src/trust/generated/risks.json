@@ -14,6 +14,21 @@
         "L-05",
         "L-08"
       ],
+      "controls": [
+        "8.24",
+        "8.12",
+        "5.17",
+        "8.20",
+        "8.21"
+      ],
+      "assets": [
+        "A-02",
+        "A-03",
+        "A-05",
+        "A-06",
+        "A-07",
+        "A-08"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -69,6 +84,16 @@
       "limitations": [
         "L-05"
       ],
+      "controls": [
+        "8.24",
+        "5.14",
+        "8.21",
+        "5.23"
+      ],
+      "assets": [
+        "A-02",
+        "A-07"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -122,6 +147,14 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "5.17",
+        "8.5",
+        "8.24"
+      ],
+      "assets": [
+        "A-05"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -178,6 +211,17 @@
         "L-03",
         "L-09"
       ],
+      "controls": [
+        "5.15",
+        "5.18",
+        "8.3",
+        "5.12"
+      ],
+      "assets": [
+        "A-01",
+        "A-02",
+        "A-07"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -231,6 +275,17 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "5.15",
+        "8.3",
+        "8.5"
+      ],
+      "assets": [
+        "A-01",
+        "A-02",
+        "A-04",
+        "A-07"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -284,6 +339,17 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "8.3",
+        "5.15",
+        "8.26",
+        "8.29"
+      ],
+      "assets": [
+        "A-01",
+        "A-02",
+        "A-07"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -339,6 +405,14 @@
       "limitations": [
         "L-10"
       ],
+      "controls": [
+        "8.24",
+        "8.26"
+      ],
+      "assets": [
+        "A-01",
+        "A-02"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -392,6 +466,15 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "8.5",
+        "5.17",
+        "8.26"
+      ],
+      "assets": [
+        "A-06",
+        "A-07"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -445,6 +528,15 @@
       "treatment": "Mitigate",
       "residual": "Medium",
       "limitations": [],
+      "controls": [
+        "8.5",
+        "5.17",
+        "8.16"
+      ],
+      "assets": [
+        "A-05",
+        "A-07"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -498,6 +590,13 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "8.5",
+        "5.17"
+      ],
+      "assets": [
+        "A-05"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -552,6 +651,15 @@
       "residual": "Medium",
       "limitations": [
         "L-11"
+      ],
+      "controls": [
+        "8.7",
+        "8.26",
+        "8.12"
+      ],
+      "assets": [
+        "A-01",
+        "A-11"
       ],
       "fields": [
         {
@@ -608,6 +716,17 @@
       "limitations": [
         "L-01"
       ],
+      "controls": [
+        "8.26",
+        "8.28",
+        "8.29"
+      ],
+      "assets": [
+        "A-01",
+        "A-03",
+        "A-04",
+        "A-06"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -661,6 +780,15 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "8.26",
+        "8.28",
+        "8.5"
+      ],
+      "assets": [
+        "A-02",
+        "A-07"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -714,6 +842,17 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "8.28",
+        "8.26",
+        "8.29"
+      ],
+      "assets": [
+        "A-02",
+        "A-05",
+        "A-07",
+        "A-11"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -769,6 +908,16 @@
       "limitations": [
         "L-05"
       ],
+      "controls": [
+        "8.12",
+        "8.15",
+        "8.28"
+      ],
+      "assets": [
+        "A-05",
+        "A-07",
+        "A-09"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -822,6 +971,15 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "8.4",
+        "8.12",
+        "8.9",
+        "5.17"
+      ],
+      "assets": [
+        "A-09"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -877,6 +1035,17 @@
       "limitations": [
         "L-06"
       ],
+      "controls": [
+        "5.23",
+        "8.2",
+        "5.17"
+      ],
+      "assets": [
+        "A-02",
+        "A-09",
+        "A-10",
+        "A-11"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -930,6 +1099,15 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "8.9",
+        "8.21",
+        "5.23"
+      ],
+      "assets": [
+        "A-02",
+        "A-11"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -984,6 +1162,22 @@
       "residual": "Medium",
       "limitations": [
         "L-02"
+      ],
+      "controls": [
+        "8.9",
+        "8.20",
+        "8.22",
+        "8.8",
+        "8.2"
+      ],
+      "assets": [
+        "A-01",
+        "A-05",
+        "A-06",
+        "A-07",
+        "A-08",
+        "A-09",
+        "A-10"
       ],
       "fields": [
         {
@@ -1041,6 +1235,13 @@
         "L-13",
         "L-25"
       ],
+      "controls": [
+        "5.33",
+        "8.15"
+      ],
+      "assets": [
+        "A-08"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1096,6 +1297,15 @@
       "limitations": [
         "L-04",
         "L-24"
+      ],
+      "controls": [
+        "5.18",
+        "8.24",
+        "5.15"
+      ],
+      "assets": [
+        "A-01",
+        "A-04"
       ],
       "fields": [
         {
@@ -1158,6 +1368,16 @@
       "limitations": [
         "L-08"
       ],
+      "controls": [
+        "8.24",
+        "5.17",
+        "8.1"
+      ],
+      "assets": [
+        "A-03",
+        "A-04",
+        "A-01"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1213,6 +1433,16 @@
       "limitations": [
         "L-01"
       ],
+      "controls": [
+        "8.1",
+        "8.7"
+      ],
+      "assets": [
+        "A-01",
+        "A-03",
+        "A-04",
+        "A-06"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1267,6 +1497,18 @@
       "residual": "Medium",
       "limitations": [
         "L-02"
+      ],
+      "controls": [
+        "8.25",
+        "8.32",
+        "8.4",
+        "8.31"
+      ],
+      "assets": [
+        "A-10",
+        "A-01",
+        "A-03",
+        "A-04"
       ],
       "fields": [
         {
@@ -1324,6 +1566,14 @@
         "L-07",
         "L-18"
       ],
+      "controls": [
+        "8.24",
+        "5.16"
+      ],
+      "assets": [
+        "A-04",
+        "A-01"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1378,6 +1628,13 @@
       "residual": "Medium",
       "limitations": [
         "L-20"
+      ],
+      "controls": [
+        "8.20",
+        "8.16"
+      ],
+      "assets": [
+        "A-11"
       ],
       "fields": [
         {
@@ -1434,6 +1691,17 @@
       "limitations": [
         "L-02"
       ],
+      "controls": [
+        "5.19 to 5.22",
+        "8.8",
+        "8.25",
+        "8.28"
+      ],
+      "assets": [
+        "A-10",
+        "A-01",
+        "A-09"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1489,6 +1757,13 @@
       "limitations": [
         "L-05"
       ],
+      "controls": [
+        "5.34",
+        "8.12"
+      ],
+      "assets": [
+        "A-07"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1543,6 +1818,13 @@
       "residual": "Medium",
       "limitations": [
         "L-22"
+      ],
+      "controls": [
+        "8.24"
+      ],
+      "assets": [
+        "A-01",
+        "A-04"
       ],
       "fields": [
         {
@@ -1601,6 +1883,14 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "5.17",
+        "8.5",
+        "5.16"
+      ],
+      "assets": [
+        "A-05"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1654,6 +1944,17 @@
       "treatment": "Mitigate",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "5.14",
+        "8.20",
+        "8.21",
+        "8.24"
+      ],
+      "assets": [
+        "A-05",
+        "A-06",
+        "A-10"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1708,6 +2009,13 @@
       "residual": "Low",
       "limitations": [
         "L-10"
+      ],
+      "controls": [
+        "8.13",
+        "8.24"
+      ],
+      "assets": [
+        "A-02"
       ],
       "fields": [
         {
@@ -1764,6 +2072,13 @@
       "limitations": [
         "L-03"
       ],
+      "controls": [
+        "5.14",
+        "8.24"
+      ],
+      "assets": [
+        "A-01"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1817,6 +2132,15 @@
       "treatment": "Mitigate, Transfer",
       "residual": "Low",
       "limitations": [],
+      "controls": [
+        "5.19 to 5.22",
+        "5.23",
+        "8.4"
+      ],
+      "assets": [
+        "A-09",
+        "A-12"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -1871,6 +2195,14 @@
       "residual": "Medium",
       "limitations": [
         "L-21"
+      ],
+      "controls": [
+        "5.16",
+        "8.24"
+      ],
+      "assets": [
+        "A-01",
+        "A-04"
       ],
       "fields": [
         {
@@ -1927,6 +2259,14 @@
       "limitations": [
         "L-23",
         "L-46"
+      ],
+      "controls": [
+        "8.24",
+        "8.26"
+      ],
+      "assets": [
+        "A-04",
+        "A-01"
       ],
       "fields": [
         {
@@ -1993,6 +2333,14 @@
       "limitations": [
         "L-24"
       ],
+      "controls": [
+        "5.18",
+        "8.24"
+      ],
+      "assets": [
+        "A-04",
+        "A-11"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -2053,6 +2401,15 @@
       "residual": "Medium (Level 1)",
       "limitations": [
         "L-25"
+      ],
+      "controls": [
+        "5.33",
+        "8.24",
+        "8.15"
+      ],
+      "assets": [
+        "A-08",
+        "A-09"
       ],
       "fields": [
         {
@@ -2115,6 +2472,18 @@
         "L-26",
         "L-28"
       ],
+      "controls": [
+        "8.2",
+        "8.3",
+        "8.9",
+        "8.32"
+      ],
+      "assets": [
+        "A-02",
+        "A-05",
+        "A-07",
+        "A-08"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -2173,6 +2542,17 @@
         "L-61",
         "L-62"
       ],
+      "controls": [
+        "5.12",
+        "5.13",
+        "8.26"
+      ],
+      "assets": [
+        "A-01",
+        "A-02",
+        "A-07",
+        "A-08"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -2229,6 +2609,17 @@
         "L-07",
         "L-40"
       ],
+      "controls": [
+        "5.17",
+        "8.5",
+        "5.24 to 5.27"
+      ],
+      "assets": [
+        "A-03",
+        "A-13",
+        "A-04",
+        "A-01"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -2284,6 +2675,18 @@
       "limitations": [
         "L-71",
         "L-75"
+      ],
+      "controls": [
+        "8.22",
+        "8.20",
+        "8.21",
+        "5.23"
+      ],
+      "assets": [
+        "A-02",
+        "A-05",
+        "A-07",
+        "A-08"
       ],
       "fields": [
         {
@@ -2343,6 +2746,16 @@
         "L-74",
         "L-77"
       ],
+      "controls": [
+        "8.13",
+        "5.37",
+        "5.24 to 5.27"
+      ],
+      "assets": [
+        "A-02",
+        "A-07",
+        "A-08"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -2398,6 +2811,13 @@
       "limitations": [
         "L-78"
       ],
+      "controls": [
+        "8.16",
+        "5.37"
+      ],
+      "assets": [
+        "A-07"
+      ],
       "fields": [
         {
           "label": "STRIDE",
@@ -2437,6 +2857,71 @@
         {
           "label": "Rating",
           "text": "Likelihood Low, Impact Medium, inherent Low. Treatment: Mitigate. Residual: Low.",
+          "items": []
+        }
+      ]
+    },
+    {
+      "id": "T-45",
+      "threat": "Unauthorized change or disclosure of ISMS records",
+      "title": "Unauthorized change or disclosure of ISMS records",
+      "likelihood": "M",
+      "impact": "M",
+      "inherent": "Medium",
+      "treatment": "Mitigate, Accept",
+      "residual": "Low",
+      "limitations": [
+        "L-81",
+        "L-82"
+      ],
+      "controls": [
+        "5.15",
+        "8.3",
+        "8.15",
+        "5.33"
+      ],
+      "assets": [
+        "A-16"
+      ],
+      "fields": [
+        {
+          "label": "STRIDE",
+          "text": "Tampering, Repudiation, Information disclosure, Elevation of privilege",
+          "items": []
+        },
+        {
+          "label": "Assets",
+          "text": "A-16",
+          "items": []
+        },
+        {
+          "label": "Threat",
+          "text": "Someone other than the ISMS manager reads internal findings and risk decisions, or a record is changed so that a control looks verified, a risk accepted or a finding closed without the documented steps (ADR-016).",
+          "items": []
+        },
+        {
+          "label": "Attack scenario",
+          "text": "An ordinary account calls the ISMS routes; a client sends a status field or a decision through the record route; a stale browser overwrites a newer record; a verification is recorded on stale evidence; attached output smuggles a credential into the records; an \"internal audit\" is recorded as independent by its own planner; an activity row is edited afterwards.",
+          "items": []
+        },
+        {
+          "label": "Security controls",
+          "text": "PA-06 to PA-08 behind the platform administrator gate (PLATFORM_ADMIN with MFA; 404 for everyone else) and a step-up for every decision; strict schemas with no status field; server-side state machines with documented conditions; optimistic concurrency; serialized writes; the freshness rule checked by the server; attachments limited in size and refused when they contain secret material; database CHECKs, a guard trigger and an append-only activity table with SELECT and INSERT only.",
+          "items": []
+        },
+        {
+          "label": "Residual risk",
+          "text": "A platform administrator can record any decision (L-82); the activity history is not tamper-evident (L-81).",
+          "items": []
+        },
+        {
+          "label": "Testing strategy",
+          "text": "tests/isms/isms.test.ts (authorization, step-up, every condition, conflicts, malformed input, secrets, database guards), packages/shared/src/isms.test.ts, negative controls NC-22-01 to NC-22-05, tests/e2e/isms.spec.ts in three engines.",
+          "items": []
+        },
+        {
+          "label": "Rating",
+          "text": "Likelihood Medium, Impact Medium, inherent Medium. Treatment: Mitigate, Accept. Residual: Low.",
           "items": []
         }
       ]

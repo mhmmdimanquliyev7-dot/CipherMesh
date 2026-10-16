@@ -1588,6 +1588,63 @@ const CONTROLS = [
     ],
     tests: ['apps/web/src/trust/trust-content.test.ts'],
   },
+  // Operational ISMS (ADR-016, CM-T091): each workflow condition is real only if its tests fail
+  // without it. The shared workflow is the single place the API enforces them.
+  {
+    id: 'NC-22-01',
+    defect: 'A risk treatment is verified while a linked control has no current verification',
+    file: 'packages/shared/src/isms-workflow.ts',
+    edits: [
+      [
+        "    if (assurance.some((a) => a?.state !== 'VERIFIED')) return fail('ISMS_CONDITION_NOT_MET', 'CONTROL_NOT_VERIFIED');",
+        "    if (assurance.some((a) => a === undefined)) return fail('ISMS_CONDITION_NOT_MET', 'CONTROL_NOT_VERIFIED');",
+      ],
+    ],
+    tests: ['tests/isms/isms.test.ts'],
+  },
+  {
+    id: 'NC-22-02',
+    defect: 'A PASS verification may rest on evidence past its freshness rule',
+    file: 'packages/shared/src/isms-workflow.ts',
+    edits: [
+      [
+        "    if (freshness.some((f) => f.state !== 'CURRENT')) return fail('ISMS_CONDITION_NOT_MET', 'EVIDENCE_NOT_CURRENT');",
+        "    if (freshness.some((f) => f.state === 'UNKNOWN')) return fail('ISMS_CONDITION_NOT_MET', 'EVIDENCE_NOT_CURRENT');",
+      ],
+    ],
+    tests: ['tests/isms/isms.test.ts'],
+  },
+  {
+    id: 'NC-22-03',
+    defect: 'Attached verification output is stored without the secret-material check (INV-10)',
+    file: 'apps/api/src/isms/service.ts',
+    edits: [
+      [
+        '        const problem = attachmentProblem(request.input.attachment.text);',
+        "        const problem = attachmentProblem(request.input.attachment.text) === 'TOO_LARGE' ? 'TOO_LARGE' : undefined;",
+      ],
+    ],
+    tests: ['tests/isms/isms.test.ts'],
+  },
+  {
+    id: 'NC-22-04',
+    defect: 'A real (non-exercise) ISMS record can be withdrawn',
+    file: 'packages/shared/src/isms-workflow.ts',
+    edits: [["    if (!record.exercise) return fail('ISMS_CONDITION_NOT_MET', 'EXERCISE_ONLY');", '']],
+    tests: ['tests/isms/isms.test.ts', 'packages/shared/src/isms.test.ts'],
+  },
+  {
+    id: 'NC-22-05',
+    defect: 'An "internal audit" may be performed by the person who planned it (false independence)',
+    file: 'packages/shared/src/isms-workflow.ts',
+    edits: [
+      [
+        "  if (input.independence === 'INTERNAL_AUDIT' && input.auditorUserId === ctx.actor.userId) {",
+        "  if (input.independence === 'INTERNAL_AUDIT' && input.auditorUserId === '') {",
+      ],
+    ],
+    tests: ['tests/isms/isms.test.ts'],
+  },
 ];
 
 /** @param {string[]} files */

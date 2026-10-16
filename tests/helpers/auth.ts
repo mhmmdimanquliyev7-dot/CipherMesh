@@ -61,13 +61,21 @@ export function newIdentity(): { email: string; password: string; displayName: s
  * A distinct client address per scenario (IPv6 documentation range, RFC 3849), so per-address
  * limits never leak between tests.
  */
-let addressCounter = randomInt(1, 0xffff);
-// One IPv6 group holds at most four hex digits: past 0xffff the address would be invalid, the API
-// would key every later request as 'unknown', and the per-address limits would trip (observed as a
-// 429 on registration in a full run). The counter therefore wraps inside 1..0xfffe.
+// Vitest reloads this module for every test file, but files of one project share a database, and
+// the abuse suite counts login attempts by address while other files log in concurrently. A
+// counter that restarted per file (even from a random offset) could give two files the same
+// address, adding a foreign row to one's count. The address is therefore a group chosen once per
+// worker process plus a counter kept on globalThis, which survives the module reloads: no two
+// scenarios of one worker share an address, and two workers share a group with probability
+// 1 in 65534. One IPv6 group holds at most four hex digits: past 0xffff the address would be
+// invalid, the API would key every later request as 'unknown', and the per-address limits would
+// trip (observed as a 429 on registration in a full run), so the counter wraps inside 1..0xfffe.
+const addressState = globalThis as typeof globalThis & { __cmTestAddress?: { group: number; counter: number } };
+addressState.__cmTestAddress ??= { group: randomInt(1, 0xffff), counter: 0 };
 export const newAddress = (): string => {
-  addressCounter = (addressCounter % 0xfffe) + 1;
-  return `2001:db8::${addressCounter.toString(16)}`;
+  const state = addressState.__cmTestAddress ?? { group: 1, counter: 0 };
+  state.counter = (state.counter % 0xfffe) + 1;
+  return `2001:db8::${state.group.toString(16)}:${state.counter.toString(16)}`;
 };
 
 interface Response {

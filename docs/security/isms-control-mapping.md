@@ -4,7 +4,7 @@ Status: Phase 0 baseline, with implementation notes for Phases 2 to 4 and Phase 
 
 ## 1. Scope statement
 
-The scope covers the design, development, deployment and demonstration operation of the CipherMesh platform: the web client, API and worker, the cloud VM, the managed database and object storage, and the management tooling (GitHub, Jira Cloud) used to build it. Physical security of data centres is the cloud provider's responsibility. People-related controls apply only in the limited sense of a student project team.
+Scope revision 2 (2026-10-15, operational ISMS, CM-T090; revision 1 was the Phase 0 statement). The ISMS covers the design, development, operation and demonstration of the CipherMesh platform: the browser client, the API and worker, PostgreSQL and the SeaweedFS object storage as run in the local Docker Desktop demonstration and in CI, the project owner's development and operator workstation, the encrypted backups, the security evidence and ISMS records, and the management tooling (GitHub with CI, Jira Cloud) used to build it. The Oracle Cloud Always Free VM of ADR-014 is designed and enters the scope when it is provisioned; it is not deployed, and no cloud control is verified. Physical security of data centres would be the cloud provider's responsibility. People-related controls apply only in the limited sense of a one-person student project. Boundaries, interested parties and responsibilities: [isms-operations.md](isms-operations.md) sections 2 and 3.
 
 ## 2. Management-system clauses
 
@@ -19,10 +19,10 @@ The scope covers the design, development, deployment and demonstration operation
 | 7.5 | Documented information | `docs/`, ADRs, Jira history, Git history |
 | 8.1 | Operational planning and control | Jira workflow with SECURITY REVIEW and TESTING gates |
 | 8.2, 8.3 | Performing risk assessment and treatment | Threat model review at the end of every phase |
-| 9.1 | Monitoring and measurement | Security Dashboard (Phase 14: aggregates for the platform administrator, PA-01), CI security suites; audit verification runs are deferred with Phase 12 |
-| 9.2 | Internal audit | Phase 20 security assessment |
-| 9.3 | Management review | Project owner approval at each phase gate |
-| 10.1, 10.2 | Continual improvement, corrective action | Security Finding workflow with regression tests; residual risk re-rating |
+| 9.1 | Monitoring and measurement | Security Dashboard (Phase 14: aggregates for the platform administrator, PA-01), CI security suites; the operational ISMS computes control assurance, evidence freshness and the metrics M-01 to M-07 ([isms-operations.md](isms-operations.md) sections 7 and 12); audit verification runs are deferred with Phase 12 |
+| 9.2 | Internal audit | Audit records in the ISMS Control Center (self-assessments and simulations, declared independence; [isms-operations.md](isms-operations.md) section 9); the Phase 20 security assessment remains planned |
+| 9.3 | Management review | Management review records with computed inputs, decisions and tracked actions ([isms-operations.md](isms-operations.md) section 11); project owner approval at each phase gate |
+| 10.1, 10.2 | Continual improvement, corrective action | Finding and corrective-action records with root cause, effectiveness check and closure evidence ([isms-operations.md](isms-operations.md) section 10); Security Finding workflow with regression tests; residual risk re-rating |
 
 ## 3. Annex A controls
 
@@ -58,7 +58,7 @@ Status values: **Implemented by design** (designed in Phase 0, built in the list
 | 8.4 | Access to source code | Implemented by design | GitHub permissions, protected `main` | EV-01-02 |
 | 8.5 | Secure authentication | Implemented by design | TOTP MFA, opaque server-side sessions with rotation and revocation, login backoff without lockout, CSRF defences including login CSRF, step-up (built in Phase 3). Phase 4: vault setup and passphrase change need a recent step-up, a vault reset a strict one, and a reset ends all other sessions **Phase 10:** the room profile decides the session requirements: MFA and a password sign-in within 4 or 1 hours (CONFIDENTIAL, RESTRICTED), a step-up within 15 minutes for sensitive operations in RESTRICTED rooms and within 5 minutes for any downgrade | EV-03-03 to EV-03-09, EV-04-08 |
 | 8.7 | Protection against malware | Partial | Forced attachment downloads, no inline rendering, CSP; no scanning of encrypted files (L-11) | EV-08-02 |
-| 8.8 | Management of technical vulnerabilities | Implemented by design | Dependency, container and secret scanning; patching | EV-16-03 |
+| 8.8 | Management of technical vulnerabilities | Implemented by design | Dependency, container and secret scanning; patching. `pnpm audit:deps` and gitleaks run in CI on every pull request; the dependency audit is also evidence with a 7-day freshness rule in the operational ISMS ([isms-operations.md](isms-operations.md) section 7) | EV-01-07, EV-16-03 |
 | 8.9 | Configuration management | Implemented by design | Compose, Nginx, PostgreSQL, systemd and hardening configuration in Git (`infrastructure/`); images built only from a commit on the origin (`cm-deploy`), digest-pinned base images; the whole stack is built and checked on linux/arm64 in CI on every pull request | EV-17-03, EV-17-06, EV-19-03 |
 | 8.10 | Information deletion | Implemented by design | Expiry, burn-after-reading, crypto-shredding of live data; backup caveat (L-12) | EV-09-01 |
 | 8.12 | Data leakage prevention | Implemented by design | Client-side encryption, log redaction, encrypted filenames. **Phase 7:** a canary scan finds no file name or content (in four encodings) in any table, the bucket or the log, and browser tests find none in any request or browser storage (`tests/files`, `tests/e2e/files.spec.ts`). Phase 4: browser tests inspect every vault request for the passphrase in five encodings and for private-key structures, and a log test searches for every secret and ciphertext used. **Phase 8:** a note canary scan finds no title or body (five encodings) in any table or the log, and browser tests find none in any request or browser storage (`tests/notes`, `tests/e2e/notes.spec.ts`). **Phase 9:** a secret canary scan finds no text (five encodings) in any table, the log or the events, and browser tests find none in any request or browser storage (`tests/secrets`, `tests/e2e/secrets.spec.ts`) | EV-09-05, EV-08-03, EV-07-05, EV-04-01, EV-04-08 |

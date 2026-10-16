@@ -13,6 +13,8 @@ import { createRoomAuthorizer } from './authorization/rooms';
 import type { AppConfig } from './config/env';
 import { authDataAccess } from './db/auth-store';
 import { createDashboardStore } from './db/dashboard-store';
+import { createIsmsStore } from './db/isms-store';
+import { createIsmsService } from './isms/service';
 import { createRoomAccessStore } from './db/room-access-store';
 import { accountDataAccess, roomDataAccess } from './db/room-store';
 import { vaultDataAccess } from './db/vault-store';
@@ -39,6 +41,7 @@ import { fileRoutes } from './routes/files';
 import { noteRoutes } from './routes/notes';
 import { secretRoutes } from './routes/secrets';
 import { invitationRoutes } from './routes/invitations';
+import { ismsRoutes } from './routes/isms';
 import { roomRoutes } from './routes/rooms';
 import { rekeyRoutes } from './routes/rekey';
 import { vaultRoutes } from './routes/vault';
@@ -183,6 +186,8 @@ export function createApp(deps: AppDependencies): CipherMeshApp {
         statusFile: config.platformStatusFile,
         storage,
       }),
+      // Operational ISMS (ADR-016, PA-06 to PA-08): governance records for platform administrators.
+      ...ismsRoutes(createIsmsService(createIsmsStore(database.prisma), clock), clock),
       ...(testing?.routes ?? []),
     ],
     [...PUBLIC_ROUTE_ALLOWLIST, ...AUTH_PUBLIC_ROUTES, ...(testing?.publicAllowlist ?? [])],

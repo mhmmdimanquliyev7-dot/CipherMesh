@@ -194,6 +194,10 @@ describe('route inventory', () => {
       '/rooms/:roomId/rekey-operations/current',
       // Phase 14: the platform security dashboard computes aggregates on request and writes nothing.
       '/admin/security-dashboard',
+      // Operational ISMS (ADR-016): the state and one record's history are reads; every change is
+      // a named POST transition through the CSRF gate.
+      '/isms/state',
+      '/isms/records/:recordId',
     ]);
   });
 
@@ -204,6 +208,13 @@ describe('route inventory', () => {
       'POST /admin/users/disable PA-03-DISABLE',
       'POST /admin/users/enable PA-03-ENABLE',
       'GET /admin/security-dashboard PA-01-DASHBOARD',
+      // Operational ISMS (ADR-016): view, record and decide (the decisions declare a step-up).
+      'GET /isms/state PA-06-ISMS-VIEW',
+      'GET /isms/records/:recordId PA-06-ISMS-VIEW',
+      'POST /isms/records PA-07-ISMS-RECORD',
+      'POST /isms/records/:recordId/transitions PA-07-ISMS-RECORD',
+      'POST /isms/decisions PA-08-ISMS-DECIDE',
+      'POST /isms/records/:recordId/decisions PA-08-ISMS-DECIDE',
     ]);
   });
 
