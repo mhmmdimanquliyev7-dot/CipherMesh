@@ -18,7 +18,7 @@ engineStrict: true
 catalog:
   zod: 4.6.5
   typescript: 6.0.3
-  '@types/node': 24.19.0
+  '@types/node': 26.6.4
   prisma: 7.10.0
   '@prisma/client': 7.10.0
   '@prisma/adapter-pg': 7.10.0
