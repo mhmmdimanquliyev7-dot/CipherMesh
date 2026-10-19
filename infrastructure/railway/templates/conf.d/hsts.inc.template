@@ -1,0 +1,4 @@
+# HSTS, staged (deployment-architecture.md section 4): CM_HSTS_MAX_AGE is 0 until HTTPS and
+# certificate renewal are verified, then raised. No includeSubDomains (the parent zone is the
+# hostname provider's), no preload.
+add_header Strict-Transport-Security "max-age=${CM_HSTS_MAX_AGE}" always;

@@ -5,7 +5,7 @@
 // Scope: the local development container and CI service container, where POSTGRES_USER is the
 // container's superuser. A managed cloud database is provisioned by the deployment runbook
 // (CM-T067) with the same role names and attributes; local roles are not cloud IAM.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import pg from 'pg';
 
 /** Fixed role names: the grant migration refers to them. */
@@ -44,6 +44,24 @@ function required(variable) {
  * @returns {pg.ClientConfig}
  */
 export function adminConnection(database) {
+  // Railway demonstration (docs/deployment/railway-demo.md): the one-off bootstrap job reaches the
+  // database over the private network, and only with a verified certificate. Without
+  // POSTGRES_HOST the connection stays loopback-only, as before.
+  const remoteHost = process.env.POSTGRES_HOST;
+  if (remoteHost !== undefined && remoteHost !== '') {
+    return {
+      host: remoteHost,
+      port: Number(required('POSTGRES_PORT')),
+      user: required('POSTGRES_USER'),
+      password: required('POSTGRES_PASSWORD'),
+      database: database ?? required('POSTGRES_DB'),
+      ssl: {
+        ca: readFileSync(required('POSTGRES_SSL_CA_FILE'), 'utf8'),
+        rejectUnauthorized: true,
+        servername: remoteHost,
+      },
+    };
+  }
   return {
     host: '127.0.0.1',
     port: Number(required('POSTGRES_PORT')),
