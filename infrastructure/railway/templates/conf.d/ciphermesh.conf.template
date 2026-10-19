@@ -1,0 +1,60 @@
+# Application origin on Railway (docs/deployment/railway-demo.md). Railway terminates TLS at its
+# edge and forwards plain HTTP to $PORT; the API is reached over Railway's private network.
+# Rate limits, the dotfile and source-map refusals and the static-client headers are those of
+# infrastructure/nginx/templates/conf.d/ciphermesh.conf.template.
+
+# Railway's edge appends the visitor's address; trust it only from Railway's proxy range, so the
+# rate limits and the API see visitors, not the edge.
+set_real_ip_from 100.64.0.0/10;
+real_ip_header X-Real-IP;
+
+server {
+  listen ${PORT};
+  listen [::]:${PORT};
+  server_name _;
+
+  root /usr/share/nginx/html;
+  limit_conn cm_conn 30;
+
+  # Private-network DNS resolves the API at request time, so nginx starts before the API does.
+  resolver [fd12::10] valid=10s ipv6=on;
+  set $cm_api http://api.railway.internal:4100;
+
+  location = /nginx-health { access_log off; return 200 "ok"; }
+
+  location ~ /\. { return 404; }
+  location ~ \.map$ { return 404; }
+
+  location ~ ^/api/(auth/(login|register|mfa/verify|mfa/recovery|step-up|password)|mfa/) {
+    limit_req zone=cm_auth burst=10 nodelay;
+    include /etc/nginx/cm/api-proxy-railway.conf;
+  }
+  location = /api/directory/lookup {
+    limit_req zone=cm_lookup burst=10 nodelay;
+    include /etc/nginx/cm/api-proxy-railway.conf;
+  }
+  location /api/ {
+    limit_req zone=cm_api burst=100 nodelay;
+    include /etc/nginx/cm/api-proxy-railway.conf;
+  }
+  location = /api { return 404; }
+
+  location /_next/static/ {
+    include /etc/nginx/cm/static-headers.conf;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    try_files $uri =404;
+  }
+
+  location / {
+    include /etc/nginx/cm/static-headers.conf;
+    add_header Cache-Control "no-cache" always;
+    limit_except GET HEAD { deny all; }
+    try_files $uri $uri.html $uri/index.html =404;
+  }
+  error_page 404 /404.html;
+  location = /404.html {
+    internal;
+    include /etc/nginx/cm/static-headers.conf;
+    add_header Cache-Control "no-cache" always;
+  }
+}

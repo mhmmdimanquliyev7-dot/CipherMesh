@@ -13,6 +13,8 @@
 
 ARG NODE_IMAGE=node:24.19.0-alpine3.23@sha256:244cc2b53f46f9e876304391d17682b0ddae9ac33491f4857e25e35a36ba7995
 ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30.0-alpine3.23@sha256:808f7846d21a9c94cf53833e8807a00a33fd0b65cc47fb05b79efe366c2d201f
+# Selects the image Railway builds (final stage at the end of this file); the default is the web image.
+ARG CM_TARGET=web
 
 # ------------------------------------------------------------------------------------ build
 FROM ${NODE_IMAGE} AS build
@@ -94,3 +96,40 @@ COPY --from=build /src/apps/web/out/ /usr/share/nginx/html/
 RUN chmod -R a-w /usr/share/nginx/html /etc/nginx
 USER 101
 EXPOSE 80 443
+
+# ------------------------------------------------------------------------- web-railway (demo)
+# The web image for the Railway trial demonstration (docs/deployment/railway-demo.md): the same
+# static client and security headers, but plain HTTP behind Railway's TLS edge, listening on $PORT,
+# with the API reached over Railway's private network. No certificate files, no storage proxy.
+FROM web AS web-railway
+USER root
+RUN rm -rf /etc/nginx/templates/conf.d
+COPY infrastructure/railway/nginx.conf /etc/nginx/nginx.conf
+COPY infrastructure/railway/templates/ /etc/nginx/templates/
+COPY infrastructure/railway/api-proxy-railway.conf /etc/nginx/cm/api-proxy-railway.conf
+RUN chmod -R a-w /etc/nginx
+USER 101
+
+# ----------------------------------------------------------------- api-railway, ops-railway (demo)
+# The API image with a start script that writes the public database CA certificate from a variable
+# (Railway has no volume for it), and the one-off database initialization job (db-init.sh).
+FROM api AS api-railway
+USER root
+COPY infrastructure/railway/api-start.sh /usr/local/bin/cm-api-start
+RUN chmod 0555 /usr/local/bin/cm-api-start
+USER node
+ENTRYPOINT ["/usr/local/bin/cm-api-start"]
+CMD ["dist/server.js"]
+
+# One-off grant of PLATFORM_ADMIN (cm-platform-admin equivalent): a temporary service with
+# CM_GRANT_EMAIL, deleted afterwards. The account must already have MFA.
+FROM api-railway AS grant-railway
+ENTRYPOINT ["/bin/sh", "-c", "/usr/local/bin/cm-api-start dist/platform-admin.js grant \"$CM_GRANT_EMAIL\"; sleep 3600"]
+
+FROM ops AS ops-railway
+CMD ["sh", "infrastructure/railway/db-init.sh"]
+
+# ------------------------------------------------------------------------------- final target
+# Platforms that cannot pass --target (Railway) select the image with a build argument. Not
+# setting CM_TARGET builds the web image, as before.
+FROM ${CM_TARGET} AS final
