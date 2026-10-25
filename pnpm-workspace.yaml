@@ -22,7 +22,7 @@ catalog:
   prisma: 7.10.0
   '@prisma/client': 7.10.0
   '@prisma/adapter-pg': 7.10.0
-  pg: 8.23.0
+  pg: 8.23.1
 # Security overrides for the Prisma CLI tree (Phase 2 dependency audit). Prisma 7.10.0 pins
 # vulnerable versions; remove these when a Prisma 7 release ships patched ones.
 #   deepmerge-ts: GHSA-ggr8-5vv4-36mx (high). @prisma/config only calls `deepmerge`, unchanged in 8.x.
