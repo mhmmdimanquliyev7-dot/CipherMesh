@@ -44,7 +44,7 @@ services:
   # listing, no bucket creation or deletion, no other bucket. CORS answers only the application
   # origins, which browsers use for presigned PUT and GET (deployment-architecture.md).
   object-storage:
-    image: chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
     command:
       - server
       - -dir=/data
